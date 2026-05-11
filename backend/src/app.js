@@ -6,7 +6,9 @@ const morgan = require('morgan');
 const { errorHandler } = require('./middlewares/error.middleware');
 
 // Rutas
-const authRoutes = require('./routes/auth.routes');
+const authStaffRoutes = require('./routes/authStaff.routes');
+const authPatientRoutes = require('./routes/authPatient.routes');
+const activationRoutes = require('./routes/activation.routes');
 const userRoutes = require('./routes/user.routes');
 const patientRoutes = require('./routes/patient.routes');
 const serviceRoutes = require('./routes/service.routes');
@@ -31,8 +33,12 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Montar rutas
-app.use('/api/auth', authRoutes);
+// ===== AUTH (dos sistemas separados) =====
+app.use('/api/auth/staff', authStaffRoutes);       // Staff: email + password
+app.use('/api/auth/patient', authPatientRoutes);   // Paciente: doc + password
+app.use('/api/auth/activate', activationRoutes);   // Activación de cuentas
+
+// ===== RECURSOS =====
 app.use('/api/users', userRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/services', serviceRoutes);

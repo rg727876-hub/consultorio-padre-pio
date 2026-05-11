@@ -141,7 +141,7 @@ CREATE TABLE PACIENTE (
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     foto VARCHAR(255),
     fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_creacion_cuenta DATETIME NOT NULL,
+    fecha_creacion_cuenta DATETIME NULL,
     CONSTRAINT PK_PACIENTE PRIMARY KEY (paciente_id),
 	CONSTRAINT UQ_PACIENTE_DOCUMENTO UNIQUE (tipo_documento, numero_documento),
     CONSTRAINT UQ_PACIENTE_EMAIL_CUENTA UNIQUE (email_cuenta),
@@ -342,7 +342,7 @@ VALUES (
     '00000001',
     '999999999',
     'ACTIVO',
-    '$2b$10$YourHashHere.ReplaceThisWithARealBcryptHashOfAdmin123!'
+    '$2b$10$vNrK3VOQ1TwR8Yi8ws.0eO.kQ0qal/YfHmLE7uVSyRBQ2y9fktRDu'
 );
 
 -- Asignar rol ADMINISTRADOR al admin
