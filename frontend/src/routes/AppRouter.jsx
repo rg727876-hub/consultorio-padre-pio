@@ -1,36 +1,31 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import PrivateRoute from './PrivateRoute';
-import LoginPage from '../pages/LoginPage';
+import StaffLoginPage from '../pages/auth/StaffLoginPage';
+import ActivateAccountPage from '../pages/auth/ActivateAccountPage';
 import DashboardPage from '../pages/DashboardPage';
 
 export default function AppRouter() {
-    return (
+  return (
     <BrowserRouter>
-        <AuthProvider>
+      <AuthProvider>
         <Routes>
-          {/* Pública */}
-            <Route path="/login" element={<LoginPage />} />
+          {/* Públicas */}
+          <Route path="/login" element={<StaffLoginPage />} />
+          <Route path="/activate/:token" element={<ActivateAccountPage />} />
 
           {/* Protegidas */}
-            <Route path="/dashboard" element={
+          <Route path="/dashboard" element={
             <PrivateRoute>
-                <DashboardPage />
+              <DashboardPage />
             </PrivateRoute>
-            } />
+          } />
 
-          {/* Agrega más rutas conforme desarrolles cada módulo */}
-            {/*
-            <Route path="/patients" element={
-            <PrivateRoute roles={['ADMINISTRADOR', 'RECEPCIONISTA']}>
-                <PatientListPage />
-            </PrivateRoute>
-            } />
-          */}
+          {/* Agrega rutas conforme desarrolles cada módulo */}
 
-            <Route path="*" element={<Navigate to="/login" />} />
+          <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
-        </AuthProvider>
+      </AuthProvider>
     </BrowserRouter>
-    );
+  );
 }
