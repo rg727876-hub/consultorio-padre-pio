@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  UserPlus, Users, Calendar, Stethoscope,
+  UserPlus, Users, Calendar, Stethoscope, ClipboardList,
   CreditCard, BarChart2, LogOut, Menu, X,
   Home, ChevronRight,
 } from 'lucide-react';
@@ -32,6 +32,13 @@ const MODULOS = {
       icon:        Stethoscope,
       color:       'bg-green-50 text-green-700',
       ruta:        '/admin/servicios/nuevo',
+    },
+    {
+      label:       'Gestionar servicios',
+      descripcion: 'Ver, editar o cambiar el estado de los servicios',
+      icon:        ClipboardList,
+      color:       'bg-teal-50 text-teal-600',
+      ruta:        '/admin/servicios',
     },
     {
       label:       'Reportes',

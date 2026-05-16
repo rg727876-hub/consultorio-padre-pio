@@ -6,6 +6,7 @@ import ActivateAccountPage    from '../pages/auth/ActivateAccountPage';
 import DashboardPage          from '../pages/DashboardPage';
 import RegistroUsuario        from '../pages/admin/RegistroUsuario';
 import RegistroServicio       from '../pages/admin/RegistroServicio';
+import GestionarServicios     from '../pages/admin/GestionarServicios';
 
 export default function AppRouter() {
   return (
@@ -33,6 +34,12 @@ export default function AppRouter() {
           <Route path="/admin/servicios/nuevo" element={
             <PrivateRoute roles={['ADMINISTRADOR']}>
               <RegistroServicio />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/servicios" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <GestionarServicios />
             </PrivateRoute>
           } />
 
