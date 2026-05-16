@@ -27,12 +27,11 @@ const MODULOS = {
       proximamente: true,
     },
     {
-      label:       'Servicios',
-      descripcion: 'Administra los servicios dentales disponibles',
+      label:       'Registrar servicio',
+      descripcion: 'Agrega nuevos servicios dentales al sistema',
       icon:        Stethoscope,
       color:       'bg-green-50 text-green-700',
-      ruta:        '/admin/servicios',
-      proximamente: true,
+      ruta:        '/admin/servicios/nuevo',
     },
     {
       label:       'Reportes',
