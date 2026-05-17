@@ -83,7 +83,7 @@ export default function RegistroUsuario() {
     if (!form.rol)                e.rol      = 'Selecciona un rol';
     if (esDoctor) {
       if (!form.especialidad.trim())   e.especialidad   = 'Especialidad requerida';
-      if (!form.nroColegiatura.trim()) e.nroColegiatura = 'N° de colegiatura requerido';
+      if (!form.nroColegiatura.trim()) e.nroColegiatura = 'C.O.P requerido';
     }
     return e;
   };
@@ -209,7 +209,7 @@ export default function RegistroUsuario() {
                            onChange={handleChange}
                            placeholder="Ej. Ortodoncia" error={errors.especialidad} />
                   </Field>
-                  <Field label="N° Colegiatura *" error={errors.nroColegiatura}
+                  <Field label="C.O.P *" error={errors.nroColegiatura}
                          hint="Solo números">
                     <Input name="nroColegiatura" value={form.nroColegiatura}
                            onChange={handleChange}

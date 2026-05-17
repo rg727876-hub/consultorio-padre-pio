@@ -5,6 +5,9 @@ import StaffLoginPage         from '../pages/auth/StaffLoginPage';
 import ActivateAccountPage    from '../pages/auth/ActivateAccountPage';
 import DashboardPage          from '../pages/DashboardPage';
 import RegistroUsuario        from '../pages/admin/RegistroUsuario';
+import RegistroServicio       from '../pages/admin/RegistroServicio';
+import GestionarServicios     from '../pages/admin/GestionarServicios';
+import HorariosDoctor         from '../pages/admin/HorariosDoctor';
 
 export default function AppRouter() {
   return (
@@ -26,6 +29,24 @@ export default function AppRouter() {
           <Route path="/admin/usuarios/nuevo" element={
             <PrivateRoute roles={['ADMINISTRADOR']}>
               <RegistroUsuario />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/servicios/nuevo" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <RegistroServicio />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/servicios" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <GestionarServicios />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/horarios" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <HorariosDoctor />
             </PrivateRoute>
           } />
 

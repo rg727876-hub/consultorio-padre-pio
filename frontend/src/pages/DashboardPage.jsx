@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  UserPlus, Users, Calendar, Stethoscope,
+  UserPlus, Users, Calendar, Stethoscope, ClipboardList,
   CreditCard, BarChart2, LogOut, Menu, X,
-  Home, ChevronRight,
+  Home, ChevronRight, Clock,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -27,12 +27,25 @@ const MODULOS = {
       proximamente: true,
     },
     {
-      label:       'Servicios',
-      descripcion: 'Administra los servicios dentales disponibles',
+      label:       'Registrar servicio',
+      descripcion: 'Agrega nuevos servicios dentales al sistema',
       icon:        Stethoscope,
       color:       'bg-green-50 text-green-700',
+      ruta:        '/admin/servicios/nuevo',
+    },
+    {
+      label:       'Gestionar servicios',
+      descripcion: 'Ver, editar o cambiar el estado de los servicios',
+      icon:        ClipboardList,
+      color:       'bg-teal-50 text-teal-600',
       ruta:        '/admin/servicios',
-      proximamente: true,
+    },
+    {
+      label:       'Horarios de doctores',
+      descripcion: 'Define los bloques de disponibilidad semanal por doctor',
+      icon:        Clock,
+      color:       'bg-orange-50 text-orange-600',
+      ruta:        '/admin/horarios',
     },
     {
       label:       'Reportes',

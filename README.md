@@ -2,10 +2,13 @@
 
 Sistema web completo para la gestión integral de una clínica dental, desarrollado con **Node.js + Express** en el backend y **React + Vite** en el frontend.
 
+> ⚠️ **PROYECTO EN DESARROLLO** - Sprint 1: MVP Funcional en progreso
+
 ---
 
 ## 📋 Tabla de Contenidos
 
+- [Estado del Proyecto](#-estado-del-proyecto--roadmap)
 - [Características](#características)
 - [Requisitos del Sistema](#requisitos-del-sistema)
 - [Instalación](#instalación)
@@ -14,6 +17,35 @@ Sistema web completo para la gestión integral de una clínica dental, desarroll
 - [Estructura del Proyecto](#estructura-del-proyecto)
 - [API Endpoints](#api-endpoints)
 - [Informe Técnico](#informe-técnico)
+
+---
+
+## 🚀 Estado del Proyecto & Roadmap
+
+### Sprint 1: MVP Funcional (Vertical Slice)
+
+**Objetivo:** Implementar funcionalidades core del sistema para validar el flujo completo de negocio.
+
+#### Historias de Usuario en Desarrollo:
+
+| ID | Descripción | Estado |
+|----|-----------|---------| 
+| **INT-HU001** | Login seguro con email y contraseña | 🟢 Completada |
+| **INT-HU003** | Registro de nuevos usuarios por administrador | 🟢 Completada |
+| **INT-HU008** | Registrar nuevos servicios clínicos | 🟡 En Progreso |
+| **INT-HU007** | Definir y gestionar horarios de doctores | 🟡 En Progreso |
+| **INT-HU010** | Registrar pacientes por recepcionista | 🟡 En Progreso |
+| **INT-HU012** | Crear citas a pacientes registrados | 🟡 En Progreso |
+| **INT-HU021** | Registrar pagos de citas | 🟡 En Progreso |
+| **INT-HU013** | Listar y buscar citas existentes | 🟡 En Progreso |
+| **INT-HU014** | Visualizar información completa de cita | 🟡 En Progreso |
+| **INT-HU018** | Visualizar agenda de doctor con diferentes vistas | 🟡 En Progreso |
+
+**Leyenda:** 🟢 Completada | 🟡 En Progreso | 🔵 Planificado | ⚫ Bloqueado
+
+---
+
+## ✨ Características
 
 ---
 
@@ -539,7 +571,38 @@ curl http://localhost:4000/api/doctors -H "Authorization: Bearer TOKEN"
 
 ---
 
-## 📞 Contacto y Soporte
+## � Roadmap Futuro
+
+### Sprint 2: Gestión Integral
+- Gestión completa de usuarios y roles
+- Portal del paciente (WEB-HU001 - WEB-HU007)
+- Autenticación para pacientes
+- Dashboard personalizado por rol
+
+### Sprint 3: Reportes y Análisis
+- Reportes financieros con filtros por fecha
+- Gráficas de crecimiento y satisfacción
+- Exportación de reportes (PDF/Excel)
+- Dashboard de métricas clínicas
+
+### Sprint 4: Optimización y Producción
+- Tests automatizados (unit, integration)
+- Documentación OpenAPI/Swagger
+- Implementación de caché (Redis)
+- Optimización de performance
+- Despliegue a producción
+
+### Features Futuros
+- Notificaciones por SMS/Email a pacientes
+- Integración con pasarela de pago
+- Portal de pacientes móvil
+- Sistema de feedback y satisfacción
+- Telemedicina (videollamadas)
+- Integración con sistemas externos de facturación
+
+---
+
+## �📞 Contacto y Soporte
 
 Para problemas técnicos, contacta al equipo de desarrollo.
 
