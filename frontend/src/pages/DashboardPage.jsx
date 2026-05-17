@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, Users, Calendar, Stethoscope, ClipboardList,
   CreditCard, BarChart2, LogOut, Menu, X,
-  Home, ChevronRight,
+  Home, ChevronRight, Clock,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -39,6 +39,13 @@ const MODULOS = {
       icon:        ClipboardList,
       color:       'bg-teal-50 text-teal-600',
       ruta:        '/admin/servicios',
+    },
+    {
+      label:       'Horarios de doctores',
+      descripcion: 'Define los bloques de disponibilidad semanal por doctor',
+      icon:        Clock,
+      color:       'bg-orange-50 text-orange-600',
+      ruta:        '/admin/horarios',
     },
     {
       label:       'Reportes',
