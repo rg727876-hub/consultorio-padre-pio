@@ -1,5 +1,5 @@
 -- ============================================
--- DENTAL CLINIC SYSTEM - Database Schema FINAL
+-- DENTAL consultorio_padre_pio SYSTEM - Database Schema FINAL
 -- Versión integrada: lo mejor de ambos modelos
 -- 
 -- Decisiones de diseño:
@@ -12,7 +12,7 @@ DROP DATABASE IF EXISTS consultorio_padre_pio;
 CREATE DATABASE consultorio_padre_pio;
 USE consultorio_padre_pio;
 
--- ============================================
+-- ============================================haxl
 -- TABLA: USUARIO (personal interno de la clínica)
 -- ============================================
 CREATE TABLE USUARIO (
