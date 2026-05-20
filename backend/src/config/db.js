@@ -9,19 +9,16 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    timezone: '-05:00'  // Zona horaria de Perú
+    timezone: '-05:00'
 });
 
-// Verificar conexión al iniciar
 pool.getConnection()
     .then(conn => {
-        console.log('MySQL conectado — Base de datos:', process.env.DB_NAME);
+        console.log('MySQL conectado — BD:', process.env.DB_NAME);
         conn.release();
-    }
-)
+    })
     .catch(err => {
         console.error('Error conectando a MySQL:', err.message);
-    }
-);
+    });
 
 module.exports = pool;

@@ -1,36 +1,58 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from '../context/AuthContext';
-import PrivateRoute from './PrivateRoute';
-import LoginPage from '../pages/LoginPage';
-import DashboardPage from '../pages/DashboardPage';
+import { AuthProvider }       from '../context/AuthContext';
+import PrivateRoute           from './PrivateRoute';
+import StaffLoginPage         from '../pages/auth/StaffLoginPage';
+import ActivateAccountPage    from '../pages/auth/ActivateAccountPage';
+import DashboardPage          from '../pages/DashboardPage';
+import RegistroUsuario        from '../pages/admin/RegistroUsuario';
+import RegistroServicio       from '../pages/admin/RegistroServicio';
+import GestionarServicios     from '../pages/admin/GestionarServicios';
+import HorariosDoctor         from '../pages/admin/HorariosDoctor';
 
 export default function AppRouter() {
-    return (
+  return (
     <BrowserRouter>
-        <AuthProvider>
+      <AuthProvider>
         <Routes>
-          {/* Pública */}
-            <Route path="/login" element={<LoginPage />} />
+          {/* ── Públicas ── */}
+          <Route path="/login"              element={<StaffLoginPage />} />
+          <Route path="/activate/:token"    element={<ActivateAccountPage />} />
 
-          {/* Protegidas */}
-            <Route path="/dashboard" element={
+          {/* ── Protegidas (cualquier staff autenticado) ── */}
+          <Route path="/dashboard" element={
             <PrivateRoute>
-                <DashboardPage />
+              <DashboardPage />
             </PrivateRoute>
-            } />
+          } />
 
-          {/* Agrega más rutas conforme desarrolles cada módulo */}
-            {/*
-            <Route path="/patients" element={
-            <PrivateRoute roles={['ADMINISTRADOR', 'RECEPCIONISTA']}>
-                <PatientListPage />
+          {/* ── Solo Administrador ── */}
+          <Route path="/admin/usuarios/nuevo" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <RegistroUsuario />
             </PrivateRoute>
-            } />
-          */}
+          } />
 
-            <Route path="*" element={<Navigate to="/login" />} />
+          <Route path="/admin/servicios/nuevo" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <RegistroServicio />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/servicios" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <GestionarServicios />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/horarios" element={
+            <PrivateRoute roles={['ADMINISTRADOR']}>
+              <HorariosDoctor />
+            </PrivateRoute>
+          } />
+
+          <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
-        </AuthProvider>
+      </AuthProvider>
     </BrowserRouter>
-    );
+  );
 }

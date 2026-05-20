@@ -1,8 +1,8 @@
 const pool = require('../config/db');
 
 /**
- * Registra una acción en la tabla AUDITORIA
- * Coincide con tu esquema: usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen
+ * Registra en tabla AUDITORIA
+ * Campos: usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen
  */
 const logAudit = async ({
     usuario_id = null,
@@ -14,10 +14,10 @@ const logAudit = async ({
     ip_origen = null
 }) => {
     try {
-    await pool.execute(
-        `INSERT INTO AUDITORIA
+        await pool.execute(
+            `INSERT INTO AUDITORIA
             (usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen]
     );
     } catch (err) {
