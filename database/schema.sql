@@ -8,9 +8,9 @@
 -- - CONSULTA_CLINICA: 1 por cita atendida, contiene los datos clínicos de esa visita
 -- ============================================
 
-DROP DATABASE IF EXISTS clinica_padre_pio;
-CREATE DATABASE clinica_padre_pio;
-USE clinica_padre_pio;
+DROP DATABASE IF EXISTS consultorio_padre_pio;
+CREATE DATABASE consultorio_padre_pio;
+USE consultorio_padre_pio;
 
 -- ============================================
 -- TABLA: USUARIO (personal interno de la clínica)
@@ -141,7 +141,7 @@ CREATE TABLE PACIENTE (
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     foto VARCHAR(255),
     fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_creacion_cuenta DATETIME NULL,
+    fecha_creacion_cuenta DATETIME NOT NULL,
     CONSTRAINT PK_PACIENTE PRIMARY KEY (paciente_id),
 	CONSTRAINT UQ_PACIENTE_DOCUMENTO UNIQUE (tipo_documento, numero_documento),
     CONSTRAINT UQ_PACIENTE_EMAIL_CUENTA UNIQUE (email_cuenta),
@@ -247,16 +247,21 @@ CREATE TABLE PAGO (
     usuario_id INT NULL,
     fecha_pago DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     monto_total DECIMAL(10, 2) NOT NULL,
-    metodo_pago ENUM('YAPE', 'EFECTIVO', 'TARJETA', 'PLIN', 'MERCADOPAGO_ONLINE') NOT NULL,
+    metodo_pago ENUM('YAPE', 'EFECTIVO', 'TARJETA_PRESENCIAL', 'PLIN', 'TARJETA_ONLINE') NOT NULL,
     cambio DECIMAL(10, 2) DEFAULT 0,             -- útil para pagos en efectivo
     numero_operacion VARCHAR(100) NULL,          -- número de operación local (Yape, Plin, tarjeta presencial)
-    referencia_externa VARCHAR(100) NULL,        -- ID de transacción de MercadoPago
+    
+    culqi_charge_id VARCHAR(100) NULL,
+    culqi_outcome_code VARCHAR(50) NULL,  -- para saber por qué falló si falla
+    ultimos_4_tarjeta CHAR(4) NULL,
+    marca_tarjeta VARCHAR(20) NULL,
+    
     estado ENUM('PENDIENTE', 'COMPLETADO', 'FALLIDO') NOT NULL DEFAULT 'PENDIENTE',
     CONSTRAINT PK_PAGO PRIMARY KEY (pago_id),
     CONSTRAINT FK_PAGO_CITA FOREIGN KEY (cita_id) REFERENCES CITA(cita_id),
     CONSTRAINT FK_PAGO_USUARIO FOREIGN KEY (usuario_id) REFERENCES USUARIO(usuario_id),
     CONSTRAINT UK_PAGO_CITA UNIQUE (cita_id)
-);
+); 
 
 -- ============================================
 -- TABLA: COMPROBANTE
@@ -270,6 +275,17 @@ CREATE TABLE COMPROBANTE (
     fecha_emision DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     estado ENUM('EMITIDO', 'ANULADO') NOT NULL DEFAULT 'EMITIDO',
     monto_final DECIMAL(10, 2) NOT NULL,
+    nubefact_id VARCHAR(50) NULL,
+    nubefact_cpe_url VARCHAR(500) NULL,
+    nubefact_pdf_url VARCHAR(500) NULL,
+    nubefact_hash VARCHAR(255) NULL,
+    nubefact_aceptado_sunat BOOLEAN DEFAULT NULL,
+    subtotal_exonerado DECIMAL(10,2) DEFAULT 0,  -- para tu caso (servicios médicos)
+    igv DECIMAL(10,2) DEFAULT 0,  -- siempre 0 pero documentas la exoneración
+    cliente_ruc CHAR(11) NULL,
+    cliente_razon_social VARCHAR(200) NULL,
+    enviado_correo BOOLEAN DEFAULT FALSE,
+    fecha_envio_correo DATETIME NULL,
     CONSTRAINT PK_COMPROBANTE PRIMARY KEY (comprobante_id),
     CONSTRAINT FK_COMPROBANTE_PAGO FOREIGN KEY (pago_id) REFERENCES PAGO(pago_id),
     CONSTRAINT UK_COMPROBANTE_SERIE_NUMERO UNIQUE (serie, numero)
@@ -319,8 +335,6 @@ CREATE INDEX idx_paciente_documento ON PACIENTE(tipo_documento);
 CREATE INDEX idx_consulta_doctor ON CONSULTA_CLINICA(firmado_por_doctor_id);
 CREATE INDEX idx_consulta_historia ON CONSULTA_CLINICA(historia_id);
 CREATE INDEX idx_token_usuario ON TOKEN_ACTIVACION(usuario_id);
-
-
 -- ============================================================
 -- DATOS INICIALES (SEED)
 -- ============================================================
