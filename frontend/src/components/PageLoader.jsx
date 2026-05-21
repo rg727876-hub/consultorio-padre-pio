@@ -3,12 +3,23 @@ import { Loader2, ServerCrash, RefreshCw } from 'lucide-react';
 
 export default function PageLoader({ loading, error, onRetry, children }) {
   const [slow, setSlow] = useState(false);
+  const [retried, setRetried] = useState(false);
 
   useEffect(() => {
     if (!loading) { setSlow(false); return; }
     const t = setTimeout(() => setSlow(true), 6000);
     return () => clearTimeout(t);
   }, [loading]);
+
+  // Auto-retry once after error (covers Render Free Tier cold-start timeout)
+  useEffect(() => {
+    if (!error || !onRetry || retried) return;
+    const t = setTimeout(() => {
+      setRetried(true);
+      onRetry();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [error, onRetry, retried]);
 
   if (loading) {
     return (
@@ -37,17 +48,23 @@ export default function PageLoader({ loading, error, onRetry, children }) {
           <p className="text-slate-700 font-medium text-sm">
             No se pudo conectar con el servidor
           </p>
-          <p className="text-xs text-slate-400">
-            El servidor pudo no haber terminado de iniciar. Intenta de nuevo.
-          </p>
-          {onRetry && (
-            <button
-              onClick={onRetry}
-              className="inline-flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99]
-                         text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <RefreshCw size={14} /> Reintentar
-            </button>
+          {!retried && onRetry ? (
+            <p className="text-xs text-slate-400">Reintentando automáticamente…</p>
+          ) : (
+            <>
+              <p className="text-xs text-slate-400">
+                El servidor pudo no haber terminado de iniciar. Intenta de nuevo.
+              </p>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="inline-flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99]
+                             text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  <RefreshCw size={14} /> Reintentar
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
