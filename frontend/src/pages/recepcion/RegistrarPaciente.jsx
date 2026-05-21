@@ -38,7 +38,7 @@ export default function RegistrarPaciente() {
     if (name === 'nombre' || name === 'apellido')
       value = soloLetras(rawValue);
 
-    if (name === 'telefono')
+    if (name === 'telefono' || name === 'contacto_emergencia')
       value = soloNumeros(rawValue, 9);
 
     if (name === 'numero_documento' && form.tipo_documento === 'DNI')
@@ -67,6 +67,12 @@ export default function RegistrarPaciente() {
       e.telefono = 'El teléfono debe tener exactamente 9 dígitos';
 
     if (!form.sexo) e.sexo = 'Selecciona el sexo';
+
+    if (form.fecha_nacimiento) {
+      const hoy = new Date().toLocaleDateString('en-CA');
+      if (form.fecha_nacimiento >= hoy)
+        e.fecha_nacimiento = 'La fecha de nacimiento debe ser anterior al día de hoy';
+    }
 
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
       e.email = 'Correo electrónico inválido';
@@ -181,7 +187,8 @@ export default function RegistrarPaciente() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Fecha de nacimiento" error={errors.fecha_nacimiento}>
                 <Input type="date" name="fecha_nacimiento" value={form.fecha_nacimiento}
-                       onChange={handleChange} error={errors.fecha_nacimiento} />
+                       onChange={handleChange} error={errors.fecha_nacimiento}
+                       max={(() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString('en-CA'); })()} />
               </Field>
               <Field label="Correo electrónico" error={errors.email}>
                 <Input type="email" name="email" value={form.email}
@@ -202,10 +209,11 @@ export default function RegistrarPaciente() {
                 <Input name="ocupacion" value={form.ocupacion} onChange={handleChange}
                        placeholder="Ej. Docente" />
               </Field>
-              <Field label="Contacto de emergencia">
+              <Field label="Contacto de emergencia" hint="9 dígitos">
                 <Input name="contacto_emergencia" value={form.contacto_emergencia}
                        onChange={handleChange}
-                       placeholder="Nombre y teléfono" />
+                       placeholder="987654321" maxLength={9}
+                       inputMode="numeric" />
               </Field>
             </div>
 
