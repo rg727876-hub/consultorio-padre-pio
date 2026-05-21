@@ -34,6 +34,17 @@ const register = async (req, res) => {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim()))
     return res.status(400).json({ error: 'El correo electrónico no es válido' });
 
+  if (contacto_emergencia && !/^\d{9}$/.test(String(contacto_emergencia).trim()))
+    return res.status(400).json({ error: 'El contacto de emergencia debe tener exactamente 9 dígitos' });
+
+  if (fecha_nacimiento) {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const dob = new Date(fecha_nacimiento + 'T00:00:00');
+    if (dob >= hoy)
+      return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
+  }
+
   // ── Insertar ─────────────────────────────────────────────────
   try {
     const paciente_id = await create({
