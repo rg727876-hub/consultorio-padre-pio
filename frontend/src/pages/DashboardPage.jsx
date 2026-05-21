@@ -63,7 +63,6 @@ const MODULOS = {
       icon:        UserPlus,
       color:       'bg-blue-50 text-[#0059B3]',
       ruta:        '/recepcion/pacientes/nuevo',
-      proximamente: true,
     },
     {
       label:       'Agendar cita',
