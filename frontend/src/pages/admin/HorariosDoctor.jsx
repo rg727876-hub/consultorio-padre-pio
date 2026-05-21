@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, startTransition } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Plus, Pencil, Trash2, X, Check,
@@ -224,7 +224,7 @@ export default function HorariosDoctor() {
           ) : (
             <select
               value={doctorId}
-              onChange={(e) => setDoctorId(e.target.value)}
+              onChange={(e) => { const v = e.target.value; startTransition(() => setDoctorId(v)); }}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm
                          focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40
                          min-w-[260px]"
