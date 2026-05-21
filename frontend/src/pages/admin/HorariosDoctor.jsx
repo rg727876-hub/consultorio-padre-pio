@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Plus, Pencil, Trash2, X, Check,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import PageLoader from '../../components/PageLoader';
 
 const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
 const DIAS_LABEL = {
@@ -28,6 +29,7 @@ export default function HorariosDoctor() {
   const [doctor, setDoctor]           = useState(null);
   const [horarios, setHorarios]       = useState([]);
   const [loadingDoc, setLoadingDoc]   = useState(true);
+  const [errorDoc, setErrorDoc]       = useState(false);
   const [loadingHor, setLoadingHor]   = useState(false);
 
   // modal: null | 'create' | 'edit' | 'delete'
@@ -38,7 +40,9 @@ export default function HorariosDoctor() {
   const [saving, setSaving]           = useState(false);
 
   // ── Cargar doctores ──────────────────────────────────────────────
-  useEffect(() => {
+  const loadDoctors = useCallback(() => {
+    setLoadingDoc(true);
+    setErrorDoc(false);
     api.get('/doctors')
       .then(({ data }) => {
         setDoctors(data);
@@ -51,9 +55,11 @@ export default function HorariosDoctor() {
           }
         }
       })
-      .catch(() => toast.error('No se pudo cargar la lista de doctores'))
+      .catch(() => setErrorDoc(true))
       .finally(() => setLoadingDoc(false));
   }, []);
+
+  useEffect(() => { loadDoctors(); }, [loadDoctors]);
 
   // ── Cargar horarios cuando cambia el doctor ──────────────────────
   useEffect(() => {
@@ -183,6 +189,7 @@ export default function HorariosDoctor() {
   const totalActivos = horarios.filter((h) => h.estado === 'ACTIVO').length;
 
   return (
+    <PageLoader loading={loadingDoc} error={errorDoc} onRetry={loadDoctors}>
     <div className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="max-w-6xl mx-auto">
 
@@ -365,6 +372,7 @@ export default function HorariosDoctor() {
         </Modal>
       )}
     </div>
+    </PageLoader>
   );
 }
 
