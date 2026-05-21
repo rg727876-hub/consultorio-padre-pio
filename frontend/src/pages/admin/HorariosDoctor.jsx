@@ -45,10 +45,11 @@ export default function HorariosDoctor() {
     setErrorDoc(false);
     api.get('/doctors')
       .then(({ data }) => {
-        setDoctors(data);
+        const list = Array.isArray(data) ? data : [];
+        setDoctors(list);
         const pre = searchParams.get('doctor_id');
         if (pre) {
-          const found = data.find((d) => String(d.doctor_id) === pre);
+          const found = list.find((d) => String(d.doctor_id) === pre);
           if (found) {
             setDoctorId(String(found.doctor_id));
             setDoctor(found);
@@ -68,14 +69,14 @@ export default function HorariosDoctor() {
     setDoctor(found ?? null);
     setLoadingHor(true);
     api.get(`/schedules?doctor_id=${doctorId}`)
-      .then(({ data }) => setHorarios(data))
+      .then(({ data }) => setHorarios(Array.isArray(data) ? data : []))
       .catch(() => toast.error('No se pudo cargar los horarios'))
       .finally(() => setLoadingHor(false));
   }, [doctorId]);
 
   const refetchHorarios = async () => {
     const { data } = await api.get(`/schedules?doctor_id=${doctorId}`);
-    setHorarios(data);
+    setHorarios(Array.isArray(data) ? data : []);
   };
 
   // ── Abrir modales ────────────────────────────────────────────────

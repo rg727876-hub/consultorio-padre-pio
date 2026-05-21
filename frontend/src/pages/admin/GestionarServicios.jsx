@@ -38,8 +38,9 @@ export default function GestionarServicios() {
     setLoadError(false);
     try {
       const { data } = await api.get('/services/all');
-      setServicios(data);
-      setFiltered(data);
+      const list = Array.isArray(data) ? data : [];
+      setServicios(list);
+      setFiltered(list);
     } catch {
       setLoadError(true);
     } finally {

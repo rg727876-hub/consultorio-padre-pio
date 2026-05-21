@@ -10,11 +10,11 @@ import RegistroServicio       from '../pages/admin/RegistroServicio';
 import GestionarServicios     from '../pages/admin/GestionarServicios';
 import HorariosDoctor         from '../pages/admin/HorariosDoctor';
 
-// Wrapper inside BrowserRouter so we can use useLocation to reset the ErrorBoundary on navigation
+// Wrapper inside BrowserRouter so we can use useLocation to reset ErrorBoundary on navigation
 function RouterContent() {
   const { pathname } = useLocation();
   return (
-    <ErrorBoundary key={pathname}>
+    <ErrorBoundary resetKey={pathname}>
       <Routes>
         {/* ── Públicas ── */}
         <Route path="/login"              element={<StaffLoginPage />} />
