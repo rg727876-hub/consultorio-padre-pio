@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import PageLoader from '../../components/PageLoader';
 
 const soloLetras  = (v) => v.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
 const soloEntero  = (v) => v.replace(/\D/g, '');
@@ -30,14 +31,17 @@ export default function GestionarServicios() {
   const [saving, setSaving]           = useState(false);
   const [serverError, setServerError] = useState('');
 
+  const [loadError, setLoadError] = useState(false);
+
   const fetchServicios = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data } = await api.get('/services/all');
       setServicios(data);
       setFiltered(data);
     } catch {
-      toast.error('No se pudo cargar la lista de servicios');
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -173,6 +177,7 @@ export default function GestionarServicios() {
   };
 
   return (
+    <PageLoader loading={loading} error={loadError} onRetry={fetchServicios}>
     <div className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="max-w-5xl mx-auto">
 
@@ -449,6 +454,7 @@ export default function GestionarServicios() {
         </div>
       )}
     </div>
+    </PageLoader>
   );
 }
 
