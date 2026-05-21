@@ -393,7 +393,7 @@ export default function GestionarServicios() {
                   name="imagen"
                   value={editForm.imagen}
                   onChange={handleEditChange}
-                  placeholder="https://..."
+                  placeholder=""
                   className={inputCls()}
                 />
               </EField>
