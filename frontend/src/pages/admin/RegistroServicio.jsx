@@ -10,8 +10,6 @@ const INITIAL = {
   duracion:    '',
   costo:       '',
   buffer:      '0',
-  imagen:      '',
-  estado:      'ACTIVO',
 };
 
 const soloLetras  = (v) => v.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
@@ -72,8 +70,7 @@ export default function RegistroServicio() {
         duracion:    Number(form.duracion),
         costo:       Number(form.costo),
         buffer:      Number(form.buffer),
-        imagen:      form.imagen.trim() || undefined,
-        estado:      form.estado,
+        estado:      'ACTIVO',
       });
       toast.success(data.message || 'Servicio registrado');
       setForm(INITIAL);
@@ -165,34 +162,6 @@ export default function RegistroServicio() {
                 </div>
               </Field>
             </div>
-
-            <SectionTitle>Opciones adicionales</SectionTitle>
-
-            {/* Imagen */}
-            <Field label="URL de imagen" hint="opcional">
-              <Input name="imagen" value={form.imagen} onChange={handleChange}
-                     placeholder="https://..." />
-            </Field>
-
-            {/* Estado */}
-            <Field label="Estado inicial">
-              <div className="flex gap-4">
-                {['ACTIVO', 'INACTIVO'].map((op) => (
-                  <label key={op}
-                         className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
-                    <input
-                      type="radio"
-                      name="estado"
-                      value={op}
-                      checked={form.estado === op}
-                      onChange={handleChange}
-                      className="accent-[#0059B3] w-4 h-4"
-                    />
-                    {op === 'ACTIVO' ? 'Activo' : 'Inactivo'}
-                  </label>
-                ))}
-              </div>
-            </Field>
 
             {/* Error servidor */}
             {serverError && (
