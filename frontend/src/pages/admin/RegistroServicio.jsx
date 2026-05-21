@@ -9,7 +9,7 @@ const INITIAL = {
   descripcion: '',
   duracion:    '',
   costo:       '',
-  buffer:      '0',
+  buffer:      '5',
 };
 
 const soloLetras  = (v) => v.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
@@ -27,7 +27,7 @@ export default function RegistroServicio() {
   const handleChange = (e) => {
     let { name, value } = e.target;
     if (name === 'nombre')                         value = soloLetras(value);
-    if (name === 'duracion' || name === 'buffer')  value = soloEntero(value);
+    if (name === 'duracion')  value = soloEntero(value);
     if (name === 'costo')                          value = soloDecimal(value);
     setForm((p) => ({ ...p, [name]: value }));
     setErrors((p) => ({ ...p, [name]: '' }));
@@ -48,10 +48,6 @@ export default function RegistroServicio() {
     const cos = Number(form.costo);
     if (!form.costo || cos <= 0)
       e.costo = 'Ingresa un precio mayor a 0';
-
-    const buf = Number(form.buffer);
-    if (form.buffer === '' || buf < 0 || !Number.isInteger(buf))
-      e.buffer = 'Ingresa 0 o un número entero positivo';
 
     return e;
   };
@@ -137,9 +133,13 @@ export default function RegistroServicio() {
               </Field>
 
               {/* Buffer */}
-              <Field label="Tiempo de espera" error={errors.buffer} hint="minutos">
-                <Input name="buffer" value={form.buffer} onChange={handleChange}
-                       placeholder="0" inputMode="numeric" error={errors.buffer} />
+              <Field label="Tiempo de espera" hint="minutos">
+                <select name="buffer" value={form.buffer} onChange={handleChange}
+                        className={selectCls()}>
+                  {[0, 5, 10, 15, 20].map((v) => (
+                    <option key={v} value={String(v)}>{v}</option>
+                  ))}
+                </select>
               </Field>
 
               {/* Costo */}
@@ -214,6 +214,14 @@ function Field({ label, error, hint, children }) {
         : hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
     </div>
   );
+}
+
+function selectCls(error) {
+  const border = error
+    ? 'border-red-400 focus:ring-red-300'
+    : 'border-slate-300 focus:ring-[#0059B3]/40';
+  return `w-full border ${border} rounded-lg px-3 py-2 text-sm bg-white
+          focus:outline-none focus:ring-2 transition-shadow`;
 }
 
 function Input({ error, ...props }) {
