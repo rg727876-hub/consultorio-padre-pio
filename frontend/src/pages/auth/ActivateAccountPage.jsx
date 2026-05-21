@@ -40,21 +40,38 @@ export default function ActivateAccountPage() {
       .finally(() => setTokenLoading(false));
   }, [token]);
 
-  // ── Submit final ─────────────────────────────────────────────
+  // ── Submit ───────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
+    // ── Paso 1: verificar DNI contra backend ──
     if (step === 1) {
       if (!/^\d{8}$/.test(DNI)) {
         setErrorMsg('El DNI debe tener exactamente 8 dígitos');
         return;
       }
-      setStep(2);
+      setLoading(true);
+      try {
+        await api.post('/auth/activate/verify-dni', { token, DNI });
+        setStep(2);
+      } catch (err) {
+        const data   = err.response?.data;
+        const status = err.response?.status;
+        if (status === 401) {
+          setIntentosRest(data?.intentosRestantes ?? 0);
+          setDNI('');
+        } else if (status === 403) {
+          setIntentosRest(0);
+        }
+        setErrorMsg(data?.error || 'El DNI ingresado no coincide');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
-    // Step 2
+    // ── Paso 2: crear contraseña y activar ──
     if (password.length < 8) {
       setErrorMsg('La contraseña debe tener mínimo 8 caracteres');
       return;
@@ -70,20 +87,8 @@ export default function ActivateAccountPage() {
       toast.success('¡Cuenta activada! Ya puedes iniciar sesión.');
       navigate('/login');
     } catch (err) {
-      const data   = err.response?.data;
-      const status = err.response?.status;
-
-      if (status === 401) {
-        // DNI incorrecto → volver al paso 1
-        setIntentosRest(data?.intentosRestantes ?? 0);
-        setDNI('');
-        setStep(1);
-        setErrorMsg(data?.error || 'El DNI ingresado no coincide');
-      } else if (status === 403) {
-        setErrorMsg(data?.error || 'Enlace bloqueado');
-      } else {
-        setErrorMsg(data?.error || 'Error al activar la cuenta');
-      }
+      const data = err.response?.data;
+      setErrorMsg(data?.error || 'Error al activar la cuenta');
     } finally {
       setLoading(false);
     }
