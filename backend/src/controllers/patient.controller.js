@@ -92,4 +92,30 @@ const register = async (req, res) => {
   }
 };
 
-module.exports = { register };
+// GET /api/patients/search?q=xxx
+const search = async (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  if (q.length < 2)
+    return res.status(400).json({ error: 'Ingresa al menos 2 caracteres para buscar' });
+
+  try {
+    const like = `%${q}%`;
+    const [rows] = await pool.query(
+      `SELECT paciente_id, nombre, apellido,
+              tipo_documento, numero_documento,
+              telefono, sexo, fecha_nacimiento
+       FROM   PACIENTE
+       WHERE  estado = 'ACTIVO'
+         AND  (numero_documento LIKE ? OR nombre LIKE ? OR apellido LIKE ?)
+       ORDER  BY apellido, nombre
+       LIMIT  10`,
+      [like, like, like]
+    );
+    return res.json(rows);
+  } catch (err) {
+    console.error('[patient.search]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { register, search };

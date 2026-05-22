@@ -71,7 +71,6 @@ const MODULOS = {
       icon:        Calendar,
       color:       'bg-green-50 text-green-700',
       ruta:        '/recepcion/citas/nueva',
-      proximamente: true,
     },
   ],
   DOCTOR: [
