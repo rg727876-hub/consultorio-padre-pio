@@ -1,10 +1,11 @@
-const { Router }    = require('express');
+const { Router }      = require('express');
 const { verifyToken } = require('../middlewares/auth.middleware');
-const { checkRole } = require('../middlewares/role.middleware');
-const { register }  = require('../controllers/patient.controller');
+const { checkRole }   = require('../middlewares/role.middleware');
+const { register, search } = require('../controllers/patient.controller');
 
 const router = Router();
 
-router.post('/', verifyToken, checkRole('RECEPCIONISTA', 'ADMINISTRADOR'), register);
+router.get('/search', verifyToken, checkRole('RECEPCIONISTA', 'ADMINISTRADOR'), search);
+router.post('/',      verifyToken, checkRole('RECEPCIONISTA', 'ADMINISTRADOR'), register);
 
 module.exports = router;
