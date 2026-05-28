@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, UserPlus, ChevronLeft } from 'lucide-react';
+import { Loader2, UserPlus } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import AppLayout from '../../components/AppLayout';
 
 const TIPOS_DOC = [
   { value: 'DNI',       label: 'DNI' },
@@ -25,8 +25,6 @@ const soloLetras  = (v) => v.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g,
 const soloNumeros = (v, max) => v.replace(/\D/g, '').slice(0, max);
 
 export default function RegistrarPaciente() {
-  const navigate = useNavigate();
-
   const [form, setForm]             = useState(INITIAL);
   const [loading, setLoading]       = useState(false);
   const [errors, setErrors]         = useState({});
@@ -115,20 +113,13 @@ export default function RegistrarPaciente() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-8">
+    <AppLayout>
+    <div className="px-4 py-8">
       <div className="max-w-2xl mx-auto">
 
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="p-2 rounded-lg hover:bg-slate-200 transition-colors text-slate-500"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-[#0059B3]">Registrar nuevo paciente</h1>
-            <p className="text-sm text-slate-500">Los campos marcados con * son obligatorios</p>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-[#0059B3]">Registrar nuevo paciente</h1>
+          <p className="text-sm text-slate-500">Los campos marcados con * son obligatorios</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -243,6 +234,7 @@ export default function RegistrarPaciente() {
         </form>
       </div>
     </div>
+    </AppLayout>
   );
 }
 

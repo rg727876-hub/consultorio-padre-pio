@@ -1,12 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import {
   UserPlus, Users, Calendar, Stethoscope, ClipboardList,
-  CreditCard, BarChart2, LogOut, Menu, X,
-  Home, ChevronRight, Clock,
+  CreditCard, BarChart2, ChevronRight, Clock, Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import logo from '../assets/images/Logo-Consultorio-Padre-Pio.png';
+import api from '../api/axios';
+import AppLayout from '../components/AppLayout';
 
 // ── Módulos por rol ──────────────────────────────────────────────
 const MODULOS = {
@@ -19,11 +19,11 @@ const MODULOS = {
       ruta:        '/admin/usuarios/nuevo',
     },
     {
-      label:       'Gestionar usuarios',
-      descripcion: 'Ver, editar o desactivar cuentas del personal',
-      icon:        Users,
-      color:       'bg-indigo-50 text-indigo-600',
-      ruta:        '/admin/usuarios',
+      label:        'Gestionar usuarios',
+      descripcion:  'Ver, editar o desactivar cuentas del personal',
+      icon:         Users,
+      color:        'bg-indigo-50 text-indigo-600',
+      ruta:         '/admin/usuarios',
       proximamente: true,
     },
     {
@@ -39,7 +39,6 @@ const MODULOS = {
       icon:        ClipboardList,
       color:       'bg-teal-50 text-teal-600',
       ruta:        '/admin/servicios',
-      proximamente: true,
     },
     {
       label:       'Horarios de doctores',
@@ -49,11 +48,11 @@ const MODULOS = {
       ruta:        '/admin/horarios',
     },
     {
-      label:       'Reportes',
-      descripcion: 'Estadísticas de atenciones y facturación',
-      icon:        BarChart2,
-      color:       'bg-purple-50 text-purple-600',
-      ruta:        '/admin/reportes',
+      label:        'Reportes',
+      descripcion:  'Estadísticas de atenciones y facturación',
+      icon:         BarChart2,
+      color:        'bg-purple-50 text-purple-600',
+      ruta:         '/admin/reportes',
       proximamente: true,
     },
   ],
@@ -75,21 +74,21 @@ const MODULOS = {
   ],
   DOCTOR: [
     {
-      label:       'Mis citas',
-      descripcion: 'Ver agenda del día y próximas citas',
-      icon:        Calendar,
-      color:       'bg-blue-50 text-[#0059B3]',
-      ruta:        '/doctor/citas',
+      label:        'Mis citas',
+      descripcion:  'Ver agenda del día y próximas citas',
+      icon:         Calendar,
+      color:        'bg-blue-50 text-[#0059B3]',
+      ruta:         '/doctor/citas',
       proximamente: true,
     },
   ],
   CAJERO: [
     {
-      label:       'Registrar pago',
-      descripcion: 'Procesar cobros de consultas',
-      icon:        CreditCard,
-      color:       'bg-green-50 text-green-700',
-      ruta:        '/caja/pagos/nuevo',
+      label:        'Registrar pago',
+      descripcion:  'Procesar cobros de consultas',
+      icon:         CreditCard,
+      color:        'bg-green-50 text-green-700',
+      ruta:         '/caja/pagos/nuevo',
       proximamente: true,
     },
   ],
@@ -104,101 +103,55 @@ const ROL_LABELS = {
 
 // ── Componente principal ─────────────────────────────────────────
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
-  const navigate         = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { user }   = useAuth();
+  const navigate   = useNavigate();
+  const modulos    = MODULOS[user?.rol] ?? [];
 
-  const modulos = MODULOS[user?.rol] ?? [];
+  const [stats, setStats] = useState({ servicios: null, doctores: null });
+
+  useEffect(() => {
+    if (user?.rol !== 'ADMINISTRADOR') return;
+    Promise.all([api.get('/services'), api.get('/doctors')])
+      .then(([svc, doc]) => setStats({
+        servicios: Array.isArray(svc.data) ? svc.data.length : 0,
+        doctores:  Array.isArray(doc.data) ? doc.data.length  : 0,
+      }))
+      .catch(() => {});
+  }, [user?.rol]);
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-
-      {/* ── Topbar ── */}
-      <header className="bg-[#0059B3] text-white shadow-md sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-
-          {/* Logo + nombre */}
-          <div className="flex items-center gap-3">
-            <img
-              src={logo}
-              alt="Padre Pio"
-              className="h-9 w-auto object-contain brightness-0 invert"
-              onError={(e) => (e.currentTarget.style.display = 'none')}
-            />
-            <div className="hidden sm:block leading-tight">
-              <p className="text-sm font-bold tracking-tight">Consultorio Padre Pio</p>
-              <p className="text-[10px] text-blue-200 uppercase tracking-widest">
-                Sistema de gestión
-              </p>
-            </div>
-          </div>
-
-          {/* Info usuario + logout (desktop) */}
-          <div className="hidden sm:flex items-center gap-4">
-            <div className="text-right leading-tight">
-              <p className="text-sm font-semibold">
-                {user?.nombre} {user?.apellido}
-              </p>
-              <p className="text-xs text-blue-200">
-                {ROL_LABELS[user?.rol] ?? user?.rol}
-              </p>
-            </div>
-            <button
-              onClick={logout}
-              title="Cerrar sesión"
-              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20
-                         px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-            >
-              <LogOut size={15} />
-              Salir
-            </button>
-          </div>
-
-          {/* Menú hamburguesa (mobile) */}
-          <button
-            className="sm:hidden p-1"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-        </div>
-
-        {/* Menú mobile desplegable */}
-        {menuOpen && (
-          <div className="sm:hidden bg-[#004a99] px-4 py-3 border-t border-blue-400 space-y-3">
-            <p className="text-sm font-semibold">
-              {user?.nombre} {user?.apellido}
-            </p>
-            <p className="text-xs text-blue-200">{ROL_LABELS[user?.rol]}</p>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 text-sm text-white/80 hover:text-white"
-            >
-              <LogOut size={15} /> Cerrar sesión
-            </button>
-          </div>
-        )}
-      </header>
-
-      {/* ── Contenido principal ── */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
+    <AppLayout>
+      <div className="px-4 py-8 max-w-6xl mx-auto w-full">
 
         {/* Bienvenida */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-            <Home size={12} />
-            <ChevronRight size={12} />
-            <span>Panel principal</span>
-          </div>
+        <div className="mb-6">
           <h2 className="text-2xl font-bold text-slate-800">
             Bienvenido, {user?.nombre}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             {user?.rol === 'ADMINISTRADOR'
-              ? 'Tienes acceso completo al sistema. ¿Qué deseas hacer hoy?'
+              ? '¿Qué deseas hacer hoy?'
               : `Estás en el panel de ${ROL_LABELS[user?.rol]?.toLowerCase()}.`}
           </p>
         </div>
+
+        {/* Stats — solo ADMINISTRADOR */}
+        {user?.rol === 'ADMINISTRADOR' && (
+          <div className="grid grid-cols-2 gap-4 mb-8 max-w-xs">
+            <StatCard
+              label="Servicios activos"
+              value={stats.servicios}
+              icon={Stethoscope}
+              colorClass="bg-green-50 text-green-600"
+            />
+            <StatCard
+              label="Doctores"
+              value={stats.doctores}
+              icon={Users}
+              colorClass="bg-blue-50 text-[#0059B3]"
+            />
+          </div>
+        )}
 
         {/* Tarjetas de módulos */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -238,12 +191,29 @@ export default function DashboardPage() {
           })}
         </div>
 
-      </main>
+      </div>
 
-      {/* ── Footer ── */}
       <footer className="text-center text-[11px] text-slate-400 py-4">
         © {new Date().getFullYear()} Consultorio Padre Pio · Todos los derechos reservados
       </footer>
+    </AppLayout>
+  );
+}
+
+function StatCard({ label, value, icon: Icon, colorClass }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClass}`}>
+        <Icon size={20} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xl font-bold text-slate-800 leading-none">
+          {value === null
+            ? <Loader2 size={16} className="animate-spin text-slate-300" />
+            : value}
+        </p>
+        <p className="text-xs text-slate-500 mt-1 leading-tight">{label}</p>
+      </div>
     </div>
   );
 }

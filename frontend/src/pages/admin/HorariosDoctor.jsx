@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, startTransition } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
-  ChevronLeft, Plus, Pencil, Trash2, X, Check,
+  Plus, Pencil, Trash2, X, Check,
   Loader2, CalendarDays, UserRound, AlertCircle,
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import PageLoader from '../../components/PageLoader';
+import AppLayout from '../../components/AppLayout';
 
 const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
 const DIAS_LABEL = {
@@ -22,7 +23,6 @@ const EMPTY_FORM = { dia_semana: 'LUNES', hora_inicio: '', hora_fin: '', estado:
 
 export default function HorariosDoctor() {
   const [searchParams]  = useSearchParams();
-  const navigate        = useNavigate();
 
   const [doctors, setDoctors]         = useState([]);
   const [doctorId, setDoctorId]       = useState('');
@@ -190,24 +190,17 @@ export default function HorariosDoctor() {
   const totalActivos = horarios.filter((h) => h.estado === 'ACTIVO').length;
 
   return (
+    <AppLayout>
     <PageLoader loading={loadingDoc} error={errorDoc} onRetry={loadDoctors}>
-    <div className="min-h-screen bg-slate-100 px-4 py-8">
+    <div className="px-4 py-8">
       <div className="max-w-6xl mx-auto">
 
         {/* ── Encabezado ── */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="p-2 rounded-lg hover:bg-slate-200 transition-colors text-slate-500"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-[#0059B3]">Horarios y disponibilidad</h1>
-            <p className="text-sm text-slate-500">
-              Define los bloques horarios semanales de cada doctor
-            </p>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-[#0059B3]">Horarios y disponibilidad</h1>
+          <p className="text-sm text-slate-500">
+            Define los bloques horarios semanales de cada doctor
+          </p>
         </div>
 
         {/* ── Selector de doctor ── */}
@@ -374,6 +367,7 @@ export default function HorariosDoctor() {
       )}
     </div>
     </PageLoader>
+    </AppLayout>
   );
 }
 

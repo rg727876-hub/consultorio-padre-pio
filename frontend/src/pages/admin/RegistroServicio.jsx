@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, ChevronLeft, Stethoscope } from 'lucide-react';
+import { Loader2, Stethoscope } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import AppLayout from '../../components/AppLayout';
 
 const INITIAL = {
   nombre:      '',
@@ -17,8 +17,6 @@ const soloEntero  = (v) => v.replace(/\D/g, '');
 const soloDecimal = (v) => v.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
 
 export default function RegistroServicio() {
-  const navigate = useNavigate();
-
   const [form, setForm]               = useState(INITIAL);
   const [loading, setLoading]         = useState(false);
   const [errors, setErrors]           = useState({});
@@ -79,19 +77,14 @@ export default function RegistroServicio() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-8">
+    <AppLayout>
+    <div className="px-4 py-8">
       <div className="max-w-xl mx-auto">
 
         {/* Encabezado */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate('/dashboard')}
-                  className="p-2 rounded-lg hover:bg-slate-200 transition-colors text-slate-500">
-            <ChevronLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-[#0059B3]">Registrar nuevo servicio</h1>
-            <p className="text-sm text-slate-500">Completa los datos del servicio dental</p>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-[#0059B3]">Registrar nuevo servicio</h1>
+          <p className="text-sm text-slate-500">Completa los datos del servicio dental</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -191,6 +184,7 @@ export default function RegistroServicio() {
         </form>
       </div>
     </div>
+    </AppLayout>
   );
 }
 
