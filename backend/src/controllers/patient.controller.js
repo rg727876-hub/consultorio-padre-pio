@@ -12,7 +12,6 @@ const register = async (req, res) => {
     email, fecha_nacimiento, direccion, ocupacion, contacto_emergencia,
   } = req.body;
 
-  // ── Validaciones obligatorias ────────────────────────────────
   if (!nombre?.trim() || !apellido?.trim() || !tipo_documento ||
       !numero_documento?.trim() || !telefono || !sexo)
     return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' });
@@ -45,7 +44,6 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
   }
 
-  // ── Insertar ─────────────────────────────────────────────────
   try {
     const paciente_id = await create({
       nombre:               String(nombre).trim(),
@@ -118,4 +116,80 @@ const search = async (req, res) => {
   }
 };
 
-module.exports = { register, search };
+// GET /api/patients/:id
+const getById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    const [[paciente]] = await pool.query(
+      `SELECT paciente_id, nombre, apellido, tipo_documento, numero_documento,
+              telefono, sexo,
+              DATE_FORMAT(fecha_nacimiento, '%Y-%m-%d') AS fecha_nacimiento,
+              email, direccion, ocupacion, contacto_emergencia
+       FROM   PACIENTE
+       WHERE  paciente_id = ? AND estado = 'ACTIVO'`,
+      [id]
+    );
+    if (!paciente)
+      return res.status(404).json({ error: 'Paciente no encontrado' });
+
+    return res.json(paciente);
+  } catch (err) {
+    console.error('[patient.getById]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// PUT /api/patients/:id
+// Solo actualiza datos de contacto (teléfono, email, dirección, ocupación, contacto emergencia).
+// Nombre, apellido, sexo, fecha de nacimiento y documento son datos de identidad — no se modifican.
+const update = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: 'ID inválido' });
+
+  const { telefono, email, direccion, ocupacion, contacto_emergencia } = req.body;
+
+  if (!telefono)
+    return res.status(400).json({ error: 'El teléfono es requerido' });
+
+  const telefonoLimpio = String(telefono).replace(/\D/g, '');
+  if (!/^\d{9}$/.test(telefonoLimpio))
+    return res.status(400).json({ error: 'El teléfono debe tener exactamente 9 dígitos' });
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim()))
+    return res.status(400).json({ error: 'El correo electrónico no es válido' });
+
+  if (contacto_emergencia && !/^\d{9}$/.test(String(contacto_emergencia).trim()))
+    return res.status(400).json({ error: 'El contacto de emergencia debe tener exactamente 9 dígitos' });
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE PACIENTE
+       SET telefono = ?, email = ?, direccion = ?, ocupacion = ?, contacto_emergencia = ?
+       WHERE paciente_id = ? AND estado = 'ACTIVO'`,
+      [
+        telefonoLimpio,
+        email               ? String(email).trim().toLowerCase() : null,
+        direccion           ? String(direccion).trim()            : null,
+        ocupacion           ? String(ocupacion).trim()            : null,
+        contacto_emergencia ? String(contacto_emergencia).trim()  : null,
+        id,
+      ]
+    );
+
+    if (result.affectedRows === 0)
+      return res.status(404).json({ error: 'Paciente no encontrado' });
+
+    return res.json({ message: 'Datos de contacto actualizados correctamente' });
+
+  } catch (err) {
+    console.error('[patient.update]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  }
+};
+
+module.exports = { register, search, getById, update };

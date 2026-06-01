@@ -346,17 +346,17 @@ INSERT INTO ROL (nombre_rol) VALUES
     ('DOCTOR'),
     ('CAJERO');
 
--- Usuario administrador por defecto
--- Email: admin@clinica.com | Password: Admin123!
+-- Usuario administrador
+-- Email: consultoripadrepio@gmail.com | Password: consultorio@padrepio123
 INSERT INTO USUARIO (nombre, apellido, email, DNI, telefono, estado, password_hash)
 VALUES (
     'Admin',
-    'Sistema',
-    'admin@clinica.com',
+    'Consultorio',
+    'consultoripadrepio@gmail.com',
     '00000001',
     '999999999',
     'ACTIVO',
-    '$2b$10$vNrK3VOQ1TwR8Yi8ws.0eO.kQ0qal/YfHmLE7uVSyRBQ2y9fktRDu'
+    '$2b$10$8ekeEhx0Abi9VOQp/hkFgOC0.2HY2zCIGHDpGZ2uOkhwcHaMHLUuO'
 );
 
 -- Asignar rol ADMINISTRADOR al admin
@@ -364,7 +364,7 @@ INSERT INTO ROL_USUARIO (rol_id, usuario_id)
 SELECT r.rol_id, u.usuario_id
 FROM ROL r, USUARIO u
 WHERE r.nombre_rol = 'ADMINISTRADOR'
-  AND u.email = 'admin@clinica.com';
+  AND u.email = 'consultoripadrepio@gmail.com';
 
 -- Servicios dentales de ejemplo
 INSERT INTO SERVICIO (nombre, descripcion, duracion, costo, buffer, estado) VALUES
