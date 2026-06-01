@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  UserPlus, Calendar, Stethoscope, ClipboardList,
+  UserPlus, Calendar, Stethoscope, ClipboardList, CreditCard,
   LogOut, Menu, X, Home, Clock, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -21,7 +21,10 @@ const NAV = {
     { label: 'Agendar cita',       icon: Calendar, ruta: '/recepcion/citas/nueva' },
   ],
   DOCTOR:  [{ label: 'Inicio', icon: Home, ruta: '/dashboard' }],
-  CAJERO:  [{ label: 'Inicio', icon: Home, ruta: '/dashboard' }],
+  CAJERO: [
+    { label: 'Inicio',          icon: Home,       ruta: '/dashboard'      },
+    { label: 'Registrar pago',  icon: CreditCard, ruta: '/caja/pagos/nuevo' },
+  ],
 };
 
 const ROL_LABELS = {

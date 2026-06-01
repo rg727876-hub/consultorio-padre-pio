@@ -84,12 +84,11 @@ const MODULOS = {
   ],
   CAJERO: [
     {
-      label:        'Registrar pago',
-      descripcion:  'Procesar cobros de consultas',
-      icon:         CreditCard,
-      color:        'bg-green-50 text-green-700',
-      ruta:         '/caja/pagos/nuevo',
-      proximamente: true,
+      label:       'Registrar pago',
+      descripcion: 'Procesar cobros de consultas y confirmar citas',
+      icon:        CreditCard,
+      color:       'bg-green-50 text-green-700',
+      ruta:        '/caja/pagos/nuevo',
     },
   ],
 };
