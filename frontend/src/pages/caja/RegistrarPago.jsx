@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, Loader2, CreditCard, Banknote, Smartphone,
-  CheckCircle2, Check, RefreshCw, X,
+  CheckCircle2, Check, RefreshCw, X, FileText,
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -19,6 +20,8 @@ const MARCAS = ['VISA', 'MASTERCARD', 'AMEX', 'DINERS'];
 const fmt = (n) => `S/ ${Number(n).toFixed(2)}`;
 
 export default function RegistrarPago() {
+  const navigate = useNavigate();
+
   // ── Búsqueda ─────────────────────────────────────────────────
   const [busqueda, setBusqueda]         = useState('');
   const [buscando, setBuscando]         = useState(false);
@@ -172,14 +175,24 @@ export default function RegistrarPago() {
                 <InfoRow label="Monto cobrado"  value={fmt(cita.precio_aplicado)} />
                 <InfoRow label="Método"         value={METODOS.find(m => m.value === metodo)?.label} />
               </div>
-              <button
-                onClick={resetAll}
-                className="inline-flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99]
-                           text-white text-sm font-semibold px-5 py-2.5 rounded-lg
-                           transition-colors"
-              >
-                <RefreshCw size={15} /> Registrar otro pago
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <button
+                  onClick={() => navigate(`/caja/comprobantes/nuevo?pago_id=${confirmado.pago_id}`)}
+                  className="inline-flex items-center gap-2 bg-[#8BC63F] hover:bg-[#78ae35]
+                             text-white text-sm font-semibold px-5 py-2.5 rounded-lg
+                             transition-colors"
+                >
+                  <FileText size={15} /> Generar comprobante
+                </button>
+                <button
+                  onClick={resetAll}
+                  className="inline-flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99]
+                             text-white text-sm font-semibold px-5 py-2.5 rounded-lg
+                             transition-colors"
+                >
+                  <RefreshCw size={15} /> Registrar otro pago
+                </button>
+              </div>
             </div>
           ) : (
             <>

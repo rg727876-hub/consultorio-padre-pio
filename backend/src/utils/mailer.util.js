@@ -99,4 +99,115 @@ const sendActivationEmail = async (to, nombre, token) => {
   });
 };
 
-module.exports = { sendActivationEmail };
+const sendComprobanteEmail = async (comp) => {
+  const label  = comp.tipo_comprobante === 'FACTURA' ? 'Factura' : 'Boleta';
+  const numero = `${comp.serie}-${comp.numero}`;
+  const monto  = `S/ ${Number(comp.monto_final).toFixed(2)}`;
+  const fecha  = new Date(comp.fecha_emision).toLocaleDateString('es-PE', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+
+  const pdfLink = comp.nubefact_pdf_url
+    ? `<p style="margin:0 0 12px;font-size:14px;text-align:center;">
+         <a href="${comp.nubefact_pdf_url}"
+            style="background:#0059B3;color:#fff;padding:12px 28px;border-radius:8px;
+                   text-decoration:none;font-weight:700;display:inline-block;">
+           Ver / Descargar ${label}
+         </a>
+       </p>`
+    : `<p style="margin:0 0 12px;font-size:13px;color:#64748b;text-align:center;">
+         (Comprobante en modo DEMO — sin enlace de descarga)
+       </p>`;
+
+  await transporter.sendMail({
+    from:    process.env.MAIL_FROM,
+    to:      comp.paciente_email,
+    subject: `Tu ${label} ${numero} — Consultorio Padre Pio`,
+    html: `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table width="520" cellpadding="0" cellspacing="0"
+               style="background:#ffffff;border-radius:12px;overflow:hidden;
+                      box-shadow:0 2px 8px rgba(0,0,0,.08);">
+          <tr>
+            <td style="background:#0059B3;padding:28px 32px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">
+                Consultorio Padre Pio
+              </h1>
+              <p style="margin:4px 0 0;color:#b3d4ff;font-size:12px;text-transform:uppercase;letter-spacing:1px;">
+                Comprobante de Pago
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <p style="margin:0 0 16px;font-size:16px;color:#1e293b;">
+                Hola, <strong>${comp.paciente_nombre}</strong>
+              </p>
+              <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+                Adjunto encontrarás tu <strong>${label} Electrónica ${numero}</strong>
+                por el servicio recibido en nuestro consultorio.
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0"
+                     style="background:#f8fafc;border:1px solid #e2e8f0;
+                            border-radius:8px;margin-bottom:24px;">
+                <tr><td style="padding:16px 20px;">
+                  <table width="100%">
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Comprobante</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${label} ${numero}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Servicio</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${comp.servicio_nombre}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Fecha de emisión</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${fecha}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:15px;font-weight:700;color:#0059B3;padding:10px 0 4px;">Total pagado</td>
+                      <td style="font-size:15px;font-weight:700;color:#0059B3;text-align:right;padding:10px 0 4px;">
+                        ${monto}
+                      </td>
+                    </tr>
+                  </table>
+                </td></tr>
+              </table>
+
+              ${pdfLink}
+
+              <p style="margin:20px 0 0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                Si tienes dudas sobre este comprobante, comunícate con nosotros.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#94a3b8;">
+                © ${new Date().getFullYear()} Consultorio Padre Pio · Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+};
+
+module.exports = { sendActivationEmail, sendComprobanteEmail };

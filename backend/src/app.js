@@ -15,7 +15,8 @@ const serviceRoutes = require('./routes/service.routes');
 const doctorRoutes = require('./routes/doctor.routes');
 const scheduleRoutes = require('./routes/schedule.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
-const paymentRoutes = require('./routes/payment.routes');
+const paymentRoutes      = require('./routes/payment.routes');
+const comprobanteRoutes  = require('./routes/comprobante.routes');
 
 const app = express();
 
@@ -48,7 +49,8 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/appointments', appointmentRoutes);
-app.use('/api/payments', paymentRoutes);
+app.use('/api/payments',     paymentRoutes);
+app.use('/api/comprobantes', comprobanteRoutes);
 
 // Manejo de errores
 app.use(errorHandler);

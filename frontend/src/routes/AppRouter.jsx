@@ -12,6 +12,8 @@ import HorariosDoctor         from '../pages/admin/HorariosDoctor';
 import RegistrarPaciente      from '../pages/recepcion/RegistrarPaciente';
 import AgendarCita            from '../pages/recepcion/AgendarCita';
 import RegistrarPago          from '../pages/caja/RegistrarPago';
+import ListaPagos             from '../pages/caja/ListaPagos';
+import GenerarComprobante     from '../pages/caja/GenerarComprobante';
 
 // Wrapper inside BrowserRouter so we can use useLocation to reset ErrorBoundary on navigation
 function RouterContent() {
@@ -72,6 +74,18 @@ function RouterContent() {
         <Route path="/caja/pagos/nuevo" element={
           <PrivateRoute roles={['CAJERO', 'ADMINISTRADOR']}>
             <RegistrarPago />
+          </PrivateRoute>
+        } />
+
+        <Route path="/caja/pagos" element={
+          <PrivateRoute roles={['CAJERO', 'ADMINISTRADOR']}>
+            <ListaPagos />
+          </PrivateRoute>
+        } />
+
+        <Route path="/caja/comprobantes/nuevo" element={
+          <PrivateRoute roles={['CAJERO', 'ADMINISTRADOR']}>
+            <GenerarComprobante />
           </PrivateRoute>
         } />
 
