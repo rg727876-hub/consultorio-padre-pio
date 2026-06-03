@@ -24,9 +24,9 @@ const searchAppointment = async (req, res) => {
         CONCAT(p.nombre, ' ', p.apellido)              AS paciente_nombre,
         p.tipo_documento,
         p.numero_documento,
-        p.telefono                                      AS paciente_telefono,
-        s.nombre                                        AS servicio_nombre,
-        CONCAT('Dr. ', u.apellido, ', ', u.nombre)      AS doctor_nombre,
+        p.telefono                                  AS paciente_telefono,
+        s.nombre                                    AS servicio_nombre,
+        CONCAT('Dr. ', u.apellido, ', ', u.nombre)    AS doctor_nombre,
         d.especialidad
       FROM  CITA     c
       JOIN  PACIENTE p ON c.paciente_id = p.paciente_id
@@ -151,4 +151,129 @@ const registerPayment = async (req, res) => {
   }
 };
 
-module.exports = { searchAppointment, registerPayment };
+// GET /api/payments?fecha_inicio=&fecha_fin=&page=1
+// Lista pagos COMPLETADOS con estado de comprobante para el cajero
+const getPayments = async (req, res) => {
+  const { fecha_inicio, fecha_fin, page = 1 } = req.query;
+  const limit  = 20;
+  const offset = (Number(page) - 1) * limit;
+
+  let dateFilter = '';
+  const params   = [];
+
+  if (fecha_inicio && fecha_fin) {
+    dateFilter = 'AND DATE(p.fecha_pago) BETWEEN ? AND ?';
+    params.push(fecha_inicio, fecha_fin);
+  } else if (fecha_inicio) {
+    dateFilter = 'AND DATE(p.fecha_pago) >= ?';
+    params.push(fecha_inicio);
+  } else if (fecha_fin) {
+    dateFilter = 'AND DATE(p.fecha_pago) <= ?';
+    params.push(fecha_fin);
+  }
+
+  try {
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM PAGO p
+       WHERE p.estado = 'COMPLETADO' ${dateFilter}`,
+      params
+    );
+
+    const [rows] = await pool.query(
+      `SELECT
+         p.pago_id,
+         p.monto_total,
+         p.metodo_pago,
+         p.fecha_pago,
+         c.cita_id,
+         c.codigo_cita,
+         c.fecha          AS cita_fecha,
+         TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
+         CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre,
+         pat.tipo_documento,
+         pat.numero_documento,
+         pat.email        AS paciente_email,
+         s.nombre         AS servicio_nombre,
+         comp.comprobante_id,
+         comp.tipo_comprobante,
+         comp.serie,
+         comp.numero,
+         comp.estado      AS comprobante_estado,
+         comp.nubefact_pdf_url
+       FROM   PAGO     p
+       JOIN   CITA     c   ON p.cita_id     = c.cita_id
+       JOIN   PACIENTE pat ON c.paciente_id  = pat.paciente_id
+       JOIN   SERVICIO s   ON c.servicio_id  = s.servicio_id
+       LEFT JOIN COMPROBANTE comp ON comp.pago_id = p.pago_id
+                                  AND comp.estado = 'EMITIDO'
+       WHERE  p.estado = 'COMPLETADO' ${dateFilter}
+       ORDER  BY p.fecha_pago DESC
+       LIMIT  ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    res.json({
+      data:  rows,
+      total: Number(total),
+      page:  Number(page),
+      pages: Math.ceil(Number(total) / limit),
+    });
+  } catch (err) {
+    console.error('[payment.getPayments]', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// GET /api/payments/:id
+// Detalle de un pago con datos para generar comprobante
+const getPaymentById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [[pago]] = await pool.query(
+      `SELECT
+         p.pago_id,
+         p.monto_total,
+         p.metodo_pago,
+         p.fecha_pago,
+         p.estado         AS pago_estado,
+         c.cita_id,
+         c.codigo_cita,
+         c.fecha          AS cita_fecha,
+         TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
+         TIME_FORMAT(c.hora_fin,   '%H:%i') AS hora_fin,
+         CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre,
+         pat.tipo_documento,
+         pat.numero_documento,
+         pat.email        AS paciente_email,
+         pat.telefono     AS paciente_telefono,
+         s.nombre         AS servicio_nombre,
+         CONCAT('Dr. ', u.apellido, ', ', u.nombre) AS doctor_nombre,
+         comp.comprobante_id,
+         comp.tipo_comprobante,
+         comp.serie,
+         comp.numero,
+         comp.estado      AS comprobante_estado,
+         comp.nubefact_pdf_url,
+         comp.nubefact_cpe_url
+       FROM   PAGO     p
+       JOIN   CITA     c   ON p.cita_id     = c.cita_id
+       JOIN   PACIENTE pat ON c.paciente_id  = pat.paciente_id
+       JOIN   SERVICIO s   ON c.servicio_id  = s.servicio_id
+       JOIN   DOCTOR   d   ON c.doctor_id    = d.doctor_id
+       JOIN   USUARIO  u   ON d.doctor_id    = u.usuario_id
+       LEFT JOIN COMPROBANTE comp ON comp.pago_id = p.pago_id
+                                  AND comp.estado = 'EMITIDO'
+       WHERE  p.pago_id = ?`,
+      [Number(id)]
+    );
+
+    if (!pago) return res.status(404).json({ error: 'Pago no encontrado' });
+    res.json(pago);
+  } catch (err) {
+    console.error('[payment.getPaymentById]', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { searchAppointment, registerPayment, getPayments, getPaymentById };

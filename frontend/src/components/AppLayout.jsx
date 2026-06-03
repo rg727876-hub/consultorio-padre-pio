@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   UserPlus, Calendar, Stethoscope, ClipboardList, CreditCard,
-  LogOut, Menu, X, Home, Clock, ChevronRight,
+  LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/images/Logo-Consultorio-Padre-Pio.png';
@@ -22,8 +22,9 @@ const NAV = {
   ],
   DOCTOR:  [{ label: 'Inicio', icon: Home, ruta: '/dashboard' }],
   CAJERO: [
-    { label: 'Inicio',          icon: Home,       ruta: '/dashboard'      },
-    { label: 'Registrar pago',  icon: CreditCard, ruta: '/caja/pagos/nuevo' },
+    { label: 'Inicio',           icon: Home,       ruta: '/dashboard'           },
+    { label: 'Registrar pago',   icon: CreditCard, ruta: '/caja/pagos/nuevo'    },
+    { label: 'Pagos y comprobantes', icon: Receipt,ruta: '/caja/pagos'          },
   ],
 };
 
