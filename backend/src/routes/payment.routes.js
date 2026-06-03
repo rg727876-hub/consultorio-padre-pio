@@ -6,9 +6,9 @@ const { searchAppointment, registerPayment } = require('../controllers/payment.c
 const router = Router();
 
 // GET /api/payments/search-appointment?q=:term
-router.get('/search-appointment', verifyToken, checkRole('CAJERO', 'ADMINISTRADOR'), searchAppointment);
+router.get('/search-appointment', verifyToken, checkRole('CAJERO'), searchAppointment);
 
 // POST /api/payments
-router.post('/', verifyToken, checkRole('CAJERO', 'ADMINISTRADOR'), registerPayment);
+router.post('/', verifyToken, checkRole('CAJERO'), registerPayment);
 
 module.exports = router;

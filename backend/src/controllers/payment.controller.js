@@ -21,17 +21,18 @@ const searchAppointment = async (req, res) => {
         c.precio_aplicado,
         c.estado,
         c.fecha_creacion,
-        CONCAT(p.nombre, ' ', p.apellido)          AS paciente_nombre,
+        CONCAT(p.nombre, ' ', p.apellido)              AS paciente_nombre,
         p.tipo_documento,
         p.numero_documento,
-        p.telefono                                  AS paciente_telefono,
-        s.nombre                                    AS servicio_nombre,
-        CONCAT('Dr. ', d.apellido, ', ', d.nombre)  AS doctor_nombre,
+        p.telefono                                      AS paciente_telefono,
+        s.nombre                                        AS servicio_nombre,
+        CONCAT('Dr. ', u.apellido, ', ', u.nombre)      AS doctor_nombre,
         d.especialidad
       FROM  CITA     c
       JOIN  PACIENTE p ON c.paciente_id = p.paciente_id
       JOIN  SERVICIO s ON c.servicio_id  = s.servicio_id
       JOIN  DOCTOR   d ON c.doctor_id    = d.doctor_id
+      JOIN  USUARIO  u ON d.doctor_id    = u.usuario_id
       WHERE c.estado = 'RESERVADA'
         AND (
           c.codigo_cita         = ?

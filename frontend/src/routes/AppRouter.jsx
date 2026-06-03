@@ -70,7 +70,7 @@ function RouterContent() {
 
         {/* ── Cajero y Administrador ── */}
         <Route path="/caja/pagos/nuevo" element={
-          <PrivateRoute roles={['CAJERO', 'ADMINISTRADOR']}>
+          <PrivateRoute roles={['CAJERO']}>
             <RegistrarPago />
           </PrivateRoute>
         } />
