@@ -99,10 +99,75 @@ const sendActivationEmail = async (to, nombre, token) => {
   });
 };
 
+// Documento de boleta/factura independiente (mismo formato que la versión imprimible).
+// Se adjunta al correo como archivo HTML para que el cliente lo pueda guardar o imprimir como PDF.
+const buildComprobanteDocHtml = (comp) => {
+  const label   = comp.tipo_comprobante === 'FACTURA' ? 'Factura' : 'Boleta';
+  const numero  = `${comp.serie}-${comp.numero}`;
+  const monto   = Number(comp.monto_final).toFixed(2);
+  const subtotal = Number(comp.subtotal_exonerado ?? comp.monto_final).toFixed(2);
+  const igv     = Number(comp.igv ?? 0).toFixed(2);
+  const fecha   = new Date(comp.fecha_emision).toLocaleDateString('es-PE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  });
+  const esFactura = comp.tipo_comprobante === 'FACTURA';
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${label} ${numero}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; max-width: 420px; margin: 24px auto; font-size: 13px; color: #1e293b; }
+    .header { text-align: center; margin-bottom: 16px; }
+    .clinic-name { font-size: 17px; font-weight: bold; }
+    .comp-type { font-size: 15px; font-weight: bold; color: #0059B3; margin-top: 4px; }
+    .comp-num { font-size: 13px; color: #475569; margin-top: 2px; }
+    .demo-badge { display: inline-block; margin-top: 8px; background: #fef3c7; border: 1px solid #f59e0b; padding: 3px 10px; border-radius: 4px; font-size: 11px; color: #92400e; }
+    .divider { border: none; border-top: 1px dashed #94a3b8; margin: 12px 0; }
+    .row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+    .row .label { color: #64748b; flex-shrink: 0; }
+    .row .val { text-align: right; font-weight: 500; }
+    .total-row { display: flex; justify-content: space-between; padding: 6px 0 0; font-size: 16px; font-weight: bold; }
+    .total-row .amount { color: #0059B3; }
+    .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8; }
+    @media print { body { margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="clinic-name">Consultorio Padre Pío</div>
+    <div class="comp-type">${label} Electrónica</div>
+    <div class="comp-num">${numero}</div>
+    ${comp.nubefact_pdf_url ? '' : '<span class="demo-badge">MODO DEMO — Sin validez ante SUNAT</span>'}
+  </div>
+  <hr class="divider">
+  <div class="row"><span class="label">Fecha:</span><span class="val">${fecha}</span></div>
+  <div class="row"><span class="label">Paciente:</span><span class="val">${comp.paciente_nombre || '—'}</span></div>
+  <div class="row"><span class="label">Documento:</span><span class="val">${comp.tipo_documento}: ${comp.numero_documento}</span></div>
+  ${esFactura && comp.cliente_ruc ? `<div class="row"><span class="label">RUC:</span><span class="val">${comp.cliente_ruc}</span></div><div class="row"><span class="label">Razón social:</span><span class="val">${comp.cliente_razon_social || ''}</span></div>` : ''}
+  <div class="row"><span class="label">Servicio:</span><span class="val">${comp.servicio_nombre || '—'}</span></div>
+  <div class="row"><span class="label">Método de pago:</span><span class="val">${comp.metodo_pago || '—'}</span></div>
+  <hr class="divider">
+  <div class="row"><span class="label">Subtotal exonerado (Ap. II Ley IGV):</span><span class="val">S/ ${subtotal}</span></div>
+  <div class="row"><span class="label">IGV (exonerado):</span><span class="val">S/ ${igv}</span></div>
+  <hr class="divider">
+  <div class="total-row"><span>TOTAL</span><span class="amount">S/ ${monto}</span></div>
+  <div class="footer">
+    <p>Comprobante emitido electrónicamente</p>
+    <p>Gracias por su preferencia</p>
+  </div>
+</body>
+</html>`;
+};
+
 const sendComprobanteEmail = async (comp) => {
   const label  = comp.tipo_comprobante === 'FACTURA' ? 'Factura' : 'Boleta';
   const numero = `${comp.serie}-${comp.numero}`;
   const monto  = `S/ ${Number(comp.monto_final).toFixed(2)}`;
+  const subtotal = `S/ ${Number(comp.subtotal_exonerado ?? comp.monto_final).toFixed(2)}`;
+  const igv      = `S/ ${Number(comp.igv ?? 0).toFixed(2)}`;
   const fecha  = new Date(comp.fecha_emision).toLocaleDateString('es-PE', {
     day: '2-digit', month: 'long', year: 'numeric',
   });
@@ -116,13 +181,20 @@ const sendComprobanteEmail = async (comp) => {
          </a>
        </p>`
     : `<p style="margin:0 0 12px;font-size:13px;color:#64748b;text-align:center;">
-         (Comprobante en modo DEMO — sin enlace de descarga)
+         Encontrarás tu ${label.toLowerCase()} adjunta a este correo. Ábrela para verla o imprimirla.
        </p>`;
+
+  const docHtml  = buildComprobanteDocHtml(comp);
 
   await transporter.sendMail({
     from:    process.env.MAIL_FROM,
     to:      comp.paciente_email,
     subject: `Tu ${label} ${numero} — Consultorio Padre Pio`,
+    attachments: [{
+      filename:    `${label}_${comp.serie}-${comp.numero}.html`,
+      content:     docHtml,
+      contentType: 'text/html; charset=utf-8',
+    }],
     html: `
 <!DOCTYPE html>
 <html lang="es">
@@ -166,6 +238,12 @@ const sendComprobanteEmail = async (comp) => {
                       </td>
                     </tr>
                     <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Documento</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${comp.tipo_documento}: ${comp.numero_documento}
+                      </td>
+                    </tr>
+                    <tr>
                       <td style="font-size:13px;color:#64748b;padding:4px 0;">Servicio</td>
                       <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
                         ${comp.servicio_nombre}
@@ -177,9 +255,22 @@ const sendComprobanteEmail = async (comp) => {
                         ${fecha}
                       </td>
                     </tr>
+                    <tr><td colspan="2" style="border-top:1px solid #e2e8f0;padding:6px 0 0;"></td></tr>
                     <tr>
-                      <td style="font-size:15px;font-weight:700;color:#0059B3;padding:10px 0 4px;">Total pagado</td>
-                      <td style="font-size:15px;font-weight:700;color:#0059B3;text-align:right;padding:10px 0 4px;">
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Subtotal exonerado (Ap. II Ley IGV)</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${subtotal}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">IGV (exonerado)</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${igv}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:15px;font-weight:700;color:#0059B3;padding:10px 0 4px;border-top:1px solid #e2e8f0;">Total pagado</td>
+                      <td style="font-size:15px;font-weight:700;color:#0059B3;text-align:right;padding:10px 0 4px;border-top:1px solid #e2e8f0;">
                         ${monto}
                       </td>
                     </tr>
