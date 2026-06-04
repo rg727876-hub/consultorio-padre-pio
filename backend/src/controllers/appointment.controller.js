@@ -318,4 +318,73 @@ const list = async (req, res) => {
   }
 };
 
-module.exports = { getSlots, create, list };
+// ─────────────────────────────────────────────────────────────────
+// GET /api/appointments/:id
+// Detalle completo de una cita: datos de la cita, paciente, servicio,
+// doctor, estado del pago y (si fue atendida) existencia de la atención
+// clínica — SIN exponer la información clínica detallada.
+// ─────────────────────────────────────────────────────────────────
+const getById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isInteger(id))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+
+  try {
+    const [[cita]] = await pool.query(
+      `SELECT
+         c.cita_id, c.codigo_cita, c.fecha,
+         TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
+         TIME_FORMAT(c.hora_fin,   '%H:%i') AS hora_fin,
+         c.estado, c.precio_aplicado, c.creado_por, c.fecha_creacion,
+         CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre,
+         pat.tipo_documento, pat.numero_documento,
+         pat.telefono AS paciente_telefono, pat.email AS paciente_email,
+         CONCAT(u.nombre,' ',u.apellido)  AS doctor_nombre, d.especialidad,
+         s.nombre AS servicio_nombre, s.duracion,
+         CONCAT(cre.nombre,' ',cre.apellido) AS creado_por_nombre
+       FROM   CITA     c
+       JOIN   PACIENTE pat ON c.paciente_id = pat.paciente_id
+       JOIN   SERVICIO s   ON c.servicio_id = s.servicio_id
+       JOIN   USUARIO  u   ON c.doctor_id   = u.usuario_id
+       LEFT JOIN DOCTOR  d   ON d.doctor_id  = u.usuario_id
+       LEFT JOIN USUARIO cre ON c.usuario_id = cre.usuario_id
+       WHERE  c.cita_id = ?`,
+      [id]
+    );
+
+    if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
+
+    // Estado del pago (solo visualización)
+    const [[pago]] = await pool.query(
+      `SELECT estado, fecha_pago, monto_total, metodo_pago
+       FROM   PAGO WHERE cita_id = ? ORDER BY pago_id DESC LIMIT 1`,
+      [id]
+    );
+
+    // Existencia de atención clínica (sin detalle clínico)
+    const [[atencion]] = await pool.query(
+      `SELECT cc.fecha_atencion,
+              CONCAT(du.nombre,' ',du.apellido) AS doctor_nombre
+       FROM   CONSULTA_CLINICA cc
+       LEFT JOIN USUARIO du ON cc.firmado_por_doctor_id = du.usuario_id
+       WHERE  cc.cita_id = ? LIMIT 1`,
+      [id]
+    );
+
+    await logAudit({
+      usuario_id: req.user?.id,
+      accion:     'CONSULTAR_DETALLE_CITA',
+      entidad:    'CITA',
+      entidad_id: id,
+      detalles:   `Detalle de cita ${cita.codigo_cita}`,
+      ip_origen:  req.ip,
+    });
+
+    return res.json({ ...cita, pago: pago ?? null, atencion: atencion ?? null });
+  } catch (err) {
+    console.error('[appointment.getById]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getSlots, create, list, getById };

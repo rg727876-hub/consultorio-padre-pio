@@ -2,29 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, ChevronLeft, ChevronRight, CalendarX2, AlertTriangle,
-  Eye, Ban, CalendarClock, X, Calendar, Clock, User, Stethoscope, Hash,
+  Eye, Ban, CalendarClock,
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
-
-// Estados con su color/etiqueta distintivos
-const ESTADOS = {
-  RESERVADA:  { label: 'Reservada',  cls: 'bg-amber-100 text-amber-700 border-amber-200',  dot: 'bg-amber-400'  },
-  CONFIRMADA: { label: 'Confirmada', cls: 'bg-green-100 text-green-700 border-green-200',   dot: 'bg-green-500'  },
-  ATENDIDA:   { label: 'Atendida',   cls: 'bg-blue-100 text-blue-700 border-blue-200',      dot: 'bg-blue-500'   },
-  CANCELADA:  { label: 'Cancelada',  cls: 'bg-red-100 text-red-700 border-red-200',         dot: 'bg-red-500'    },
-  NO_ASISTIO: { label: 'No asistió', cls: 'bg-slate-200 text-slate-600 border-slate-300',   dot: 'bg-slate-500'  },
-  EXPIRADA:   { label: 'Expirada',   cls: 'bg-slate-100 text-slate-400 border-slate-200',   dot: 'bg-slate-300'  },
-};
-
-const fmtDate = (d) => {
-  if (!d) return '—';
-  const [y, m, day] = String(d).slice(0, 10).split('-').map(Number);
-  return new Date(y, m - 1, day).toLocaleDateString('es-PE', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
-};
+import { ESTADOS, estadoInfo, fmtFecha } from './citaEstados';
 
 export default function GestionCitas() {
   const navigate = useNavigate();
@@ -36,7 +19,6 @@ export default function GestionCitas() {
   const [pages,       setPages]       = useState(1);
   const [total,       setTotal]       = useState(0);
   const [totalGlobal, setTotalGlobal] = useState(0);
-  const [hasFilters,  setHasFilters]  = useState(false);
 
   // Filtros
   const [q,           setQ]           = useState('');
@@ -47,9 +29,7 @@ export default function GestionCitas() {
   const [fechaFin,    setFechaFin]    = useState('');
 
   const [doctores, setDoctores] = useState([]);
-  const [detalle,  setDetalle]  = useState(null); // cita seleccionada
 
-  // Cargar doctores (para el filtro)
   useEffect(() => {
     api.get('/doctors')
       .then(({ data }) => setDoctores(Array.isArray(data) ? data : []))
@@ -75,7 +55,6 @@ export default function GestionCitas() {
       setTotal(data.total);
       setTotalGlobal(data.total_global);
       setPage(p);
-      setHasFilters(!!(f.q || f.codigo || f.doctorId || f.estado || f.fechaInicio || f.fechaFin));
     } catch {
       setError('Error de conexión. Intente más tarde.');
       setCitas([]);
@@ -97,6 +76,8 @@ export default function GestionCitas() {
   const proximamente = (accion) =>
     toast(`"${accion}" estará disponible en la siguiente actualización.`, { icon: '🔧' });
 
+  const verDetalle = (id) => navigate(`/recepcion/citas/${id}`);
+
   const hayFiltros = q || codigo || doctorId || estado || fechaInicio || fechaFin;
 
   return (
@@ -115,7 +96,6 @@ export default function GestionCitas() {
           {/* Filtros */}
           <section className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
             <div className="flex flex-wrap items-end gap-3">
-              {/* Búsqueda paciente */}
               <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
                 <label className="text-xs font-medium text-slate-600">Paciente (DNI, nombre o apellido)</label>
                 <input
@@ -127,7 +107,6 @@ export default function GestionCitas() {
                              focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40"
                 />
               </div>
-              {/* Código */}
               <div className="flex flex-col gap-1 w-40">
                 <label className="text-xs font-medium text-slate-600">Código de cita</label>
                 <input
@@ -149,7 +128,6 @@ export default function GestionCitas() {
             </div>
 
             <div className="flex flex-wrap items-end gap-3">
-              {/* Doctor */}
               <div className="flex flex-col gap-1 min-w-[180px]">
                 <label className="text-xs font-medium text-slate-600">Doctor</label>
                 <select
@@ -160,13 +138,10 @@ export default function GestionCitas() {
                 >
                   <option value="">Todos</option>
                   {doctores.map(d => (
-                    <option key={d.doctor_id} value={d.doctor_id}>
-                      {d.nombre} {d.apellido}
-                    </option>
+                    <option key={d.doctor_id} value={d.doctor_id}>{d.nombre} {d.apellido}</option>
                   ))}
                 </select>
               </div>
-              {/* Estado */}
               <div className="flex flex-col gap-1 min-w-[150px]">
                 <label className="text-xs font-medium text-slate-600">Estado</label>
                 <select
@@ -181,30 +156,23 @@ export default function GestionCitas() {
                   ))}
                 </select>
               </div>
-              {/* Rango de fechas */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-600">Desde</label>
-                <input
-                  type="date" value={fechaInicio}
+                <input type="date" value={fechaInicio}
                   onChange={e => { setFechaInicio(e.target.value); fetchCitas(1, { fechaInicio: e.target.value }); }}
                   className="border border-slate-300 rounded-lg px-3 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40"
-                />
+                             focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-600">Hasta</label>
-                <input
-                  type="date" value={fechaFin}
+                <input type="date" value={fechaFin}
                   onChange={e => { setFechaFin(e.target.value); fetchCitas(1, { fechaFin: e.target.value }); }}
                   className="border border-slate-300 rounded-lg px-3 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40"
-                />
+                             focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40" />
               </div>
               {hayFiltros && (
-                <button
-                  onClick={limpiarFiltros}
-                  className="text-xs text-slate-500 hover:text-slate-700 font-medium pb-2.5"
-                >
+                <button onClick={limpiarFiltros}
+                  className="text-xs text-slate-500 hover:text-slate-700 font-medium pb-2.5">
                   Limpiar filtros
                 </button>
               )}
@@ -217,10 +185,8 @@ export default function GestionCitas() {
               <div className="text-center py-16">
                 <AlertTriangle size={36} className="mx-auto mb-2 text-amber-400" />
                 <p className="text-sm text-slate-600">{error}</p>
-                <button
-                  onClick={() => fetchCitas(page)}
-                  className="mt-3 text-[#0059B3] text-sm font-medium hover:underline"
-                >
+                <button onClick={() => fetchCitas(page)}
+                  className="mt-3 text-[#0059B3] text-sm font-medium hover:underline">
                   Reintentar
                 </button>
               </div>
@@ -263,17 +229,15 @@ export default function GestionCitas() {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {citas.map(c => {
-                        const est = ESTADOS[c.estado] ?? { label: c.estado, cls: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' };
+                        const est = estadoInfo(c.estado);
                         return (
-                          <tr
-                            key={c.cita_id}
-                            onClick={() => setDetalle(c)}
-                            className="hover:bg-slate-50 transition-colors cursor-pointer"
-                          >
+                          <tr key={c.cita_id}
+                            onClick={() => verDetalle(c.cita_id)}
+                            className="hover:bg-slate-50 transition-colors cursor-pointer">
                             <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
                               {c.codigo_cita}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(c.fecha)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtFecha(c.fecha)}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-slate-600">
                               {c.hora_inicio}–{c.hora_fin}
                             </td>
@@ -292,7 +256,7 @@ export default function GestionCitas() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                               <div className="flex items-center gap-1">
-                                <IconBtn title="Ver detalles" onClick={() => setDetalle(c)}
+                                <IconBtn title="Ver detalles" onClick={() => verDetalle(c.cita_id)}
                                   className="text-slate-500 hover:bg-slate-100"><Eye size={15} /></IconBtn>
                                 <IconBtn title="Reprogramar" onClick={() => proximamente('Reprogramar')}
                                   className="text-[#0059B3] hover:bg-blue-50"><CalendarClock size={15} /></IconBtn>
@@ -332,92 +296,15 @@ export default function GestionCitas() {
           </section>
         </div>
       </div>
-
-      {/* Modal de detalle */}
-      {detalle && <DetalleCita cita={detalle} onClose={() => setDetalle(null)} onProximamente={proximamente} />}
     </AppLayout>
   );
 }
 
-// ── Botón de acción rápida ──────────────────────────────────────────
 function IconBtn({ title, onClick, className = '', children }) {
   return (
     <button title={title} onClick={onClick}
       className={`p-1.5 rounded-lg transition-colors ${className}`}>
       {children}
     </button>
-  );
-}
-
-// ── Modal de detalle de cita ────────────────────────────────────────
-function DetalleCita({ cita, onClose, onProximamente }) {
-  const est = ESTADOS[cita.estado] ?? { label: cita.estado, cls: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' };
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-         onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-fade-up"
-           onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <div>
-            <p className="text-xs text-slate-400 uppercase tracking-wide">Detalle de la cita</p>
-            <p className="font-mono font-bold text-slate-800">{cita.codigo_cita}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Cuerpo */}
-        <div className="px-5 py-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-500">Estado</span>
-            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold
-                              px-2.5 py-1 rounded-full border ${est.cls}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${est.dot}`} /> {est.label}
-            </span>
-          </div>
-          <Detalle icon={Calendar}    label="Fecha"   value={fmtDate(cita.fecha)} />
-          <Detalle icon={Clock}       label="Hora"    value={`${cita.hora_inicio} – ${cita.hora_fin}`} />
-          <Detalle icon={User}        label="Paciente" value={`${cita.paciente_nombre} (${cita.tipo_documento}: ${cita.numero_documento})`} />
-          {cita.paciente_telefono && <Detalle icon={Hash} label="Teléfono" value={cita.paciente_telefono} />}
-          <Detalle icon={Stethoscope} label="Doctor"  value={cita.doctor_nombre + (cita.especialidad ? ` · ${cita.especialidad}` : '')} />
-          <Detalle icon={Stethoscope} label="Servicio" value={`${cita.servicio_nombre}${cita.duracion ? ` (${cita.duracion} min)` : ''}`} />
-          {cita.precio_aplicado != null && (
-            <Detalle icon={Hash} label="Precio" value={`S/ ${Number(cita.precio_aplicado).toFixed(2)}`} />
-          )}
-        </div>
-
-        {/* Acciones */}
-        <div className="px-5 py-4 border-t border-slate-100 flex gap-2">
-          <button
-            onClick={() => onProximamente('Reprogramar')}
-            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg
-                       border-2 border-[#0059B3] text-[#0059B3] text-sm font-semibold
-                       hover:bg-blue-50 transition-colors">
-            <CalendarClock size={15} /> Reprogramar
-          </button>
-          <button
-            onClick={() => onProximamente('Cancelar')}
-            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg
-                       bg-red-500 hover:bg-red-600 text-white text-sm font-semibold
-                       transition-colors">
-            <Ban size={15} /> Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Detalle({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-start gap-3">
-      <Icon size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
-      <div className="flex-1 flex justify-between gap-3">
-        <span className="text-sm text-slate-500">{label}</span>
-        <span className="text-sm font-medium text-slate-800 text-right">{value}</span>
-      </div>
-    </div>
   );
 }
