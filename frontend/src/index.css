@@ -1,1 +1,87 @@
 @import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   Animaciones globales — dan "vida" a la interfaz
+   ───────────────────────────────────────────── */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Patrón base de puntos blancos (estático), sobre fondos azules */
+.dot-pattern {
+  pointer-events: none;
+  background-image: radial-gradient(#ffffff 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+  opacity: 0.08;
+  transition: opacity 0.45s ease;
+}
+.dot-host:hover .dot-pattern { opacity: 0.14; }
+
+/* Nube plomiza que "va surcando" los puntos siguiendo al cursor.
+   La posición (--cx / --cy) la interpola el hook con un ligero retraso
+   para dar la sensación de estela/deslizamiento. */
+.dot-cloud {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  mix-blend-mode: screen;          /* ilumina los puntos al pasar = llamativo */
+  filter: blur(10px);
+  background:
+    radial-gradient(circle 170px at var(--cx, -400px) var(--cy, -400px),
+      rgba(226, 232, 240, 0.55) 0%,
+      rgba(186, 200, 220, 0.30) 38%,
+      transparent 72%);
+}
+.cloud-on .dot-cloud { opacity: 1; }
+
+/* Puntos más brillantes dentro del foco de la nube (refuerza el efecto) */
+.dot-cloud::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#ffffff 1.8px, transparent 1.8px);
+  background-size: 19px 19px;
+  -webkit-mask-image: radial-gradient(circle 150px at var(--cx, -400px) var(--cy, -400px),
+                       #000 0%, rgba(0,0,0,0.4) 50%, transparent 75%);
+          mask-image: radial-gradient(circle 150px at var(--cx, -400px) var(--cy, -400px),
+                       #000 0%, rgba(0,0,0,0.4) 50%, transparent 75%);
+  opacity: 0.7;
+}
+
+/* Entrada suave (fade + slide-up). Usa cubic-bezier tipo "ease-out expo". */
+.animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+/* Esqueleto de carga con brillo deslizante */
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* Respeta a usuarios con "reducir movimiento" activado */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in,
+  .skeleton {
+    animation: none;
+  }
+}

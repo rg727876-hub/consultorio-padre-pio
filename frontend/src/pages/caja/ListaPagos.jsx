@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileText, Receipt, Search, Loader2, ChevronLeft, ChevronRight,
-  CheckCircle2, Clock, AlertCircle,
+  FileText, Receipt, Search, ChevronLeft, ChevronRight,
+  CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -113,8 +113,19 @@ export default function ListaPagos() {
           {/* Tabla */}
           <section className="bg-white rounded-2xl shadow-sm overflow-hidden">
             {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 size={24} className="animate-spin text-[#0059B3]" />
+              <div className="divide-y divide-slate-100">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-4 py-4">
+                    <div className="skeleton h-4 w-20" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="skeleton h-4 w-40" />
+                      <div className="skeleton h-3 w-24" />
+                    </div>
+                    <div className="skeleton h-5 w-16 rounded-full" />
+                    <div className="skeleton h-4 w-16" />
+                    <div className="skeleton h-7 w-20 rounded-lg" />
+                  </div>
+                ))}
               </div>
             ) : pagos.length === 0 ? (
               <div className="text-center py-16 text-slate-400">

@@ -103,7 +103,7 @@ export default function AppLayout({ children }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex">
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50/40">
 
       {/* ── Sidebar desktop ── */}
       <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-slate-200
@@ -166,8 +166,8 @@ export default function AppLayout({ children }) {
           </button>
         </header>
 
-        {/* Contenido de página */}
-        <main className="flex-1 min-w-0">
+        {/* Contenido de página — se reanima en cada navegación */}
+        <main key={location.pathname} className="flex-1 min-w-0 animate-fade-up">
           {children}
         </main>
       </div>

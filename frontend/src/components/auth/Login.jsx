@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useDotCursor } from '../../hooks/useDotCursor';
 import logo from '../../assets/images/Logo-Consultorio-Padre-Pio.png';
 
 const ROLE_PATHS = {
@@ -14,6 +15,7 @@ const ROLE_PATHS = {
 export default function Login() {
   const { loginStaff } = useAuth();
   const navigate       = useNavigate();
+  const dots           = useDotCursor();
 
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
@@ -62,18 +64,15 @@ export default function Login() {
 
       {/* ── Panel izquierdo: branding ── */}
       <div
-        className="hidden lg:flex lg:w-1/2 relative flex-col items-center justify-center
+        ref={dots.ref}
+        {...dots.handlers}
+        className="dot-host hidden lg:flex lg:w-1/2 relative flex-col items-center justify-center
                    px-12 text-center overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #0059B3 0%, #004a99 55%, #1B3A6B 100%)' }}
       >
-        {/* Patrón decorativo de puntos */}
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage: 'radial-gradient(#ffffff 1.5px, transparent 1.5px)',
-            backgroundSize: '22px 22px',
-          }}
-        />
+        {/* Puntos: base estática + nube que va surcando al pasar el cursor */}
+        <div className="absolute inset-0 dot-pattern" />
+        <div className="absolute inset-0 dot-cloud" />
 
         <div className="relative z-10 flex flex-col items-center">
           <div className="bg-white rounded-3xl p-5 shadow-2xl mb-8">

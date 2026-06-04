@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
   UserPlus, Users, Calendar, Stethoscope, ClipboardList,
-  CreditCard, BarChart2, ChevronRight, Clock, Loader2,
+  CreditCard, BarChart2, ChevronRight, Clock,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useDotCursor } from '../hooks/useDotCursor';
 import api from '../api/axios';
 import AppLayout from '../components/AppLayout';
 
@@ -100,10 +101,19 @@ const ROL_LABELS = {
   CAJERO:        'Cajero',
 };
 
+// Saludo según la hora del día
+function getSaludo() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Buenos días';
+  if (h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
 // ── Componente principal ─────────────────────────────────────────
 export default function DashboardPage() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
+  const dots       = useDotCursor();
   const modulos    = MODULOS[user?.rol] ?? [];
 
   const [stats, setStats] = useState({ servicios: null, doctores: null });
@@ -118,20 +128,31 @@ export default function DashboardPage() {
       .catch(() => {});
   }, [user?.rol]);
 
+  const saludo = getSaludo();
+
   return (
     <AppLayout>
       <div className="px-4 py-8 max-w-6xl mx-auto w-full">
 
-        {/* Bienvenida */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-800">
-            Bienvenido, {user?.nombre}
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            {user?.rol === 'ADMINISTRADOR'
-              ? '¿Qué deseas hacer hoy?'
-              : `Estás en el panel de ${ROL_LABELS[user?.rol]?.toLowerCase()}.`}
-          </p>
+        {/* Bienvenida — header con degradado de marca */}
+        <div
+          ref={dots.ref}
+          {...dots.handlers}
+          className="dot-host mb-8 rounded-2xl bg-gradient-to-r from-[#0059B3] to-[#1B3A6B]
+                     px-6 py-6 shadow-sm text-white relative overflow-hidden"
+        >
+          <div className="absolute inset-0 dot-pattern" />
+          <div className="absolute inset-0 dot-cloud" />
+          <div className="relative z-10">
+            <h2 className="text-2xl font-bold">
+              {saludo}, {user?.nombre} 👋
+            </h2>
+            <p className="text-sm text-blue-100/90 mt-1">
+              {user?.rol === 'ADMINISTRADOR'
+                ? '¿Qué deseas hacer hoy?'
+                : `Estás en el panel de ${ROL_LABELS[user?.rol]?.toLowerCase()}.`}
+            </p>
+          </div>
         </div>
 
         {/* Stats — solo ADMINISTRADOR */}
@@ -152,16 +173,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Tarjetas de módulos */}
+        {/* Tarjetas de módulos — aparición escalonada */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {modulos.map((mod) => {
+          {modulos.map((mod, i) => {
             const Icon = mod.icon;
             return (
               <button
                 key={mod.label}
                 onClick={() => !mod.proximamente && navigate(mod.ruta)}
                 disabled={mod.proximamente}
-                className={`relative text-left bg-white rounded-2xl shadow-sm p-5
+                style={{ animationDelay: `${i * 70}ms` }}
+                className={`animate-fade-up relative text-left bg-white rounded-2xl shadow-sm p-5
                             border border-transparent transition-all duration-200
                             ${mod.proximamente
                               ? 'opacity-60 cursor-not-allowed'
@@ -206,11 +228,9 @@ function StatCard({ label, value, icon: Icon, colorClass }) {
         <Icon size={20} />
       </div>
       <div className="min-w-0">
-        <p className="text-xl font-bold text-slate-800 leading-none">
-          {value === null
-            ? <Loader2 size={16} className="animate-spin text-slate-300" />
-            : value}
-        </p>
+        {value === null
+          ? <div className="skeleton h-5 w-8" />
+          : <p className="text-xl font-bold text-slate-800 leading-none">{value}</p>}
         <p className="text-xs text-slate-500 mt-1 leading-tight">{label}</p>
       </div>
     </div>
