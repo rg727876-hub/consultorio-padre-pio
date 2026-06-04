@@ -72,6 +72,13 @@ const MODULOS = {
       color:       'bg-green-50 text-green-700',
       ruta:        '/recepcion/citas/nueva',
     },
+    {
+      label:       'Gestión de citas',
+      descripcion: 'Listar, buscar, cancelar o reprogramar citas',
+      icon:        ClipboardList,
+      color:       'bg-indigo-50 text-indigo-600',
+      ruta:        '/recepcion/citas',
+    },
   ],
   DOCTOR: [
     {

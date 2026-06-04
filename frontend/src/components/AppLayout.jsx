@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   UserPlus, Calendar, Stethoscope, ClipboardList, CreditCard,
-  LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List,
+  LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List, CalendarSearch,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/images/Logo-Consultorio-Padre-Pio.png';
@@ -16,9 +16,10 @@ const NAV = {
     { label: 'Horarios de doctores', icon: Clock,         ruta: '/admin/horarios' },
   ],
   RECEPCIONISTA: [
-    { label: 'Inicio',             icon: Home,     ruta: '/dashboard' },
-    { label: 'Registrar paciente', icon: UserPlus, ruta: '/recepcion/pacientes/nuevo' },
-    { label: 'Agendar cita',       icon: Calendar, ruta: '/recepcion/citas/nueva' },
+    { label: 'Inicio',             icon: Home,           ruta: '/dashboard' },
+    { label: 'Registrar paciente', icon: UserPlus,       ruta: '/recepcion/pacientes/nuevo' },
+    { label: 'Agendar cita',       icon: Calendar,       ruta: '/recepcion/citas/nueva' },
+    { label: 'Gestión de citas',   icon: CalendarSearch, ruta: '/recepcion/citas' },
   ],
   DOCTOR:  [{ label: 'Inicio', icon: Home, ruta: '/dashboard' }],
   CAJERO: [

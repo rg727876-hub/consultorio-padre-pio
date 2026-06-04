@@ -201,4 +201,121 @@ const create = async (req, res) => {
   }
 };
 
-module.exports = { getSlots, create };
+// ─────────────────────────────────────────────────────────────────
+// GET /api/appointments
+// Lista/busca/filtra citas con paginación (20 por página).
+// Por defecto muestra las citas del día actual, en orden cronológico.
+// Filtros: codigo, q (paciente DNI/nombre/apellido), doctor_id, estado,
+//          fecha_inicio, fecha_fin.
+// ─────────────────────────────────────────────────────────────────
+const ESTADOS_VALIDOS = ['RESERVADA','CONFIRMADA','ATENDIDA','CANCELADA','NO_ASISTIO','EXPIRADA'];
+
+const list = async (req, res) => {
+  const {
+    codigo, q, doctor_id, estado,
+    fecha_inicio, fecha_fin, page = 1,
+  } = req.query;
+
+  const limit  = 20;
+  const offset = (Number(page) - 1) * limit;
+
+  const conds  = [];
+  const params = [];
+
+  if (codigo && codigo.trim()) {
+    conds.push('UPPER(c.codigo_cita) = UPPER(?)');
+    params.push(codigo.trim());
+  }
+  if (q && q.trim()) {
+    const like = `%${q.trim()}%`;
+    conds.push(`(pat.numero_documento LIKE ?
+                 OR LOWER(pat.nombre)   LIKE LOWER(?)
+                 OR LOWER(pat.apellido) LIKE LOWER(?)
+                 OR LOWER(CONCAT(pat.nombre,' ',pat.apellido)) LIKE LOWER(?))`);
+    params.push(like, like, like, like);
+  }
+  if (doctor_id && Number(doctor_id)) {
+    conds.push('c.doctor_id = ?');
+    params.push(Number(doctor_id));
+  }
+  if (estado && ESTADOS_VALIDOS.includes(estado)) {
+    conds.push('c.estado = ?');
+    params.push(estado);
+  }
+  if (fecha_inicio && fecha_fin) {
+    conds.push('c.fecha BETWEEN ? AND ?');
+    params.push(fecha_inicio, fecha_fin);
+  } else if (fecha_inicio) {
+    conds.push('c.fecha >= ?');
+    params.push(fecha_inicio);
+  } else if (fecha_fin) {
+    conds.push('c.fecha <= ?');
+    params.push(fecha_fin);
+  } else if (!codigo && !q && !doctor_id && !estado) {
+    // Sin ningún filtro → por defecto las citas de hoy
+    conds.push('c.fecha = ?');
+    params.push(new Date().toLocaleDateString('en-CA'));
+  }
+
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+  try {
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM   CITA     c
+       JOIN   PACIENTE pat ON c.paciente_id = pat.paciente_id
+       ${where}`,
+      params
+    );
+
+    // Total global (para distinguir "sistema vacío" de "sin coincidencias")
+    const [[{ total_global }]] = await pool.query(
+      'SELECT COUNT(*) AS total_global FROM CITA'
+    );
+
+    const [rows] = await pool.query(
+      `SELECT
+         c.cita_id, c.codigo_cita, c.fecha,
+         TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
+         TIME_FORMAT(c.hora_fin,   '%H:%i') AS hora_fin,
+         c.estado, c.precio_aplicado,
+         CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre,
+         pat.tipo_documento, pat.numero_documento,
+         pat.telefono AS paciente_telefono, pat.email AS paciente_email,
+         CONCAT(u.nombre,' ',u.apellido)     AS doctor_nombre,
+         d.especialidad,
+         s.nombre AS servicio_nombre, s.duracion
+       FROM   CITA     c
+       JOIN   PACIENTE pat ON c.paciente_id = pat.paciente_id
+       JOIN   SERVICIO s   ON c.servicio_id = s.servicio_id
+       JOIN   USUARIO  u   ON c.doctor_id   = u.usuario_id
+       LEFT JOIN DOCTOR d  ON d.doctor_id   = u.usuario_id
+       ${where}
+       ORDER  BY c.fecha ASC, c.hora_inicio ASC
+       LIMIT  ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    // Auditoría de la consulta
+    await logAudit({
+      usuario_id: req.user?.id,
+      accion:     'CONSULTAR_CITAS',
+      entidad:    'CITA',
+      detalles:   JSON.stringify({ codigo, q, doctor_id, estado, fecha_inicio, fecha_fin, page: Number(page) }),
+      ip_origen:  req.ip,
+    });
+
+    return res.json({
+      data:         rows,
+      total:        Number(total),
+      total_global: Number(total_global),
+      page:         Number(page),
+      pages:        Math.ceil(Number(total) / limit),
+    });
+  } catch (err) {
+    console.error('[appointment.list]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getSlots, create, list };
