@@ -94,11 +94,12 @@ const generateComprobante = async (req, res) => {
       monto_final:          monto,
       subtotal_exonerado:   monto,
       igv:                  0,
-      nubefact_id:          nubefactResp.hash       || nubefactResp.codigo_hash || null,
+      nubefact_id:          nubefactResp.key || nubefactResp.hash || nubefactResp.codigo_hash || null,
       nubefact_cpe_url:     nubefactResp.enlace_del_cdr || null,
       nubefact_pdf_url:     nubefactResp.enlace_del_pdf || null,
       nubefact_hash:        nubefactResp.codigo_hash    || null,
-      nubefact_aceptado_sunat: nubefactResp.accepted_by_sunat ?? null,
+      // Nubefact real devuelve 'aceptada_por_sunat'; el mock usa 'accepted_by_sunat'
+      nubefact_aceptado_sunat: nubefactResp.aceptada_por_sunat ?? nubefactResp.accepted_by_sunat ?? null,
       cliente_ruc:          cliente_ruc    || null,
       cliente_razon_social: cliente_razon_social || null,
     });
