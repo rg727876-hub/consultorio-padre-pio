@@ -1,4 +1,16 @@
+const fs   = require('fs');
+const path = require('path');
 const transporter = require('../config/mailer');
+
+// Logo de la clínica embebido como data URI (se lee una sola vez al iniciar).
+// Permite mostrarlo dentro del adjunto HTML aunque se abra sin conexión al servidor.
+let LOGO_DATA_URI = '';
+try {
+  const svg = fs.readFileSync(path.join(__dirname, '../assets/ICONOCLINICA.svg'), 'utf8');
+  LOGO_DATA_URI = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+} catch (e) {
+  console.warn('[mailer] No se pudo cargar el logo de la clínica:', e.message);
+}
 
 const sendActivationEmail = async (to, nombre, token) => {
   const url   = `${process.env.FRONTEND_URL}/activate/${token}`;
@@ -119,8 +131,10 @@ const buildComprobanteDocHtml = (comp) => {
   <title>${label} ${numero}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; max-width: 420px; margin: 24px auto; font-size: 13px; color: #1e293b; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #1e293b; text-align: center; padding: 24px 16px; }
+    .ticket { display: inline-block; text-align: left; width: 100%; max-width: 380px; margin: 0 auto; }
     .header { text-align: center; margin-bottom: 16px; }
+    .logo { width: 90px; height: auto; margin: 0 auto 10px; display: block; }
     .clinic-name { font-size: 17px; font-weight: bold; }
     .comp-type { font-size: 15px; font-weight: bold; color: #0059B3; margin-top: 4px; }
     .comp-num { font-size: 13px; color: #475569; margin-top: 2px; }
@@ -132,11 +146,13 @@ const buildComprobanteDocHtml = (comp) => {
     .total-row { display: flex; justify-content: space-between; padding: 6px 0 0; font-size: 16px; font-weight: bold; }
     .total-row .amount { color: #0059B3; }
     .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8; }
-    @media print { body { margin: 0; } }
+    @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
+  <div class="ticket">
   <div class="header">
+    ${LOGO_DATA_URI ? `<img class="logo" src="${LOGO_DATA_URI}" alt="Consultorio Padre Pío">` : ''}
     <div class="clinic-name">Consultorio Padre Pío</div>
     <div class="comp-type">${label} Electrónica</div>
     <div class="comp-num">${numero}</div>
@@ -157,6 +173,7 @@ const buildComprobanteDocHtml = (comp) => {
   <div class="footer">
     <p>Comprobante emitido electrónicamente</p>
     <p>Gracias por su preferencia</p>
+  </div>
   </div>
 </body>
 </html>`;
@@ -190,11 +207,19 @@ const sendComprobanteEmail = async (comp) => {
     from:    process.env.MAIL_FROM,
     to:      comp.paciente_email,
     subject: `Tu ${label} ${numero} — Consultorio Padre Pio`,
-    attachments: [{
-      filename:    `${label}_${comp.serie}-${comp.numero}.html`,
-      content:     docHtml,
-      contentType: 'text/html; charset=utf-8',
-    }],
+    attachments: [
+      {
+        filename:    `${label}_${comp.serie}-${comp.numero}.html`,
+        content:     docHtml,
+        contentType: 'text/html; charset=utf-8',
+      },
+      // Logo embebido (inline CID) para mostrarlo dentro del cuerpo del correo.
+      {
+        filename:    'logo.png',
+        path:        path.join(__dirname, '../assets/Logo-Consultorio-Padre-Pio.png'),
+        cid:         'logoClinica',
+      },
+    ],
     html: `
 <!DOCTYPE html>
 <html lang="es">
@@ -207,7 +232,10 @@ const sendComprobanteEmail = async (comp) => {
                style="background:#ffffff;border-radius:12px;overflow:hidden;
                       box-shadow:0 2px 8px rgba(0,0,0,.08);">
           <tr>
-            <td style="background:#0059B3;padding:28px 32px;text-align:center;">
+            <td style="background:#0059B3;padding:24px 32px 28px;text-align:center;">
+              <img src="cid:logoClinica" alt="Consultorio Padre Pío" width="72" height="72"
+                   style="display:block;margin:0 auto 12px;width:72px;height:72px;
+                          background:#ffffff;border-radius:50%;padding:6px;object-fit:contain;">
               <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">
                 Consultorio Padre Pio
               </h1>
