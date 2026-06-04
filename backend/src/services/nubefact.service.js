@@ -89,7 +89,7 @@ async function emitirComprobante({
       precio_unitario: Number(monto),
       descuento: '',
       subtotal: Number(monto),
-      tipo_de_igv: 7,   // Exonerado
+      tipo_de_igv: 8,   // 8 = Exonerado - Operación Onerosa (servicios médicos)
       igv: 0,
       total: Number(monto),
       anticipo_regularizacion: false,

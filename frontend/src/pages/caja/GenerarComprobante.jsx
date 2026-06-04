@@ -15,6 +15,7 @@ function openPrintWindow(result, pago) {
   const numero = `${result.serie}-${result.numero}`;
   const fecha  = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const monto  = Number(pago?.monto_total || 0).toFixed(2);
+  const logoUrl = `${window.location.origin}/ICONOCLINICA.svg`;
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -23,8 +24,11 @@ function openPrintWindow(result, pago) {
   <title>${label} ${numero}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; max-width: 420px; margin: 24px auto; font-size: 13px; color: #1e293b; }
+    html, body { height: 100%; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #1e293b; text-align: center; padding: 24px 16px; }
+    .ticket { display: inline-block; text-align: left; width: 100%; max-width: 380px; margin: 0 auto; }
     .header { text-align: center; margin-bottom: 16px; }
+    .logo { width: 90px; height: auto; margin: 0 auto 10px; display: block; }
     .clinic-name { font-size: 17px; font-weight: bold; }
     .comp-type { font-size: 15px; font-weight: bold; color: #0059B3; margin-top: 4px; }
     .comp-num { font-size: 13px; color: #475569; margin-top: 2px; }
@@ -36,11 +40,13 @@ function openPrintWindow(result, pago) {
     .total-row { display: flex; justify-content: space-between; padding: 6px 0 0; font-size: 16px; font-weight: bold; }
     .total-row .amount { color: #0059B3; }
     .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8; }
-    @media print { body { margin: 0; } }
+    @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
+  <div class="ticket">
   <div class="header">
+    <img class="logo" src="${logoUrl}" alt="Consultorio Padre Pío" onerror="this.style.display='none'">
     <div class="clinic-name">Consultorio Padre Pío</div>
     <div class="comp-type">${label} Electrónica</div>
     <div class="comp-num">${numero}</div>
@@ -62,6 +68,7 @@ function openPrintWindow(result, pago) {
   <div class="footer">
     <p>Comprobante emitido electrónicamente</p>
     <p>Gracias por su preferencia</p>
+  </div>
   </div>
   <script>
     window.onload = function () { setTimeout(function () { window.print(); }, 250); };
