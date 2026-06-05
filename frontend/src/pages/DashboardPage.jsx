@@ -82,12 +82,11 @@ const MODULOS = {
   ],
   DOCTOR: [
     {
-      label:        'Mis citas',
-      descripcion:  'Ver agenda del día y próximas citas',
-      icon:         Calendar,
-      color:        'bg-blue-50 text-[#0059B3]',
-      ruta:         '/doctor/citas',
-      proximamente: true,
+      label:       'Mi agenda',
+      descripcion: 'Consulta tus citas por día, semana, mes o histórico',
+      icon:        Calendar,
+      color:       'bg-blue-50 text-[#0059B3]',
+      ruta:        '/doctor/agenda',
     },
   ],
   CAJERO: [

@@ -13,6 +13,7 @@ import RegistrarPaciente      from '../pages/recepcion/RegistrarPaciente';
 import AgendarCita            from '../pages/recepcion/AgendarCita';
 import GestionCitas           from '../pages/recepcion/GestionCitas';
 import DetalleCita            from '../pages/recepcion/DetalleCita';
+import MiAgenda               from '../pages/doctor/MiAgenda';
 import RegistrarPago          from '../pages/caja/RegistrarPago';
 import ListaPagos             from '../pages/caja/ListaPagos';
 import GenerarComprobante     from '../pages/caja/GenerarComprobante';
@@ -81,6 +82,13 @@ function RouterContent() {
         <Route path="/recepcion/citas/:id" element={
           <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
             <DetalleCita />
+          </PrivateRoute>
+        } />
+
+        {/* ── Doctor ── */}
+        <Route path="/doctor/agenda" element={
+          <PrivateRoute roles={['DOCTOR']}>
+            <MiAgenda />
           </PrivateRoute>
         } />
 

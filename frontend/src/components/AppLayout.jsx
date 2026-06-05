@@ -21,7 +21,10 @@ const NAV = {
     { label: 'Agendar cita',       icon: Calendar,       ruta: '/recepcion/citas/nueva' },
     { label: 'Gestión de citas',   icon: CalendarSearch, ruta: '/recepcion/citas' },
   ],
-  DOCTOR:  [{ label: 'Inicio', icon: Home, ruta: '/dashboard' }],
+  DOCTOR: [
+    { label: 'Inicio',    icon: Home,     ruta: '/dashboard' },
+    { label: 'Mi agenda', icon: Calendar, ruta: '/doctor/agenda' },
+  ],
   CAJERO: [
     { label: 'Inicio',           icon: Home,       ruta: '/dashboard'           },
     { label: 'Registrar pago',   icon: CreditCard, ruta: '/caja/pagos/nuevo'    },

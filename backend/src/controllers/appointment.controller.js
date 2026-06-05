@@ -387,4 +387,134 @@ const getById = async (req, res) => {
   }
 };
 
-module.exports = { getSlots, create, list, getById };
+// ─────────────────────────────────────────────────────────────────
+// GET /api/appointments/agenda  (rol DOCTOR)
+// Agenda del doctor logueado. Solo SUS citas, nunca RESERVADA.
+// Vistas: hoy | semana | mes | historico. Filtros: estado, rango de fechas.
+// ─────────────────────────────────────────────────────────────────
+const ymd = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
+
+const rangoSemana = () => {
+  const now = new Date();
+  const day = now.getDay();                 // 0=Dom .. 6=Sab
+  const mon = new Date(now); mon.setDate(now.getDate() + (day === 0 ? -6 : 1 - day));
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  return { ini: ymd(mon), fin: ymd(sun) };
+};
+
+const rangoMes = () => {
+  const now = new Date();
+  return {
+    ini: ymd(new Date(now.getFullYear(), now.getMonth(), 1)),
+    fin: ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  };
+};
+
+const agenda = async (req, res) => {
+  const doctorId = req.user?.id;
+  const { vista = 'hoy', estado, fecha_inicio, fecha_fin } = req.query;
+
+  const conds  = ['c.doctor_id = ?', "c.estado <> 'RESERVADA'"];
+  const params = [doctorId];
+
+  if (estado && ESTADOS_VALIDOS.includes(estado) && estado !== 'RESERVADA') {
+    conds.push('c.estado = ?');
+    params.push(estado);
+  }
+
+  const hoy = new Date().toLocaleDateString('en-CA');
+
+  // Un rango de fechas personalizado tiene prioridad sobre la vista
+  if (fecha_inicio && fecha_fin) {
+    conds.push('c.fecha BETWEEN ? AND ?'); params.push(fecha_inicio, fecha_fin);
+  } else if (fecha_inicio) {
+    conds.push('c.fecha >= ?'); params.push(fecha_inicio);
+  } else if (fecha_fin) {
+    conds.push('c.fecha <= ?'); params.push(fecha_fin);
+  } else if (vista === 'semana') {
+    const { ini, fin } = rangoSemana(); conds.push('c.fecha BETWEEN ? AND ?'); params.push(ini, fin);
+  } else if (vista === 'mes') {
+    const { ini, fin } = rangoMes(); conds.push('c.fecha BETWEEN ? AND ?'); params.push(ini, fin);
+  } else if (vista === 'historico') {
+    conds.push('c.fecha < ?'); params.push(hoy);
+  } else { // hoy (por defecto)
+    conds.push('c.fecha = ?'); params.push(hoy);
+  }
+
+  const where = `WHERE ${conds.join(' AND ')}`;
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         c.cita_id, c.codigo_cita, c.fecha,
+         TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
+         TIME_FORMAT(c.hora_fin,   '%H:%i') AS hora_fin,
+         c.estado, c.precio_aplicado,
+         CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre,
+         pat.tipo_documento, pat.numero_documento,
+         s.nombre AS servicio_nombre, s.duracion,
+         cc.consulta_id
+       FROM   CITA     c
+       JOIN   PACIENTE pat ON c.paciente_id = pat.paciente_id
+       JOIN   SERVICIO s   ON c.servicio_id = s.servicio_id
+       LEFT JOIN CONSULTA_CLINICA cc ON cc.cita_id = c.cita_id
+       ${where}
+       ORDER  BY c.fecha ASC, c.hora_inicio ASC`,
+      params
+    );
+
+    await logAudit({
+      usuario_id: doctorId,
+      accion:     'CONSULTAR_AGENDA',
+      entidad:    'CITA',
+      detalles:   JSON.stringify({ vista, estado, fecha_inicio, fecha_fin }),
+      ip_origen:  req.ip,
+    });
+
+    return res.json({ data: rows, vista });
+  } catch (err) {
+    console.error('[appointment.agenda]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// PUT /api/appointments/:id/no-asistio  (rol DOCTOR)
+// Marca una cita CONFIRMADA del propio doctor como NO_ASISTIO.
+// El pago se mantiene COMPLETADO (sin reembolso).
+// ─────────────────────────────────────────────────────────────────
+const marcarNoAsistio = async (req, res) => {
+  const id       = Number(req.params.id);
+  const doctorId = req.user?.id;
+  if (!id) return res.status(400).json({ error: 'ID de cita inválido' });
+
+  try {
+    const [[cita]] = await pool.query(
+      'SELECT cita_id, doctor_id, estado, codigo_cita FROM CITA WHERE cita_id = ?',
+      [id]
+    );
+    if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (cita.doctor_id !== doctorId)
+      return res.status(403).json({ error: 'No puede modificar citas de otro doctor' });
+    if (cita.estado !== 'CONFIRMADA')
+      return res.status(409).json({ error: 'Solo se pueden marcar como no asistió las citas confirmadas' });
+
+    await pool.query("UPDATE CITA SET estado = 'NO_ASISTIO' WHERE cita_id = ?", [id]);
+
+    await logAudit({
+      usuario_id: doctorId,
+      accion:     'MARCAR_NO_ASISTIO',
+      entidad:    'CITA',
+      entidad_id: id,
+      detalles:   `Cita ${cita.codigo_cita} marcada como NO_ASISTIO`,
+      ip_origen:  req.ip,
+    });
+
+    return res.json({ message: 'Cita marcada como no asistió' });
+  } catch (err) {
+    console.error('[appointment.marcarNoAsistio]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getSlots, create, list, getById, agenda, marcarNoAsistio };
