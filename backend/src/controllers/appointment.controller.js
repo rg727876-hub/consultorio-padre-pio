@@ -424,13 +424,17 @@ const agenda = async (req, res) => {
 
   const hoy = new Date().toLocaleDateString('en-CA');
 
-  // Un rango de fechas personalizado tiene prioridad sobre la vista
+  // Un rango de fechas personalizado tiene prioridad sobre la vista.
+  // Un filtro por estado busca en todas las fechas (ignora la vista),
+  // igual que el listado de recepción.
   if (fecha_inicio && fecha_fin) {
     conds.push('c.fecha BETWEEN ? AND ?'); params.push(fecha_inicio, fecha_fin);
   } else if (fecha_inicio) {
     conds.push('c.fecha >= ?'); params.push(fecha_inicio);
   } else if (fecha_fin) {
     conds.push('c.fecha <= ?'); params.push(fecha_fin);
+  } else if (estado && ESTADOS_VALIDOS.includes(estado) && estado !== 'RESERVADA') {
+    // Sin rango de fechas: el filtro de estado abarca toda la agenda
   } else if (vista === 'semana') {
     const { ini, fin } = rangoSemana(); conds.push('c.fecha BETWEEN ? AND ?'); params.push(ini, fin);
   } else if (vista === 'mes') {

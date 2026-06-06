@@ -66,7 +66,9 @@ export default function RegistrarPaciente() {
 
     if (!form.sexo) e.sexo = 'Selecciona el sexo';
 
-    if (form.fecha_nacimiento) {
+    if (!form.fecha_nacimiento) {
+      e.fecha_nacimiento = 'Fecha de nacimiento requerida';
+    } else {
       const hoy = new Date().toLocaleDateString('en-CA');
       if (form.fecha_nacimiento >= hoy)
         e.fecha_nacimiento = 'La fecha de nacimiento debe ser anterior al día de hoy';
@@ -94,7 +96,7 @@ export default function RegistrarPaciente() {
         telefono:            form.telefono,
         sexo:                form.sexo,
         email:               form.email.trim()               || undefined,
-        fecha_nacimiento:    form.fecha_nacimiento            || undefined,
+        fecha_nacimiento:    form.fecha_nacimiento,
         direccion:           form.direccion.trim()            || undefined,
         ocupacion:           form.ocupacion.trim()            || undefined,
         contacto_emergencia: form.contacto_emergencia.trim()  || undefined,
@@ -176,7 +178,7 @@ export default function RegistrarPaciente() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Fecha de nacimiento" error={errors.fecha_nacimiento}>
+              <Field label="Fecha de nacimiento *" error={errors.fecha_nacimiento}>
                 <Input type="date" name="fecha_nacimiento" value={form.fecha_nacimiento}
                        onChange={handleChange} error={errors.fecha_nacimiento}
                        max={(() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString('en-CA'); })()} />

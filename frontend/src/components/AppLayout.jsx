@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  UserPlus, Calendar, Stethoscope, ClipboardList, CreditCard,
+  UserPlus, Calendar, Stethoscope, CreditCard,
   LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List, CalendarSearch,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -12,7 +12,6 @@ const NAV = {
     { label: 'Inicio',               icon: Home,          ruta: '/dashboard' },
     { label: 'Registrar usuario',    icon: UserPlus,      ruta: '/admin/usuarios/nuevo' },
     { label: 'Registrar servicio',   icon: Stethoscope,   ruta: '/admin/servicios/nuevo' },
-    { label: 'Gestionar servicios',  icon: ClipboardList, ruta: '/admin/servicios' },
     { label: 'Horarios de doctores', icon: Clock,         ruta: '/admin/horarios' },
   ],
   RECEPCIONISTA: [

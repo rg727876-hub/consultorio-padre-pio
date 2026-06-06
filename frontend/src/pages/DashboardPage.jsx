@@ -35,11 +35,12 @@ const MODULOS = {
       ruta:        '/admin/servicios/nuevo',
     },
     {
-      label:       'Gestionar servicios',
-      descripcion: 'Ver, editar o cambiar el estado de los servicios',
-      icon:        ClipboardList,
-      color:       'bg-teal-50 text-teal-600',
-      ruta:        '/admin/servicios',
+      label:        'Gestionar servicios',
+      descripcion:  'Ver, editar o cambiar el estado de los servicios',
+      icon:         ClipboardList,
+      color:        'bg-teal-50 text-teal-600',
+      ruta:         '/admin/servicios',
+      proximamente: true,
     },
     {
       label:       'Horarios de doctores',

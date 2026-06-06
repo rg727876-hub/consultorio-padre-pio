@@ -25,7 +25,7 @@ export default function MiAgenda() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
-  const [vista,       setVista]       = useState('hoy');
+  const [vista,       setVista]       = useState('semana');
   const [estado,      setEstado]      = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin,    setFechaFin]    = useState('');
@@ -57,8 +57,8 @@ export default function MiAgenda() {
 
   const cambiarVista = (v) => {
     setVista(v);
-    setFechaInicio(''); setFechaFin('');
-    fetchAgenda({ vista: v, fechaInicio: '', fechaFin: '' });
+    setEstado(''); setFechaInicio(''); setFechaFin('');
+    fetchAgenda({ vista: v, estado: '', fechaInicio: '', fechaFin: '' });
   };
 
   const limpiarFiltros = () => {
@@ -102,7 +102,7 @@ export default function MiAgenda() {
             {VISTAS.map(v => (
               <button key={v.key} onClick={() => cambiarVista(v.key)}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors
-                            ${vista === v.key && !fechaInicio && !fechaFin
+                            ${vista === v.key && !fechaInicio && !fechaFin && !estado
                               ? 'bg-[#0059B3] text-white shadow-sm'
                               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
                 {v.label}
