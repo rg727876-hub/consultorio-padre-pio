@@ -33,8 +33,11 @@ export default function RegistrarPaciente() {
   const handleField = (name, rawValue) => {
     let value = rawValue;
 
-    if (name === 'nombre' || name === 'apellido')
+    if (name === 'nombre' || name === 'apellido') {
       value = soloLetras(rawValue);
+      // Nombre y apellido siempre en MAYÚSCULAS para uniformar las búsquedas
+      value = value.toUpperCase();
+    }
 
     if (name === 'telefono' || name === 'contacto_emergencia')
       value = soloNumeros(rawValue, 9);

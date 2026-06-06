@@ -49,6 +49,10 @@ export default function RegistroUsuario() {
     if (name === 'nombre' || name === 'apellido' || name === 'especialidad')
       value = soloLetras(rawValue);
 
+    // Nombre y apellido siempre en MAYÚSCULAS para uniformar las búsquedas
+    if (name === 'nombre' || name === 'apellido')
+      value = value.toUpperCase();
+
     if (name === 'DNI')
       value = soloNumeros(rawValue, 8);
 
