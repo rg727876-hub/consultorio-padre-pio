@@ -9,6 +9,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 import { estadoInfo, PAGO_ESTADOS, fmtFecha, fmtFechaHora } from './citaEstados';
+import ModalCancelarCita from '../../components/appointments/ModalCancelarCita';
 
 const ACCIONABLES = ['RESERVADA', 'CONFIRMADA'];
 
@@ -16,9 +17,10 @@ export default function DetalleCita() {
   const { id }   = useParams();
   const navigate = useNavigate();
 
-  const [cita,    setCita]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
+  const [cita,          setCita]          = useState(null);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
+  const [modalCancelar, setModalCancelar] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -171,9 +173,10 @@ export default function DetalleCita() {
                            hover:bg-blue-50 transition-colors">
                 <CalendarClock size={16} /> Reprogramar cita
               </button>
-              <button onClick={() => proximamente('Cancelar cita')}
+              <button
+                onClick={() => setModalCancelar(true)}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
-                           bg-red-500 hover:bg-red-600 text-white text-sm font-semibold
+                           bg-red-500 hover:bg-red-600 active:bg-red-700 text-white text-sm font-semibold
                            transition-colors">
                 <Ban size={16} /> Cancelar cita
               </button>
@@ -183,6 +186,14 @@ export default function DetalleCita() {
               Esta cita está en estado <strong>{est.label}</strong> — solo visualización.
             </p>
           )}
+
+          {/* Modal de confirmación de cancelación */}
+          <ModalCancelarCita
+            open={modalCancelar}
+            onClose={() => setModalCancelar(false)}
+            citaId={cita.cita_id}
+            codigoCita={cita.codigo_cita}
+          />
         </div>
       </div>
     </AppLayout>

@@ -521,4 +521,104 @@ const marcarNoAsistio = async (req, res) => {
   }
 };
 
-module.exports = { getSlots, create, list, getById, agenda, marcarNoAsistio };
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/appointments/:id/cancel  (rol RECEPCIONISTA | ADMINISTRADOR)
+// Cancela una cita cuyo estado sea RESERVADA o CONFIRMADA.
+//
+// Transacción SQL:
+//  1. SELECT … FOR UPDATE → obtiene la cita y bloquea la fila.
+//  2. Valida que el estado sea RESERVADA o CONFIRMADA; si no → 400.
+//  3. UPDATE CITA → estado = 'CANCELADA'.
+//     (La tabla PAGO NO se toca: la regla financiera retiene el ingreso.)
+//  4. INSERT AUDITORIA → accion = 'CANCELACION_CITA' dentro de la txn.
+//  5. COMMIT → libera el slot del doctor para nuevas reservas.
+// ─────────────────────────────────────────────────────────────────
+const cancel = async (req, res) => {
+  const citaId   = Number(req.params.id);
+  const usuarioId = req.user?.id ?? null;          // recepcionista del JWT
+
+  if (!citaId || !Number.isInteger(citaId))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+
+  const ESTADOS_CANCELABLES = ['RESERVADA', 'CONFIRMADA'];
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query('START TRANSACTION');
+
+    // ── 1. Leer y bloquear la fila ──────────────────────────────────
+    const [[cita]] = await conn.query(
+      `SELECT cita_id, paciente_id, doctor_id, codigo_cita, estado
+       FROM   CITA
+       WHERE  cita_id = ?
+       FOR UPDATE`,
+      [citaId]
+    );
+
+    if (!cita) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+
+    // ── 2. Validar estado cancelable ────────────────────────────────
+    if (!ESTADOS_CANCELABLES.includes(cita.estado)) {
+      await conn.query('ROLLBACK');
+      return res.status(400).json({
+        error: `No se puede cancelar una cita en estado '${cita.estado}'. ` +
+               `Solo se permiten cancelar citas en estado: ${ESTADOS_CANCELABLES.join(', ')}.`,
+      });
+    }
+
+    // ── 3. Cancelar la cita ─────────────────────────────────────────
+    // Se marca como CANCELADA. No se modifica PAGO (retención financiera).
+    await conn.query(
+      `UPDATE CITA
+       SET    estado = 'CANCELADA'
+       WHERE  cita_id = ?`,
+      [citaId]
+    );
+
+    // ── 4. Registrar auditoría dentro de la misma transacción ───────
+    await conn.query(
+      `INSERT INTO AUDITORIA
+         (usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen)
+       VALUES (?, ?, 'CANCELACION_CITA', 'CITA', ?, ?, ?)`,
+      [
+        usuarioId,
+        cita.paciente_id,
+        citaId,
+        JSON.stringify({
+          codigo_cita:    cita.codigo_cita,
+          estado_previo:  cita.estado,
+          cancelado_por:  usuarioId,
+        }),
+        req.ip ?? null,
+      ]
+    );
+
+    // ── 5. Confirmar transacción ─────────────────────────────────────
+    await conn.query('COMMIT');
+
+    return res.status(200).json({
+      message:     'Cita cancelada exitosamente',
+      cita_id:     citaId,
+      codigo_cita: cita.codigo_cita,
+      estado:      'CANCELADA',
+    });
+
+  } catch (err) {
+    if (conn) {
+      try { await conn.query('ROLLBACK'); } catch (_) {}
+    }
+    console.error('[appointment.cancel]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+module.exports = { getSlots, create, list, getById, agenda, marcarNoAsistio, cancel };

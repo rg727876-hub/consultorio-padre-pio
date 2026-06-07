@@ -2,7 +2,7 @@ const { Router }      = require('express');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { checkRole }   = require('../middlewares/role.middleware');
 const {
-  getSlots, create, list, getById, agenda, marcarNoAsistio,
+  getSlots, create, list, getById, agenda, marcarNoAsistio, cancel,
 } = require('../controllers/appointment.controller');
 
 const router = Router();
@@ -21,6 +21,9 @@ router.get('/:id', verifyToken, checkRole('RECEPCIONISTA', 'ADMINISTRADOR'), get
 
 // PUT /api/appointments/:id/no-asistio  → marcar como NO_ASISTIO (doctor)
 router.put('/:id/no-asistio', verifyToken, checkRole('DOCTOR'), marcarNoAsistio);
+
+// PATCH /api/appointments/:id/cancel  → cancelar cita RESERVADA o CONFIRMADA
+router.patch('/:id/cancel', verifyToken, checkRole('RECEPCIONISTA', 'ADMINISTRADOR'), cancel);
 
 // POST /api/appointments
 router.post('/', verifyToken, checkRole('RECEPCIONISTA', 'ADMINISTRADOR'), create);

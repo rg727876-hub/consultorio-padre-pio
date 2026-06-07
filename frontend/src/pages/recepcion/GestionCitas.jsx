@@ -8,6 +8,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 import { ESTADOS, estadoInfo, fmtFecha } from './citaEstados';
+import ModalCancelarCita from '../../components/appointments/ModalCancelarCita';
 
 export default function GestionCitas() {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ export default function GestionCitas() {
   const [pages,       setPages]       = useState(1);
   const [total,       setTotal]       = useState(0);
   const [totalGlobal, setTotalGlobal] = useState(0);
+  // Cita seleccionada para cancelar: { cita_id, codigo_cita } | null
+  const [citaCancelar, setCitaCancelar] = useState(null);
 
   // Filtros
   const [q,           setQ]           = useState('');
@@ -260,8 +263,15 @@ export default function GestionCitas() {
                                   className="text-slate-500 hover:bg-slate-100"><Eye size={15} /></IconBtn>
                                 <IconBtn title="Reprogramar" onClick={() => proximamente('Reprogramar')}
                                   className="text-[#0059B3] hover:bg-blue-50"><CalendarClock size={15} /></IconBtn>
-                                <IconBtn title="Cancelar" onClick={() => proximamente('Cancelar')}
-                                  className="text-red-500 hover:bg-red-50"><Ban size={15} /></IconBtn>
+                                {['RESERVADA', 'CONFIRMADA'].includes(c.estado) && (
+                                  <IconBtn
+                                    title="Cancelar cita"
+                                    onClick={() => setCitaCancelar({ cita_id: c.cita_id, codigo_cita: c.codigo_cita })}
+                                    className="text-red-500 hover:bg-red-50"
+                                  >
+                                    <Ban size={15} />
+                                  </IconBtn>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -296,6 +306,18 @@ export default function GestionCitas() {
           </section>
         </div>
       </div>
+
+      {/* Modal de confirmación de cancelación */}
+      <ModalCancelarCita
+        open={!!citaCancelar}
+        onClose={() => setCitaCancelar(null)}
+        citaId={citaCancelar?.cita_id}
+        codigoCita={citaCancelar?.codigo_cita}
+        onSuccess={() => {
+          setCitaCancelar(null);
+          fetchCitas(page);  // refresca la página actual
+        }}
+      />
     </AppLayout>
   );
 }
