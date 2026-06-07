@@ -10,6 +10,8 @@ import RegistroServicio       from '../pages/admin/RegistroServicio';
 import GestionarServicios     from '../pages/admin/GestionarServicios';
 import HorariosDoctor         from '../pages/admin/HorariosDoctor';
 import RegistrarPaciente      from '../pages/recepcion/RegistrarPaciente';
+import ListaPacientes         from '../pages/recepcion/ListaPacientes';
+import DetallePaciente        from '../pages/recepcion/DetallePaciente';
 import AgendarCita            from '../pages/recepcion/AgendarCita';
 import GestionCitas           from '../pages/recepcion/GestionCitas';
 import DetalleCita            from '../pages/recepcion/DetalleCita';
@@ -62,9 +64,21 @@ function RouterContent() {
         } />
 
         {/* ── Recepcionista y Administrador ── */}
+        <Route path="/recepcion/pacientes" element={
+          <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
+            <ListaPacientes />
+          </PrivateRoute>
+        } />
+
         <Route path="/recepcion/pacientes/nuevo" element={
           <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
             <RegistrarPaciente />
+          </PrivateRoute>
+        } />
+
+        <Route path="/recepcion/pacientes/:id" element={
+          <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
+            <DetallePaciente />
           </PrivateRoute>
         } />
 
