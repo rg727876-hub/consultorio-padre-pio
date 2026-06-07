@@ -8,6 +8,7 @@ import DashboardPage          from '../pages/DashboardPage';
 import RegistroUsuario        from '../pages/admin/RegistroUsuario';
 import GestionUsuarios        from '../pages/admin/GestionUsuarios';
 import PerfilUsuario          from '../pages/admin/PerfilUsuario';
+import PerfilMedico           from '../pages/admin/PerfilMedico';
 import RegistroServicio       from '../pages/admin/RegistroServicio';
 import GestionarServicios     from '../pages/admin/GestionarServicios';
 import HorariosDoctor         from '../pages/admin/HorariosDoctor';
@@ -53,6 +54,12 @@ function RouterContent() {
         <Route path="/admin/usuarios/:id" element={
           <PrivateRoute roles={['ADMINISTRADOR']}>
             <PerfilUsuario />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/medicos/:id" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <PerfilMedico />
           </PrivateRoute>
         } />
 

@@ -257,7 +257,7 @@ export default function GestionUsuarios() {
                       <td className="px-6 py-4 text-center">
                         {/* CA9: Ver detalles (ícono de ojo) */}
                         <button
-                          onClick={() => navigate(`/admin/usuarios/${u.usuario_id}`)}
+                          onClick={() => navigate(u.nombre_rol === 'DOCTOR' ? `/admin/medicos/${u.usuario_id}` : `/admin/usuarios/${u.usuario_id}`)}
                           className="p-1.5 text-slate-400 hover:text-[#0059B3] hover:bg-blue-50 rounded-lg transition-colors inline-flex"
                           title="Ver detalles"
                         >

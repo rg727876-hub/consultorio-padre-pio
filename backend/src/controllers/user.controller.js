@@ -35,6 +35,7 @@ const getAllUsers = async (req, res) => {
 };
 
 // POST /api/users  — solo ADMINISTRADOR
+const register = async (req, res) => {
   const {
     nombre, apellido, DNI, email, telefono, direccion,
     rol, especialidad, nroColegiatura, servicios = [],
