@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  UserPlus, Calendar, Stethoscope, CreditCard,
+  UserPlus, Calendar, Stethoscope, CreditCard, Users,
   LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List, CalendarSearch,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -10,6 +10,7 @@ import logo from '../assets/images/Logo-Consultorio-Padre-Pio.png';
 const NAV = {
   ADMINISTRADOR: [
     { label: 'Inicio',               icon: Home,          ruta: '/dashboard' },
+    { label: 'Gestión de personal',  icon: Users,         ruta: '/admin/usuarios' },
     { label: 'Registrar usuario',    icon: UserPlus,      ruta: '/admin/usuarios/nuevo' },
     { label: 'Registrar servicio',   icon: Stethoscope,   ruta: '/admin/servicios/nuevo' },
     { label: 'Horarios de doctores', icon: Clock,         ruta: '/admin/horarios' },

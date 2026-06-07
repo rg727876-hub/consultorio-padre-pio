@@ -20,6 +20,23 @@ Sistema web completo para la gestión integral de una clínica dental, desarroll
 
 ---
 
+## 🆕 Novedades en la rama `feature/admin`
+
+En esta rama se han implementado las funcionalidades de **Listado y control centralizado de personal** (PIO-16) y **Gestión de roles administrativos** (PIO-17).
+
+**Nuevos Endpoints (API):**
+- `GET /api/users`: Listado completo de usuarios (solo administradores).
+- `GET /api/users/:id`: Obtiene el perfil detallado del usuario junto con su historial de auditoría.
+- `PUT /api/users/:id`: Edición de datos personales (valida unicidad de correo).
+- `PUT /api/users/:id/status`: Activa/Desactiva usuarios. Evita desactivar al último administrador.
+- `POST /api/users/:id/resend-activation`: Reenvía correos de activación e invalida tokens anteriores.
+
+**Nuevas Vistas Frontend:**
+- `/admin/usuarios`: Tabla de listado de personal con filtros por rol y estado.
+- `/admin/usuarios/:id`: Perfil completo con formulario de edición bloqueado parcialmente, validaciones offline y una pestaña de **Historial de Actividad**.
+
+---
+
 ## 🚀 Estado del Proyecto & Roadmap
 
 ### Sprint 1: MVP Funcional (Vertical Slice)
