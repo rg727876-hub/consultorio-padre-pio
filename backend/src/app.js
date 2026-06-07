@@ -17,6 +17,7 @@ const scheduleRoutes = require('./routes/schedule.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
 const paymentRoutes      = require('./routes/payment.routes');
 const comprobanteRoutes  = require('./routes/comprobante.routes');
+const agendaRoutes       = require('./routes/agenda.routes');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments',     paymentRoutes);
 app.use('/api/comprobantes', comprobanteRoutes);
+app.use('/api/agenda',       agendaRoutes);
 
 // Manejo de errores
 app.use(errorHandler);
