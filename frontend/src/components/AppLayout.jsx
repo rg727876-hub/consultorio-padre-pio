@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   UserPlus, Calendar, Stethoscope, CreditCard,
-  LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List, CalendarSearch,
+  LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List, CalendarSearch, LayoutGrid, Users,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/images/Logo-Consultorio-Padre-Pio.png';
@@ -13,12 +13,15 @@ const NAV = {
     { label: 'Registrar usuario',    icon: UserPlus,      ruta: '/admin/usuarios/nuevo' },
     { label: 'Registrar servicio',   icon: Stethoscope,   ruta: '/admin/servicios/nuevo' },
     { label: 'Horarios de doctores', icon: Clock,         ruta: '/admin/horarios' },
+    { label: 'Gestión de pacientes', icon: Users,         ruta: '/recepcion/pacientes' },
   ],
   RECEPCIONISTA: [
-    { label: 'Inicio',             icon: Home,           ruta: '/dashboard' },
-    { label: 'Registrar paciente', icon: UserPlus,       ruta: '/recepcion/pacientes/nuevo' },
-    { label: 'Agendar cita',       icon: Calendar,       ruta: '/recepcion/citas/nueva' },
-    { label: 'Gestión de citas',   icon: CalendarSearch, ruta: '/recepcion/citas' },
+    { label: 'Inicio',               icon: Home,          ruta: '/dashboard' },
+    { label: 'Registrar paciente',   icon: UserPlus,      ruta: '/recepcion/pacientes/nuevo' },
+    { label: 'Gestión de pacientes', icon: Users,         ruta: '/recepcion/pacientes' },
+    { label: 'Agendar cita',         icon: Calendar,      ruta: '/recepcion/citas/nueva' },
+    { label: 'Gestión de citas',     icon: CalendarSearch, ruta: '/recepcion/citas' },
+    { label: 'Agenda médica',        icon: LayoutGrid,    ruta: '/recepcion/agenda' },
   ],
   DOCTOR: [
     { label: 'Inicio',    icon: Home,     ruta: '/dashboard' },
