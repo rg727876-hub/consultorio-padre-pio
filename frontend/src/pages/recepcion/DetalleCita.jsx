@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, AlertTriangle, Ban, CalendarClock,
   Hash, Calendar, Clock, Timer, User, Phone, Mail, IdCard,
@@ -9,18 +9,29 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 import { estadoInfo, PAGO_ESTADOS, fmtFecha, fmtFechaHora } from './citaEstados';
-import ModalCancelarCita from '../../components/appointments/ModalCancelarCita';
+import ModalCancelarCita   from '../../components/appointments/ModalCancelarCita';
+import ModalReprogramar    from '../../components/appointments/ModalReprogramar';
 
 const ACCIONABLES = ['RESERVADA', 'CONFIRMADA'];
 
 export default function DetalleCita() {
   const { id }   = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [cita,          setCita]          = useState(null);
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState('');
-  const [modalCancelar, setModalCancelar] = useState(false);
+  const [cita,             setCita]             = useState(null);
+  const [loading,          setLoading]          = useState(true);
+  const [error,            setError]            = useState('');
+  const [modalCancelar,    setModalCancelar]    = useState(false);
+  const [modalReprogramar, setModalReprogramar] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.openReschedule) {
+      setModalReprogramar(true);
+      // Clean state to avoid reopening on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     let activo = true;
@@ -167,7 +178,9 @@ export default function DetalleCita() {
           {/* Acciones según estado */}
           {accionable ? (
             <div className="flex gap-3">
-              <button onClick={() => proximamente('Reprogramar cita')}
+              <button
+                id="btn-reprogramar-cita"
+                onClick={() => setModalReprogramar(true)}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
                            border-2 border-[#0059B3] text-[#0059B3] text-sm font-semibold
                            hover:bg-blue-50 transition-colors">
@@ -193,6 +206,26 @@ export default function DetalleCita() {
             onClose={() => setModalCancelar(false)}
             citaId={cita.cita_id}
             codigoCita={cita.codigo_cita}
+          />
+
+          {/* Modal de reprogramación */}
+          <ModalReprogramar
+            open={modalReprogramar}
+            onClose={() => setModalReprogramar(false)}
+            cita={{
+              cita_id:        cita.cita_id,
+              codigo_cita:    cita.codigo_cita,
+              doctor_id:      cita.doctor_id,
+              doctor_nombre:  cita.doctor_nombre,
+              servicio_nombre: cita.servicio_nombre,
+              fecha:          cita.fecha,
+              hora_inicio:    cita.hora_inicio,
+              hora_fin:       cita.hora_fin,
+            }}
+            onSuccess={() => {
+              setModalReprogramar(false);
+              navigate('/recepcion/citas');  // recarga la lista con el estado actualizado
+            }}
           />
         </div>
       </div>

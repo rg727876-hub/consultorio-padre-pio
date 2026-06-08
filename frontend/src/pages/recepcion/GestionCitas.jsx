@@ -261,8 +261,10 @@ export default function GestionCitas() {
                               <div className="flex items-center gap-1">
                                 <IconBtn title="Ver detalles" onClick={() => verDetalle(c.cita_id)}
                                   className="text-slate-500 hover:bg-slate-100"><Eye size={15} /></IconBtn>
-                                <IconBtn title="Reprogramar" onClick={() => proximamente('Reprogramar')}
-                                  className="text-[#0059B3] hover:bg-blue-50"><CalendarClock size={15} /></IconBtn>
+                                {['RESERVADA', 'CONFIRMADA'].includes(c.estado) && (
+                                  <IconBtn title="Reprogramar" onClick={() => navigate(`/recepcion/citas/${c.cita_id}`, { state: { openReschedule: true } })}
+                                    className="text-[#0059B3] hover:bg-blue-50"><CalendarClock size={15} /></IconBtn>
+                                )}
                                 {['RESERVADA', 'CONFIRMADA'].includes(c.estado) && (
                                   <IconBtn
                                     title="Cancelar cita"
