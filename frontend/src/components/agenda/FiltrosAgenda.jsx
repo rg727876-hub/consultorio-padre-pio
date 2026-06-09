@@ -4,6 +4,7 @@ import { Search, X } from 'lucide-react';
 const VISTAS = [
   { id: 'diaria',  label: 'Diaria'  },
   { id: 'semanal', label: 'Semanal' },
+  { id: 'mensual', label: 'Mensual' },
 ];
 
 export default function FiltrosAgenda({

@@ -6,7 +6,10 @@ const getActive = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.usuario_id AS doctor_id,
               u.nombre, u.apellido, u.DNI,
-              d.especialidad, d.nroColegiatura
+              (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+                 FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+                WHERE de.doctor_id = d.doctor_id) AS especialidad,
+              d.nroColegiatura
        FROM   USUARIO u
        JOIN   ROL_USUARIO ru ON ru.usuario_id = u.usuario_id
        JOIN   ROL r          ON r.rol_id = ru.rol_id
@@ -32,7 +35,9 @@ const getByService = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.usuario_id AS doctor_id,
               u.nombre, u.apellido,
-              d.especialidad
+              (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+                 FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+                WHERE de.doctor_id = d.doctor_id) AS especialidad
        FROM   USUARIO u
        JOIN   DOCTOR d           ON d.doctor_id    = u.usuario_id
        JOIN   SERVICIO_DOCTOR sd ON sd.doctor_id   = u.usuario_id

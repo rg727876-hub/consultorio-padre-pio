@@ -8,7 +8,7 @@ import {
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
-import { estadoInfo, PAGO_ESTADOS, fmtFecha, fmtFechaHora } from './citaEstados';
+import { estadoInfo, pagoVista, fmtFecha, fmtFechaHora } from './citaEstados';
 import ModalCancelarCita   from '../../components/appointments/ModalCancelarCita';
 import ModalReprogramar    from '../../components/appointments/ModalReprogramar';
 
@@ -81,8 +81,7 @@ export default function DetalleCita() {
   }
 
   const est        = estadoInfo(cita.estado);
-  const pagoEstado = cita.pago?.estado ?? 'PENDIENTE';
-  const pagoInfo   = PAGO_ESTADOS[pagoEstado] ?? PAGO_ESTADOS.PENDIENTE;
+  const pagoInfo   = pagoVista(cita);
   const accionable = ACCIONABLES.includes(cita.estado);
 
   return (
@@ -149,7 +148,7 @@ export default function DetalleCita() {
                 {pagoInfo.label}
               </span>
             </div>
-            {pagoEstado === 'COMPLETADO' && (
+            {cita.pago?.estado === 'COMPLETADO' && (
               <Row icon={Calendar} label="Fecha del pago" value={fmtFechaHora(cita.pago?.fecha_pago)} />
             )}
           </Section>

@@ -66,8 +66,8 @@ export default function MiAgenda() {
     fetchAgenda({ estado: '', fechaInicio: '', fechaFin: '' });
   };
 
-  const atender    = (id)   => toast('El formulario de atención llega en INT-HU019.', { icon: '🩺' });
-  const verAtencion = (id)  => toast('La vista de la consulta clínica llega en INT-HU019.', { icon: '📄' });
+  const atender     = (id) => navigate(`/doctor/atencion/${id}`);
+  const verAtencion = (id) => navigate(`/doctor/atencion/${id}`);
 
   const confirmarNoAsistio = async () => {
     if (!confirmar) return;

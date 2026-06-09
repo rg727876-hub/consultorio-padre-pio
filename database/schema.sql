@@ -1,18 +1,18 @@
 -- ============================================
--- DENTAL consultorio_padre_pio SYSTEM - Database Schema FINAL
--- Versión integrada: lo mejor de ambos modelos
--- 
--- Decisiones de diseño:
--- - PACIENTE: solo datos personales y de cuenta de login
--- - HISTORIA_CLINICA: 1 por paciente, contiene antecedentes médicos generales
--- - CONSULTA_CLINICA: 1 por cita atendida, contiene los datos clínicos de esa visita
+-- DENTAL CLINIC SYSTEM - Database Schema FINAL
+-- Versión actualizada con:
+-- - Especialidades multi-valor (N:N)
+-- - Soporte para motivo de cancelación
+-- - Soporte para reprogramación
+-- - Liberación de slot al cancelar (slot_activo)
+-- - Registro de Atención Médica / Historia Clínica Odontológica (INT-HU019)
 -- ============================================
 
 DROP DATABASE IF EXISTS consultorio_padre_pio;
 CREATE DATABASE consultorio_padre_pio;
 USE consultorio_padre_pio;
 
--- ============================================haxl
+-- ============================================
 -- TABLA: USUARIO (personal interno de la clínica)
 -- ============================================
 CREATE TABLE USUARIO (
@@ -55,15 +55,36 @@ CREATE TABLE ROL_USUARIO (
 );
 
 -- ============================================
--- TABLA: DOCTOR (especialización de USUARIO)
+-- TABLA: ESPECIALIDAD (catálogo)
+-- ============================================
+CREATE TABLE ESPECIALIDAD (
+    especialidad_id INT AUTO_INCREMENT,
+    nombre VARCHAR(120) NOT NULL,
+    estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
+    CONSTRAINT PK_ESPECIALIDAD PRIMARY KEY (especialidad_id),
+    CONSTRAINT UK_ESPECIALIDAD_NOMBRE UNIQUE (nombre)
+);
+
+-- ============================================
+-- TABLA: DOCTOR (especialidades ahora en N:N)
 -- ============================================
 CREATE TABLE DOCTOR (
     doctor_id INT,
-    especialidad VARCHAR(120) NOT NULL,
-    nroColegiatura INT NOT NULL, -- ver si cambiar
+    nroColegiatura INT NOT NULL,
     CONSTRAINT PK_DOCTOR PRIMARY KEY (doctor_id),
     CONSTRAINT FK_DOCTOR_USUARIO FOREIGN KEY (doctor_id) REFERENCES USUARIO(usuario_id),
     CONSTRAINT UK_DOCTOR_NROCOLEGIATURA UNIQUE (nroColegiatura)
+);
+
+-- ============================================
+-- TABLA: DOCTOR_ESPECIALIDAD (relación N:N)
+-- ============================================
+CREATE TABLE DOCTOR_ESPECIALIDAD (
+    doctor_id INT,
+    especialidad_id INT,
+    CONSTRAINT PK_DOCTOR_ESPECIALIDAD PRIMARY KEY (doctor_id, especialidad_id),
+    CONSTRAINT FK_DE_DOCTOR FOREIGN KEY (doctor_id) REFERENCES DOCTOR(doctor_id),
+    CONSTRAINT FK_DE_ESPECIALIDAD FOREIGN KEY (especialidad_id) REFERENCES ESPECIALIDAD(especialidad_id)
 );
 
 -- ============================================
@@ -84,12 +105,11 @@ CREATE TABLE HORARIO (
 
 -- ============================================
 -- TABLA: SERVICIO
--- Agregado: descripcion (idea tomada del modelo del compañero)
 -- ============================================
 CREATE TABLE SERVICIO (
     servicio_id INT AUTO_INCREMENT,
     nombre VARCHAR(50) NOT NULL,
-    descripcion TEXT NULL,                       -- útil para mostrar en web pública
+    descripcion TEXT NULL,
     duracion INT NOT NULL,
     costo DECIMAL(10, 2) NOT NULL,
     buffer INT NOT NULL DEFAULT 0,
@@ -115,42 +135,37 @@ CREATE TABLE SERVICIO_DOCTOR (
 
 -- ============================================
 -- TABLA: PACIENTE
--- AHORA MÁS LIMPIA: solo datos personales, contacto y cuenta de login
--- (los antecedentes médicos van en HISTORIA_CLINICA)
 -- ============================================
 CREATE TABLE PACIENTE (
     paciente_id INT AUTO_INCREMENT,
     nombre VARCHAR(50) NOT NULL,
     apellido VARCHAR(50) NOT NULL,
-    email VARCHAR(100) NULL,                     -- email de CONTACTO
-    email_cuenta VARCHAR(100) NULL,              -- email de LOGIN (único, NULL si no tiene cuenta)
+    email VARCHAR(100) NULL,
+    email_cuenta VARCHAR(100) NULL,
     tipo_documento ENUM('DNI', 'CE', 'PASAPORTE') NOT NULL DEFAULT 'DNI',
-	numero_documento VARCHAR(20) NOT NULL,  -- ya no CHAR(8)
+    numero_documento VARCHAR(20) NOT NULL,
     telefono VARCHAR(15) NOT NULL,
     direccion VARCHAR(299),
     sexo ENUM('FEMENINO', 'MASCULINO') NOT NULL,
     fecha_nacimiento DATE NULL,
     ocupacion VARCHAR(100) NULL,
     contacto_emergencia VARCHAR(150) NULL,
-    -- Datos de cuenta de paciente (login)
     password_hash VARCHAR(255) NULL,
     estado_cuenta ENUM('SIN_CUENTA', 'ACTIVO') DEFAULT 'SIN_CUENTA',
     intentos_fallidos INT DEFAULT 0,
     bloqueado_hasta DATETIME NULL,
-    -- Estado del paciente como entidad
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     foto VARCHAR(255),
     fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_creacion_cuenta DATETIME NOT NULL,
     CONSTRAINT PK_PACIENTE PRIMARY KEY (paciente_id),
-	CONSTRAINT UQ_PACIENTE_DOCUMENTO UNIQUE (tipo_documento, numero_documento),
+    CONSTRAINT UQ_PACIENTE_DOCUMENTO UNIQUE (tipo_documento, numero_documento),
     CONSTRAINT UQ_PACIENTE_EMAIL_CUENTA UNIQUE (email_cuenta),
     CONSTRAINT CK_PACIENTE_TELEFONO CHECK (CHAR_LENGTH(telefono) >= 9)
 );
 
 -- ============================================
--- TABLA: CITA (la reserva del horario)
--- usuario_id NULL si la creó el paciente desde la web
+-- TABLA: CITA (con cancelación, reprogramación y liberación de slot)
 -- ============================================
 CREATE TABLE CITA (
     cita_id INT AUTO_INCREMENT,
@@ -166,32 +181,40 @@ CREATE TABLE CITA (
     estado ENUM('RESERVADA', 'CONFIRMADA', 'EXPIRADA', 'CANCELADA', 'ATENDIDA', 'NO_ASISTIO') NOT NULL DEFAULT 'RESERVADA',
     creado_por ENUM('PERSONAL', 'PACIENTE_ONLINE') NOT NULL DEFAULT 'PERSONAL',
     fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Campos de cancelación
+    motivo_cancelacion ENUM('PACIENTE_VOLUNTARIO', 'CLINICA_OPERATIVO', 'OTRO') NULL,
+    observacion_cancelacion TEXT NULL,
+    fecha_cancelacion DATETIME NULL,
+    -- Campo de reprogramación
+    veces_reprogramada INT DEFAULT 0,
+    -- Vale 1 solo mientras la cita ocupa el horario (RESERVADA/CONFIRMADA) y NULL
+    -- en cualquier otro estado. MySQL ignora los NULL en índices UNIQUE, por lo que
+    -- una cita CANCELADA/EXPIRADA/etc. libera el slot para reservar de nuevo,
+    -- conservando su registro en el historial.
+    slot_activo TINYINT GENERATED ALWAYS AS (
+        CASE WHEN estado IN ('RESERVADA', 'CONFIRMADA') THEN 1 ELSE NULL END
+    ) STORED,
     CONSTRAINT PK_CITA PRIMARY KEY (cita_id),
     CONSTRAINT FK_CITA_PACIENTE FOREIGN KEY (paciente_id) REFERENCES PACIENTE(paciente_id),
     CONSTRAINT FK_CITA_DOCTOR FOREIGN KEY (doctor_id) REFERENCES DOCTOR(doctor_id),
     CONSTRAINT FK_CITA_SERVICIO FOREIGN KEY (servicio_id) REFERENCES SERVICIO(servicio_id),
     CONSTRAINT FK_CITA_USUARIO FOREIGN KEY (usuario_id) REFERENCES USUARIO(usuario_id),
-    CONSTRAINT UK_CITA_DOCTOR_FECHA_HORA UNIQUE (doctor_id, fecha, hora_inicio),
+    CONSTRAINT UK_CITA_DOCTOR_FECHA_HORA UNIQUE (doctor_id, fecha, hora_inicio, slot_activo),
     CONSTRAINT UK_CITA_CODIGO_CITA UNIQUE (codigo_cita)
 );
 
 -- ============================================
--- TABLA: HISTORIA_CLINICA
--- 1 fila por paciente (UNIQUE paciente_id).
--- Contiene los antecedentes médicos generales que casi no cambian.
--- Se crea cuando el paciente tiene su primera consulta.
+-- TABLA: HISTORIA_CLINICA (1 por paciente, antecedentes generales)
 -- ============================================
 CREATE TABLE HISTORIA_CLINICA (
     historia_id INT AUTO_INCREMENT,
     paciente_id INT NOT NULL,
-    -- Antecedentes médicos generales (los actualiza el doctor)
     antecedentes_sistemicos TEXT NULL,
     antecedentes_estomatologicos TEXT NULL,
     antecedentes_farmacologicos TEXT NULL,
     antecedentes_familiares TEXT NULL,
     antecedentes_otros TEXT NULL,
     alergias TEXT NULL,
-    -- Auditoría de la historia clínica
     creado_por_doctor_id INT NOT NULL,
     actualizado_por_doctor_id INT NULL,
     fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -205,26 +228,39 @@ CREATE TABLE HISTORIA_CLINICA (
 
 -- ============================================
 -- TABLA: CONSULTA_CLINICA
--- 1 fila por cada cita atendida (UNIQUE cita_id).
--- Registra los datos clínicos específicos de esa visita.
--- Inmutable: no se permite UPDATE, solo INSERT y SELECT (controlado en backend).
+-- 1 fila por cita atendida. Inmutable: solo INSERT/SELECT (controlado en backend).
+-- Estructura alineada con la Historia Clínica Odontológica oficial del consultorio.
 -- ============================================
 CREATE TABLE CONSULTA_CLINICA (
     consulta_id INT AUTO_INCREMENT,
     cita_id INT NOT NULL,
-    historia_id INT NOT NULL,                    -- cada consulta pertenece a una historia clínica
+    historia_id INT NOT NULL,
     motivo_consulta TEXT NULL,
+    -- Funciones vitales al ingreso (P.A, Pulso, F.R, T)
+    presion_arterial VARCHAR(20) NULL,
+    pulso VARCHAR(20) NULL,
+    frecuencia_respiratoria VARCHAR(20) NULL,
+    temperatura DECIMAL(4,1) NULL,
+    -- Enfermedad actual desglosada
     enfermedad_actual TEXT NULL,
+    enfermedad_inicio TEXT NULL,
+    enfermedad_evolucion TEXT NULL,
+    enfermedad_estado_actual TEXT NULL,
+    -- Examen regional
     examen_extraoral TEXT NULL,
     examen_intraoral TEXT NULL,
+    -- Diagnósticos
     diagnostico_presuntivo TEXT NULL,
     examenes_complementarios TEXT NULL,
     diagnostico_definitivo TEXT NULL,
+    diagnostico_cie10 VARCHAR(30) NULL,
+    -- Plan y tratamiento
     plan_tratamiento TEXT NULL,
+    prescripciones TEXT NULL,
     tratamiento_aplicado TEXT NULL,
     pronostico TEXT NULL,
-    control_evolucion TEXT NULL,                 -- idea tomada del modelo del compañero
-    alta_paciente TEXT NULL,                     -- idea tomada del modelo del compañero
+    control_evolucion TEXT NULL,
+    alta_paciente TEXT NULL,
     observaciones TEXT NULL,
     odontograma_url VARCHAR(255) NULL,
     firmado_por_doctor_id INT NOT NULL,
@@ -237,9 +273,7 @@ CREATE TABLE CONSULTA_CLINICA (
 );
 
 -- ============================================
--- TABLA: PAGO
--- usuario_id NULL para pagos online (sin cajero)
--- Agregados: cambio, numero_operacion (ideas tomadas del modelo del compañero)
+-- TABLA: PAGO (Forma B: solo se crea al pagar)
 -- ============================================
 CREATE TABLE PAGO (
     pago_id INT AUTO_INCREMENT,
@@ -248,20 +282,18 @@ CREATE TABLE PAGO (
     fecha_pago DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     monto_total DECIMAL(10, 2) NOT NULL,
     metodo_pago ENUM('YAPE', 'EFECTIVO', 'TARJETA_PRESENCIAL', 'PLIN', 'TARJETA_ONLINE') NOT NULL,
-    cambio DECIMAL(10, 2) DEFAULT 0,             -- útil para pagos en efectivo
-    numero_operacion VARCHAR(100) NULL,          -- número de operación local (Yape, Plin, tarjeta presencial)
-    
+    cambio DECIMAL(10, 2) DEFAULT 0,
+    numero_operacion VARCHAR(100) NULL,
     culqi_charge_id VARCHAR(100) NULL,
-    culqi_outcome_code VARCHAR(50) NULL,  -- para saber por qué falló si falla
+    culqi_outcome_code VARCHAR(50) NULL,
     ultimos_4_tarjeta CHAR(4) NULL,
     marca_tarjeta VARCHAR(20) NULL,
-    
     estado ENUM('PENDIENTE', 'COMPLETADO', 'FALLIDO') NOT NULL DEFAULT 'PENDIENTE',
     CONSTRAINT PK_PAGO PRIMARY KEY (pago_id),
     CONSTRAINT FK_PAGO_CITA FOREIGN KEY (cita_id) REFERENCES CITA(cita_id),
     CONSTRAINT FK_PAGO_USUARIO FOREIGN KEY (usuario_id) REFERENCES USUARIO(usuario_id),
     CONSTRAINT UK_PAGO_CITA UNIQUE (cita_id)
-); 
+);
 
 -- ============================================
 -- TABLA: COMPROBANTE
@@ -280,8 +312,8 @@ CREATE TABLE COMPROBANTE (
     nubefact_pdf_url VARCHAR(500) NULL,
     nubefact_hash VARCHAR(255) NULL,
     nubefact_aceptado_sunat BOOLEAN DEFAULT NULL,
-    subtotal_exonerado DECIMAL(10,2) DEFAULT 0,  -- para tu caso (servicios médicos)
-    igv DECIMAL(10,2) DEFAULT 0,  -- siempre 0 pero documentas la exoneración
+    subtotal_exonerado DECIMAL(10,2) DEFAULT 0,
+    igv DECIMAL(10,2) DEFAULT 0,
     cliente_ruc CHAR(11) NULL,
     cliente_razon_social VARCHAR(200) NULL,
     enviado_correo BOOLEAN DEFAULT FALSE,
@@ -293,7 +325,6 @@ CREATE TABLE COMPROBANTE (
 
 -- ============================================
 -- TABLA: AUDITORIA
--- Registro de acciones críticas del sistema
 -- ============================================
 CREATE TABLE AUDITORIA (
     auditoria_id INT AUTO_INCREMENT,
@@ -310,6 +341,9 @@ CREATE TABLE AUDITORIA (
     CONSTRAINT FK_AUDIT_PACIENTE FOREIGN KEY (paciente_id) REFERENCES PACIENTE(paciente_id)
 );
 
+-- ============================================
+-- TABLA: TOKEN_ACTIVACION
+-- ============================================
 CREATE TABLE TOKEN_ACTIVACION (
     token_id INT AUTO_INCREMENT,
     usuario_id INT NOT NULL,
@@ -335,18 +369,32 @@ CREATE INDEX idx_paciente_documento ON PACIENTE(tipo_documento);
 CREATE INDEX idx_consulta_doctor ON CONSULTA_CLINICA(firmado_por_doctor_id);
 CREATE INDEX idx_consulta_historia ON CONSULTA_CLINICA(historia_id);
 CREATE INDEX idx_token_usuario ON TOKEN_ACTIVACION(usuario_id);
+CREATE INDEX idx_doctor_especialidad ON DOCTOR_ESPECIALIDAD(especialidad_id);
+
 -- ============================================================
 -- DATOS INICIALES (SEED)
 -- ============================================================
+
+-- Especialidades odontológicas reconocidas (catálogo) — para doctores especializados
+INSERT INTO ESPECIALIDAD (nombre) VALUES
+    ('Ortodoncia y Ortopedia Maxilar'),
+    ('Cirugía Bucal y Maxilofacial'),
+    ('Endodoncia'),
+    ('Periodoncia e Implantología'),
+    ('Rehabilitación Oral'),
+    ('Odontopediatría'),
+    ('Radiología Bucal y Maxilofacial'),
+    ('Patología Bucal'),
+    ('Salud Pública Estomatológica');
 
 -- Roles del sistema
 INSERT INTO ROL (nombre_rol) VALUES
     ('ADMINISTRADOR'),
     ('RECEPCIONISTA'),
-    ('DOCTOR'),
-    ('CAJERO');
+    ('CAJERO'),
+    ('DOCTOR');
 
--- Usuario administrador
+-- Usuario administrador (único usuario inicial)
 -- Email: consultoripadrepio@gmail.com | Password: consultorio@padrepio123
 INSERT INTO USUARIO (nombre, apellido, email, DNI, telefono, estado, password_hash)
 VALUES (
@@ -366,10 +414,16 @@ FROM ROL r, USUARIO u
 WHERE r.nombre_rol = 'ADMINISTRADOR'
   AND u.email = 'consultoripadrepio@gmail.com';
 
--- Servicios dentales de ejemplo
-INSERT INTO SERVICIO (nombre, descripcion, duracion, costo, buffer, estado) VALUES
-    ('Limpieza Dental',   'Profilaxis dental completa con ultrasonido',    30,  80.00, 10, 'ACTIVO'),
-    ('Extracción Simple', 'Extracción de pieza dental sin complicaciones', 45, 120.00, 15, 'ACTIVO'),
-    ('Curación Dental',   'Restauración con resina fotocurada',            40, 100.00, 10, 'ACTIVO'),
-    ('Blanqueamiento',    'Blanqueamiento dental con lámpara LED',         60, 250.00, 10, 'ACTIVO'),
-    ('Consulta General',  'Evaluación y diagnóstico inicial',              20,  50.00, 10, 'ACTIVO');
+-- Servicios que ofrece la clínica
+-- NOTA: duración (min) y costo son valores iniciales; ajústalos en "Gestionar servicios".
+INSERT INTO SERVICIO (nombre, duracion, costo, buffer) VALUES
+    ('Brackets de ortodoncia', 60, 0.00, 10),
+    ('Limpieza dental',        30, 0.00, 10),
+    ('Curaciones',             30, 0.00, 10),
+    ('Blanqueamiento dental',  60, 0.00, 10),
+    ('Prótesis fija',          60, 0.00, 10),
+    ('Prótesis removible',     60, 0.00, 10),
+    ('Exodoncias',             45, 0.00, 10),
+    ('Endodoncia',             60, 0.00, 10),
+    ('Odontopediatría',        30, 0.00, 10),
+    ('Implante dental',        90, 0.00, 10);

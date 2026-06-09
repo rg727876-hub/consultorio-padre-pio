@@ -96,9 +96,6 @@ function Slot({ slot }) {
           <p className="text-slate-300 text-[10px] truncate mt-0.5">
             {slot.cita.servicio_nombre}
           </p>
-          <p className="text-slate-400 text-[10px] mt-1.5 font-mono">
-            {slot.cita.hora_inicio_cita} – {slot.cita.hora_fin_con_buffer}
-          </p>
           {/* Flechita inferior */}
           <div className="absolute top-full left-1/2 -translate-x-1/2
                           border-[5px] border-transparent border-t-slate-800" />

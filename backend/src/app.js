@@ -18,6 +18,9 @@ const appointmentRoutes = require('./routes/appointment.routes');
 const paymentRoutes      = require('./routes/payment.routes');
 const comprobanteRoutes  = require('./routes/comprobante.routes');
 const agendaRoutes       = require('./routes/agenda.routes');
+const auditRoutes        = require('./routes/audit.routes');
+const consultaRoutes     = require('./routes/consulta.routes');
+const especialidadRoutes = require('./routes/especialidad.routes');
 
 const app = express();
 
@@ -53,6 +56,9 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments',     paymentRoutes);
 app.use('/api/comprobantes', comprobanteRoutes);
 app.use('/api/agenda',       agendaRoutes);
+app.use('/api/audit',        auditRoutes);
+app.use('/api/consultas',    consultaRoutes);
+app.use('/api/especialidades', especialidadRoutes);
 
 // Manejo de errores
 app.use(errorHandler);

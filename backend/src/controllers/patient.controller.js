@@ -251,7 +251,9 @@ const getById = async (req, res) => {
          c.estado, c.precio_aplicado,
          s.nombre AS servicio_nombre, s.duracion,
          CONCAT(u.nombre,' ',u.apellido) AS doctor_nombre,
-         d.especialidad
+         (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+            FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+           WHERE de.doctor_id = d.doctor_id) AS especialidad
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
        JOIN   USUARIO  u ON u.usuario_id  = c.doctor_id
@@ -294,66 +296,67 @@ const update = async (req, res) => {
     telefono, email, direccion, ocupacion, contacto_emergencia,
   } = req.body;
 
-  // Validaciones
-  if (!nombre?.trim() || !apellido?.trim())
-    return res.status(400).json({ error: 'Nombre y apellido son obligatorios' });
+  // Actualización PARCIAL: solo se validan/actualizan los campos enviados.
+  // (El modal de "datos de contacto" no envía nombre/apellido — y no debe.)
+  const has = (v) => v !== undefined;
 
-  if (!telefono)
-    return res.status(400).json({ error: 'El teléfono es requerido' });
+  // ── Validaciones (solo de los campos presentes) ──────────────────
+  if (has(nombre) && !String(nombre).trim())
+    return res.status(400).json({ error: 'El nombre no puede estar vacío' });
+  if (has(apellido) && !String(apellido).trim())
+    return res.status(400).json({ error: 'El apellido no puede estar vacío' });
 
-  const telefonoLimpio = String(telefono).replace(/\D/g, '');
-  if (!RE_TELEFONO.test(telefonoLimpio))
+  if (has(telefono) && !RE_TELEFONO.test(String(telefono).replace(/\D/g, '')))
     return res.status(400).json({ error: 'El teléfono debe tener exactamente 9 dígitos' });
 
-  if (sexo && !SEXOS_VALIDOS.includes(sexo))
+  if (has(sexo) && sexo && !SEXOS_VALIDOS.includes(sexo))
     return res.status(400).json({ error: 'Sexo no válido' });
 
-  if (email && !RE_EMAIL.test(String(email).trim()))
+  if (has(email) && email && !RE_EMAIL.test(String(email).trim()))
     return res.status(400).json({ error: 'El correo electrónico no es válido' });
 
-  if (contacto_emergencia && !RE_TELEFONO.test(String(contacto_emergencia).trim()))
+  if (has(contacto_emergencia) && contacto_emergencia &&
+      !RE_TELEFONO.test(String(contacto_emergencia).replace(/\D/g, '')))
     return res.status(400).json({ error: 'El contacto de emergencia debe tener exactamente 9 dígitos' });
 
-  if (fecha_nacimiento) {
+  if (has(fecha_nacimiento) && fecha_nacimiento) {
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     const dob = new Date(fecha_nacimiento + 'T00:00:00');
     if (dob >= hoy)
       return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
   }
 
+  // ── Construir SET dinámico con los campos presentes ──────────────
+  const sets = [];
+  const params = [];
+  const push = (col, val) => { sets.push(`${col} = ?`); params.push(val); };
+
+  if (has(nombre))           push('nombre',   String(nombre).trim());
+  if (has(apellido))         push('apellido', String(apellido).trim());
+  if (has(sexo))             push('sexo', sexo || null);
+  if (has(fecha_nacimiento)) push('fecha_nacimiento', fecha_nacimiento || null);
+  if (has(telefono))         push('telefono', String(telefono).replace(/\D/g, ''));
+  if (has(email))            push('email', email ? String(email).trim().toLowerCase() : null);
+  if (has(direccion))        push('direccion', direccion ? String(direccion).trim() : null);
+  if (has(ocupacion))        push('ocupacion', ocupacion ? String(ocupacion).trim() : null);
+  if (has(contacto_emergencia))
+    push('contacto_emergencia', contacto_emergencia ? String(contacto_emergencia).trim() : null);
+
+  if (!sets.length)
+    return res.status(400).json({ error: 'No se enviaron campos para actualizar' });
+
   try {
     // Verificar que el paciente existe
     const [[existente]] = await pool.query(
-      'SELECT paciente_id, nombre, apellido FROM PACIENTE WHERE paciente_id = ?',
+      'SELECT paciente_id FROM PACIENTE WHERE paciente_id = ?',
       [id]
     );
     if (!existente)
       return res.status(404).json({ error: 'Paciente no encontrado' });
 
     await pool.query(
-      `UPDATE PACIENTE
-       SET nombre              = ?,
-           apellido            = ?,
-           sexo                = ?,
-           fecha_nacimiento    = ?,
-           telefono            = ?,
-           email               = ?,
-           direccion           = ?,
-           ocupacion           = ?,
-           contacto_emergencia = ?
-       WHERE paciente_id = ?`,
-      [
-        String(nombre).trim(),
-        String(apellido).trim(),
-        sexo               || null,
-        fecha_nacimiento   || null,
-        telefonoLimpio,
-        email               ? String(email).trim().toLowerCase() : null,
-        direccion           ? String(direccion).trim()            : null,
-        ocupacion           ? String(ocupacion).trim()            : null,
-        contacto_emergencia ? String(contacto_emergencia).trim()  : null,
-        id,
-      ]
+      `UPDATE PACIENTE SET ${sets.join(', ')} WHERE paciente_id = ?`,
+      [...params, id]
     );
 
     await logAudit({

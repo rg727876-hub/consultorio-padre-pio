@@ -1,22 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { LayoutGrid, AlertTriangle } from 'lucide-react';
+import { LayoutGrid, AlertTriangle, RefreshCw } from 'lucide-react';
 import api from '../../api/axios';
 import AppLayout from '../../components/AppLayout';
 import FiltrosAgenda from '../../components/agenda/FiltrosAgenda';
 import GrillaDisponibilidad from '../../components/agenda/GrillaDisponibilidad';
+import GrillaMensual from '../../components/agenda/GrillaMensual';
 
 // ── Fecha de hoy en formato YYYY-MM-DD ───────────────────────────
 const hoy = () => new Date().toLocaleDateString('en-CA');
 
+// ── Intervalo de refresco automático en vivo (CA6) ───────────────
+const POLL_MS = 15000; // 15 s
+
 // ── Registro de auditoría — fire-and-forget ──────────────────────
-// Usa logAudit vía la misma instancia Axios del proyecto.
+// Persiste la acción de UI en la tabla AUDITORIA vía POST /api/audit.
 // No bloquea la UI si falla (el catch es silencioso).
 const auditLog = (accion, detalles) => {
   api.post('/audit', { accion, detalles }).catch(() => {});
-  // Si el proyecto no tiene endpoint POST /audit propio, usa directamente
-  // el helper del backend (logAudit está en el servidor, no en el cliente).
-  // En este caso el log queda en consola para trazabilidad local:
-  console.info(`[AUDIT] ${accion}`, detalles);
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -27,23 +27,25 @@ const auditLog = (accion, detalles) => {
 //   └─ Encabezado
 //   └─ FiltrosAgenda   (selección de doctor/especialidad/vista)
 //   └─ Panel de info del doctor seleccionado
-//   └─ GrillaDisponibilidad (columnas de slots coloreados)
+//   └─ GrillaDisponibilidad (diaria/semanal) | GrillaMensual (mensual)
 // ══════════════════════════════════════════════════════════════════
 export default function AgendaMedica() {
   // ── Filtros ────────────────────────────────────────────────────
   const [doctores,     setDoctores]     = useState([]);
   const [doctorId,     setDoctorId]     = useState('');
   const [especialidad, setEspecialidad] = useState('');
-  const [vista,        setVista]        = useState('diaria');   // 'diaria' | 'semanal'
+  const [vista,        setVista]        = useState('diaria');   // 'diaria' | 'semanal' | 'mensual'
   const [fecha,        setFecha]        = useState(hoy());
 
   // ── Doctor seleccionado (objeto completo) ──────────────────────
   const [doctorInfo, setDoctorInfo] = useState(null);
 
   // ── Datos de disponibilidad ────────────────────────────────────
-  const [grilla,  setGrilla]  = useState({});   // { [fecha]: slots[] }
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
+  const [grilla,   setGrilla]   = useState({});    // { [fecha]: slots[] }  (diaria/semanal)
+  const [mesDias,  setMesDias]  = useState([]);     // [{ fecha, dia, ... }] (mensual)
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
+  const [ultimaAct, setUltimaAct] = useState(null); // marca de tiempo del último refresco
 
   // Ref para cancelar fetches si el componente se desmonta
   const abortRef = useRef(null);
@@ -62,7 +64,7 @@ export default function AgendaMedica() {
     setDoctorInfo(doc ?? null);
   }, [doctorId, doctores]);
 
-  // ── Fechas a mostrar según la vista ───────────────────────────
+  // ── Fechas a mostrar según la vista (diaria/semanal) ───────────
   const fechasVista = useCallback(() => {
     if (vista === 'diaria') return [fecha];
     // Semanal: lunes a sábado de la semana que contiene `fecha`
@@ -78,75 +80,112 @@ export default function AgendaMedica() {
     });
   }, [vista, fecha]);
 
-  // ── Fetch de disponibilidad ────────────────────────────────────
-  const fetchDisponibilidad = useCallback(async () => {
+  // ── Fetch de datos según la vista ──────────────────────────────
+  // `silent` = true → refresco en vivo: no limpia la grilla ni muestra
+  //   el spinner, para que la actualización no provoque parpadeos.
+  const fetchData = useCallback(async (silent = false) => {
     if (!doctorId) return;
 
     // Cancelar fetch anterior si existe
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
 
-    const fechas = fechasVista();
-    setLoading(true);
-    setError('');
-    setGrilla({});
+    if (!silent) {
+      setLoading(true);
+      setError('');
+      if (vista === 'mensual') setMesDias([]);
+      else                     setGrilla({});
+    }
 
-    // Auditoría — se dispara al consultar la disponibilidad
-    auditLog('CONSULTAR_DISPONIBILIDAD_UI', {
-      doctor_id: doctorId,
-      vista,
-      fecha,
-      fechas_solicitadas: fechas,
-    });
+    // Auditoría — solo en cargas explícitas (no en cada poll, para no
+    // inundar el log de auditoría).
+    if (!silent) {
+      auditLog('CONSULTAR_DISPONIBILIDAD_UI', { doctor_id: doctorId, vista, fecha });
+    }
 
     try {
-      const resultados = await Promise.all(
-        fechas.map(f =>
-          api.get(`/agenda/disponibilidad/${doctorId}`, {
-            params: { fecha: f },
-            signal: abortRef.current.signal,
-          })
-            .then(({ data }) => ({ fecha: f, slots: data.slots ?? [], doctor: data.doctor }))
-            .catch(() => ({ fecha: f, slots: [] }))
-        )
-      );
-
-      const nueva = {};
-      resultados.forEach(({ fecha: f, slots }) => { nueva[f] = slots; });
-      setGrilla(nueva);
-
-      // Tomar info del doctor desde la primera respuesta exitosa
-      const primerConDoctor = resultados.find(r => r.doctor);
-      if (primerConDoctor?.doctor && !doctorInfo) {
-        setDoctorInfo(prev => prev ?? primerConDoctor.doctor);
+      if (vista === 'mensual') {
+        const [anio, mes] = fecha.split('-').map(Number);
+        const { data } = await api.get(`/agenda/resumen-mes/${doctorId}`, {
+          params: { anio, mes }, signal,
+        });
+        setMesDias(data.dias ?? []);
+        if (data.doctor && !doctorInfo) setDoctorInfo(prev => prev ?? data.doctor);
+      } else {
+        const fechas = fechasVista();
+        const resultados = await Promise.all(
+          fechas.map(f =>
+            api.get(`/agenda/disponibilidad/${doctorId}`, { params: { fecha: f }, signal })
+              .then(({ data }) => ({ fecha: f, slots: data.slots ?? [], doctor: data.doctor }))
+              .catch(() => ({ fecha: f, slots: [] }))
+          )
+        );
+        const nueva = {};
+        resultados.forEach(({ fecha: f, slots }) => { nueva[f] = slots; });
+        setGrilla(nueva);
+        const primerConDoctor = resultados.find(r => r.doctor);
+        if (primerConDoctor?.doctor && !doctorInfo) {
+          setDoctorInfo(prev => prev ?? primerConDoctor.doctor);
+        }
       }
+      setUltimaAct(new Date());
+      if (silent) setError('');
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED' && !silent) {
         setError('No se pudo cargar la disponibilidad. Intente nuevamente.');
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctorId, vista, fecha]);
 
   // ── Manejadores de filtros ─────────────────────────────────────
   const handleVistaChange = (nuevaVista) => {
-    setVista(nuevaVista);
+    if (nuevaVista === vista) return;
     auditLog('CAMBIO_VISTA_AGENDA', { vista_anterior: vista, vista_nueva: nuevaVista, doctor_id: doctorId });
+    setVista(nuevaVista);
   };
 
-  const handleFechaChange = (nuevaFecha) => {
-    setFecha(nuevaFecha);
+  const handleFechaChange = (nuevaFecha) => setFecha(nuevaFecha);
+
+  // Navegación de mes (vista mensual)
+  const handleNavegarMes = (delta) => {
+    const [y, m] = fecha.split('-').map(Number);
+    const nd = new Date(y, m - 1 + delta, 1);
+    setFecha(nd.toLocaleDateString('en-CA'));
   };
 
-  // Auto-refrescar cuando cambia vista o fecha (si ya hay doctor seleccionado)
+  // Al hacer clic en un día del calendario mensual → vista diaria de ese día
+  const handleSelectDia = (fechaDia) => {
+    auditLog('CAMBIO_VISTA_AGENDA', { vista_anterior: 'mensual', vista_nueva: 'diaria', doctor_id: doctorId });
+    setFecha(fechaDia);
+    setVista('diaria');
+  };
+
+  // Auto-cargar cuando cambia vista, fecha o doctor
   useEffect(() => {
-    if (doctorId) fetchDisponibilidad();
+    if (doctorId) fetchData(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista, fecha, doctorId]);
 
+  // ── Sincronización en tiempo real (CA6) ────────────────────────
+  // Refresca en silencio cada POLL_MS para reflejar cancelaciones,
+  // reprogramaciones o nuevas reservas hechas desde el portal público,
+  // sin que la recepcionista tenga que recargar la página.
+  // Se pausa cuando la pestaña no está visible para no malgastar red.
+  useEffect(() => {
+    if (!doctorId) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchData(true);
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [doctorId, fetchData]);
+
   // ── Render ─────────────────────────────────────────────────────
+  const [anioSel, mesSel] = fecha.split('-').map(Number);
+
   return (
     <AppLayout>
       <div className="px-4 py-8">
@@ -159,7 +198,7 @@ export default function AgendaMedica() {
               <h1 className="text-xl font-bold text-[#0059B3]">Agenda Médica</h1>
             </div>
             <p className="text-sm text-slate-500 mt-0.5">
-              Visualiza la disponibilidad de los doctores por día o semana
+              Visualiza la disponibilidad de los doctores por día, semana o mes
             </p>
           </div>
 
@@ -172,7 +211,7 @@ export default function AgendaMedica() {
             onDoctorChange={setDoctorId}
             onEspecialidadChange={setEspecialidad}
             onVistaChange={handleVistaChange}
-            onBuscar={fetchDisponibilidad}
+            onBuscar={() => fetchData(false)}
             loading={loading}
           />
 
@@ -192,10 +231,20 @@ export default function AgendaMedica() {
                   <p className="text-xs text-slate-500">{doctorInfo.especialidad}</p>
                 )}
               </div>
-              <span className="ml-auto text-xs font-medium text-[#0059B3] bg-[#0059B3]/10
-                               px-2.5 py-1 rounded-full capitalize">
-                Vista {vista}
-              </span>
+
+              {/* Indicador de actualización en vivo */}
+              <div className="ml-auto flex items-center gap-3">
+                {ultimaAct && (
+                  <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-emerald-600">
+                    <RefreshCw size={11} className="animate-[spin_3s_linear_infinite]" />
+                    En vivo · {ultimaAct.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+                <span className="text-xs font-medium text-[#0059B3] bg-[#0059B3]/10
+                                 px-2.5 py-1 rounded-full capitalize">
+                  Vista {vista}
+                </span>
+              </div>
             </div>
           )}
 
@@ -206,7 +255,7 @@ export default function AgendaMedica() {
               <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />
               <p className="text-sm text-amber-700">{error}</p>
               <button
-                onClick={fetchDisponibilidad}
+                onClick={() => fetchData(false)}
                 className="ml-auto text-xs font-semibold text-amber-700
                            hover:text-amber-900 underline"
               >
@@ -215,15 +264,27 @@ export default function AgendaMedica() {
             </div>
           )}
 
-          {/* ── Grilla de disponibilidad ── */}
-          <GrillaDisponibilidad
-            doctorId={doctorId}
-            vista={vista}
-            fecha={fecha}
-            grilla={grilla}
-            loading={loading}
-            onFechaChange={handleFechaChange}
-          />
+          {/* ── Grilla / Calendario ── */}
+          {vista === 'mensual' ? (
+            <GrillaMensual
+              doctorId={doctorId}
+              anio={anioSel}
+              mes={mesSel}
+              dias={mesDias}
+              loading={loading}
+              onNavegar={handleNavegarMes}
+              onSelectDia={handleSelectDia}
+            />
+          ) : (
+            <GrillaDisponibilidad
+              doctorId={doctorId}
+              vista={vista}
+              fecha={fecha}
+              grilla={grilla}
+              loading={loading}
+              onFechaChange={handleFechaChange}
+            />
+          )}
 
         </div>
       </div>

@@ -69,7 +69,9 @@ const getDisponibilidad = async (req, res) => {
     const [[doctor]] = await pool.query(
       `SELECT u.usuario_id AS id,
               CONCAT(u.nombre,' ',u.apellido) AS nombre,
-              d.especialidad
+              (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+                 FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+                WHERE de.doctor_id = d.doctor_id) AS especialidad
        FROM   USUARIO u
        JOIN   DOCTOR  d ON d.doctor_id = u.usuario_id
        WHERE  u.usuario_id = ? AND u.estado = 'ACTIVO'`,
@@ -247,4 +249,109 @@ const getDisponibilidad = async (req, res) => {
   }
 };
 
-module.exports = { getDisponibilidad };
+// ─────────────────────────────────────────────────────────────────
+// GET /api/agenda/resumen-mes/:doctorId?anio=YYYY&mes=M
+//
+// Resumen mensual para la vista "Mensual" de la Agenda Médica.
+// Devuelve un arreglo con un registro por día del mes indicando:
+//   es_laboral → el doctor tiene horario configurado ese día de la semana
+//   ocupados   → nº de citas activas (RESERVADA|CONFIRMADA) ese día
+//
+// Se resuelve con solo dos consultas agregadas (no genera la grilla de
+// slots por día), por lo que es eficiente para pintar el calendario.
+//
+// Roles: RECEPCIONISTA, ADMINISTRADOR, DOCTOR
+// ─────────────────────────────────────────────────────────────────
+const getResumenMes = async (req, res) => {
+  const doctorId = Number(req.params.doctorId);
+  if (!doctorId || !Number.isInteger(doctorId))
+    return res.status(400).json({ error: 'ID de doctor inválido' });
+
+  const anio = Number(req.query.anio);
+  const mes  = Number(req.query.mes);   // 1-12
+  if (!anio || !mes || mes < 1 || mes > 12)
+    return res.status(400).json({ error: 'Parámetros requeridos: anio y mes (1-12)' });
+
+  try {
+    // ── 1. Doctor activo ────────────────────────────────────────────
+    const [[doctor]] = await pool.query(
+      `SELECT u.usuario_id AS id,
+              CONCAT(u.nombre,' ',u.apellido) AS nombre,
+              (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+                 FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+                WHERE de.doctor_id = d.doctor_id) AS especialidad
+       FROM   USUARIO u
+       JOIN   DOCTOR  d ON d.doctor_id = u.usuario_id
+       WHERE  u.usuario_id = ? AND u.estado = 'ACTIVO'`,
+      [doctorId]
+    );
+    if (!doctor)
+      return res.status(404).json({ error: 'Doctor no encontrado o inactivo' });
+
+    // ── 2. Días de la semana en que el doctor atiende ───────────────
+    const [horarios] = await pool.query(
+      `SELECT DISTINCT dia_semana FROM HORARIO
+       WHERE  doctor_id = ? AND estado = 'ACTIVO'`,
+      [doctorId]
+    );
+    const diasLaborables = new Set(horarios.map(h => h.dia_semana));
+
+    // ── 3. Citas activas por día en el mes ──────────────────────────
+    const mm        = String(mes).padStart(2, '0');
+    const ultimoNum = new Date(anio, mes, 0).getDate();   // último día del mes
+    const primerDia = `${anio}-${mm}-01`;
+    const ultimoDia = `${anio}-${mm}-${String(ultimoNum).padStart(2, '0')}`;
+
+    const [citasPorDia] = await pool.query(
+      `SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, COUNT(*) AS total
+       FROM   CITA
+       WHERE  doctor_id = ? AND fecha BETWEEN ? AND ?
+         AND  UPPER(estado) IN ('RESERVADA', 'CONFIRMADA')
+       GROUP  BY fecha`,
+      [doctorId, primerDia, ultimoDia]
+    );
+    const mapaCitas = new Map(citasPorDia.map(r => [r.fecha, Number(r.total)]));
+
+    // ── 4. Construir el arreglo de días del mes ─────────────────────
+    const DIAS = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    const dias = [];
+    for (let d = 1; d <= ultimoNum; d++) {
+      const fecha     = `${anio}-${mm}-${String(d).padStart(2, '0')}`;
+      const diaSemana = DIAS[new Date(anio, mes - 1, d).getDay()];
+      const esLaboral = diaSemana !== 'DOMINGO' && diasLaborables.has(diaSemana);
+      dias.push({
+        fecha,
+        dia:        d,
+        dia_semana: diaSemana,
+        es_laboral: esLaboral,
+        ocupados:   mapaCitas.get(fecha) ?? 0,
+      });
+    }
+
+    // ── 5. Auditoría ────────────────────────────────────────────────
+    await logAudit({
+      usuario_id: req.user?.id,
+      accion:     'CONSULTAR_RESUMEN_MES',
+      entidad:    'HORARIO',
+      entidad_id: doctorId,
+      detalles:   JSON.stringify({ doctor_id: doctorId, anio, mes }),
+      ip_origen:  req.ip,
+    });
+
+    return res.json({
+      doctor: { id: doctor.id, nombre: doctor.nombre, especialidad: doctor.especialidad },
+      anio,
+      mes,
+      dias,
+    });
+
+  } catch (err) {
+    console.error('[agenda.getResumenMes]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  }
+};
+
+module.exports = { getDisponibilidad, getResumenMes };

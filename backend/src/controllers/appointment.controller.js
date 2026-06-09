@@ -283,7 +283,7 @@ const list = async (req, res) => {
          pat.tipo_documento, pat.numero_documento,
          pat.telefono AS paciente_telefono, pat.email AS paciente_email,
          CONCAT(u.nombre,' ',u.apellido)     AS doctor_nombre,
-         d.especialidad,
+         (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ') FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id WHERE de.doctor_id = d.doctor_id) AS especialidad,
          s.nombre AS servicio_nombre, s.duracion
        FROM   CITA     c
        JOIN   PACIENTE pat ON c.paciente_id = pat.paciente_id
@@ -339,7 +339,7 @@ const getById = async (req, res) => {
          CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre,
          pat.tipo_documento, pat.numero_documento,
          pat.telefono AS paciente_telefono, pat.email AS paciente_email,
-         CONCAT(u.nombre,' ',u.apellido)  AS doctor_nombre, d.especialidad,
+         CONCAT(u.nombre,' ',u.apellido)  AS doctor_nombre, (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ') FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id WHERE de.doctor_id = d.doctor_id) AS especialidad,
          s.nombre AS servicio_nombre, s.duracion,
          CONCAT(cre.nombre,' ',cre.apellido) AS creado_por_nombre
        FROM   CITA     c

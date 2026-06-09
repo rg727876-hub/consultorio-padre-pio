@@ -9,7 +9,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 const register = async (req, res) => {
   const {
     nombre, apellido, DNI, email, telefono, direccion,
-    rol, especialidad, nroColegiatura, servicios = [],
+    rol, especialidades = [], nroColegiatura, servicios = [],
   } = req.body;
 
   // ── Validaciones básicas ──────────────────────────────────────
@@ -31,8 +31,7 @@ const register = async (req, res) => {
     return res.status(400).json({ error: 'Rol no válido' });
 
   if (rol === 'DOCTOR') {
-    if (!especialidad || !String(especialidad).trim())
-      return res.status(400).json({ error: 'La especialidad es requerida para doctores' });
+    // La especialidad es OPCIONAL (un recién egresado puede no tenerla).
     if (!nroColegiatura || !String(nroColegiatura).trim())
       return res.status(400).json({ error: 'El número de colegiatura es requerido para doctores' });
   }
@@ -85,9 +84,18 @@ const register = async (req, res) => {
     // 4. Si es Doctor
     if (rol === 'DOCTOR') {
       await conn.query(
-        'INSERT INTO DOCTOR (doctor_id, especialidad, nroColegiatura) VALUES (?, ?, ?)',
-        [usuario_id, String(especialidad).trim(), Number(nroColegiatura)]
+        'INSERT INTO DOCTOR (doctor_id, nroColegiatura) VALUES (?, ?)',
+        [usuario_id, Number(nroColegiatura)]
       );
+
+      // Especialidades (N:N) — se ignoran ids duplicados/ inválidos
+      const espIds = [...new Set(especialidades.map(Number).filter(Boolean))];
+      for (const especialidad_id of espIds) {
+        await conn.query(
+          'INSERT INTO DOCTOR_ESPECIALIDAD (doctor_id, especialidad_id) VALUES (?, ?)',
+          [usuario_id, especialidad_id]
+        );
+      }
 
       for (const servicio_id of servicios) {
         await conn.query(
