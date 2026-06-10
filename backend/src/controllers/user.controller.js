@@ -6,29 +6,68 @@ const { sendActivationEmail } = require('../utils/mailer.util');
 const isDev = process.env.NODE_ENV !== 'production';
 
 // GET /api/users — solo ADMINISTRADOR
+// Soporta filtro opcional ?rol=DOCTOR
 const getAllUsers = async (req, res) => {
+  const { rol } = req.query; // Filtro opcional: ?rol=DOCTOR
   let conn;
   try {
     conn = await pool.getConnection();
-    const [users] = await conn.query(`
-      SELECT 
-        u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.estado, 
-        r.nombre_rol, 
-        d.especialidad
-      FROM USUARIO u
-      LEFT JOIN ROL_USUARIO ru ON u.usuario_id = ru.usuario_id
-      LEFT JOIN ROL r ON ru.rol_id = r.rol_id
-      LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
-      ORDER BY u.apellido ASC
-    `);
-    
-    return res.status(200).json(users);
-  } catch (err) {
-    console.error('[user.getAllUsers] Error:', err.message);
-    return res.status(500).json({
-      error: 'Error interno del servidor',
-      ...(isDev && { detail: err.message }),
-    });
+    try {
+      let query = `
+        SELECT 
+          u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.estado, 
+          r.nombre_rol, 
+          d.especialidad
+        FROM USUARIO u
+        LEFT JOIN ROL_USUARIO ru ON u.usuario_id = ru.usuario_id
+        LEFT JOIN ROL r ON ru.rol_id = r.rol_id
+        LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
+      `;
+      
+      if (rol && rol !== 'TODOS') {
+        query += ` WHERE r.nombre_rol = ?`;
+      }
+      
+      query += ` ORDER BY u.apellido ASC`;
+      
+      const params = rol && rol !== 'TODOS' ? [rol] : [];
+      const [users] = await conn.query(query, params);
+      return res.status(200).json(users);
+    } catch (err) {
+      // Fallback: some deployments may not have the DOCTOR.especialidad column
+      if (err.code === 'ER_BAD_FIELD_ERROR' || /Unknown column 'd\.especialidad'/.test(err.message)) {
+        try {
+          let fallbackQuery = `
+            SELECT 
+              u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.estado, 
+              r.nombre_rol
+            FROM USUARIO u
+            LEFT JOIN ROL_USUARIO ru ON u.usuario_id = ru.usuario_id
+            LEFT JOIN ROL r ON ru.rol_id = r.rol_id
+          `;
+          
+          if (rol && rol !== 'TODOS') {
+            fallbackQuery += ` WHERE r.nombre_rol = ?`;
+          }
+          
+          fallbackQuery += ` ORDER BY u.apellido ASC`;
+          
+          const fbParams = rol && rol !== 'TODOS' ? [rol] : [];
+          const [users] = await conn.query(fallbackQuery, fbParams);
+          // Ensure response shape includes 'especialidad' for frontend compatibility
+          const normalized = users.map(u => ({ ...u, especialidad: null }));
+          return res.status(200).json(normalized);
+        } catch (err2) {
+          console.error('[user.getAllUsers] Fallback error:', err2.message);
+          return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err2.message }) });
+        }
+      }
+      console.error('[user.getAllUsers] Error:', err.message);
+      return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+    }
+  } catch (dbErr) {
+    console.error('[user.getAllUsers] DB connection error:', dbErr.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: dbErr.message }) });
   } finally {
     if (conn) conn.release();
   }
@@ -183,20 +222,68 @@ const getUserById = async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const [users] = await conn.query(`
-      SELECT 
-        u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
-        u.estado, u.fecha_registro,
-        r.nombre_rol, 
-        d.especialidad, d.nroColegiatura
-      FROM USUARIO u
-      LEFT JOIN ROL_USUARIO ru ON u.usuario_id = ru.usuario_id
-      LEFT JOIN ROL r ON ru.rol_id = r.rol_id
-      LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
-      WHERE u.usuario_id = ?
-    `, [id]);
-    
-    if (!users.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+    try {
+      const [users] = await conn.query(`
+        SELECT 
+          u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
+          u.estado, u.fecha_registro,
+          r.nombre_rol, 
+          d.especialidad, d.nroColegiatura
+        FROM USUARIO u
+        LEFT JOIN ROL_USUARIO ru ON u.usuario_id = ru.usuario_id
+        LEFT JOIN ROL r ON ru.rol_id = r.rol_id
+        LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
+        WHERE u.usuario_id = ?
+      `, [id]);
+
+      if (!users.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+      // CA16: Historial de Auditoría
+      const [audit] = await conn.query(`
+        SELECT accion, detalles, fecha_evento, 
+          (SELECT CONCAT(nombre, ' ', apellido) FROM USUARIO actor WHERE actor.usuario_id = a.usuario_id) as autor
+        FROM AUDITORIA a
+        WHERE entidad = 'USUARIO' AND entidad_id = ?
+        ORDER BY fecha_evento DESC
+        LIMIT 20
+      `, [id]);
+
+      return res.status(200).json({ ...users[0], auditoria: audit });
+    } catch (err) {
+      // Fallback if DOCTOR table missing expected columns
+      if (err.code === 'ER_BAD_FIELD_ERROR' || /Unknown column 'd\.especialidad'/.test(err.message)) {
+        try {
+          const [users] = await conn.query(`
+            SELECT 
+              u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
+              u.estado, u.fecha_registro,
+              r.nombre_rol
+            FROM USUARIO u
+            LEFT JOIN ROL_USUARIO ru ON u.usuario_id = ru.usuario_id
+            LEFT JOIN ROL r ON ru.rol_id = r.rol_id
+            WHERE u.usuario_id = ?
+          `, [id]);
+
+          if (!users.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+          const [audit] = await conn.query(`
+            SELECT accion, detalles, fecha_evento, 
+              (SELECT CONCAT(nombre, ' ', apellido) FROM USUARIO actor WHERE actor.usuario_id = a.usuario_id) as autor
+            FROM AUDITORIA a
+            WHERE entidad = 'USUARIO' AND entidad_id = ?
+            ORDER BY fecha_evento DESC
+            LIMIT 20
+          `, [id]);
+
+          return res.status(200).json({ ...users[0], especialidad: null, nroColegiatura: null, auditoria: audit });
+        } catch (err2) {
+          console.error('[user.getUserById] Fallback error:', err2.message);
+          return res.status(500).json({ error: 'Error interno del servidor' });
+        }
+      }
+      console.error('[user.getUserById] Error:', err.message);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
 
     // CA16: Historial de Auditoría
     const [audit] = await conn.query(`

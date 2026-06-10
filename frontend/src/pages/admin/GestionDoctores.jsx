@@ -8,7 +8,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 
-export default function GestionUsuarios() {
+export default function GestionDoctores() {
   const navigate = useNavigate();
 
   const [users, setUsers] = useState([]);
@@ -16,8 +16,6 @@ export default function GestionUsuarios() {
   
   // Estados para filtros y búsqueda
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('TODOS');
-  // Mostrar por defecto todos los estados para no ocultar usuarios
   const [statusFilter, setStatusFilter] = useState('TODOS');
   
   // Paginación
@@ -25,22 +23,20 @@ export default function GestionUsuarios() {
   const itemsPerPage = 20;
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchDoctores = async () => {
       try {
         setLoading(true);
-        // Traer TODOS los usuarios (sin filtro de rol en URL)
-        const { data } = await api.get('/users');
-        // Filtrar en el cliente: excluir doctores
-        const personal = data.filter(u => u.nombre_rol !== 'DOCTOR');
-        setUsers(personal);
+        // Solo traer doctores
+        const { data } = await api.get('/users?rol=DOCTOR');
+        setUsers(data);
       } catch (err) {
-        console.error('fetchUsers error', err);
-        toast.error('Error al cargar la lista de usuarios');
+        console.error('fetchDoctores error', err);
+        toast.error('Error al cargar la lista de doctores');
       } finally {
         setLoading(false);
       }
     };
-    fetchUsers();
+    fetchDoctores();
   }, []);
 
   // Reset page when filters change
@@ -52,37 +48,34 @@ export default function GestionUsuarios() {
   const filteredAndSortedUsers = useMemo(() => {
     // 1. Filtrado
     let result = users.filter((u) => {
-      // CA5: Búsqueda ágil (DNI, nombre, apellido)
+      // Búsqueda ágil (DNI, nombre, apellido)
       const term = search.toLowerCase();
       const matchesSearch = 
         u.DNI?.includes(term) ||
         u.nombre?.toLowerCase().includes(term) ||
         u.apellido?.toLowerCase().includes(term);
       
-      // Filtro de Rol
-      const matchesRole = roleFilter === 'TODOS' || u.nombre_rol === roleFilter;
-      
       // Filtro de Estado
       const matchesStatus = statusFilter === 'TODOS' || u.estado === statusFilter;
 
-      return matchesSearch && matchesRole && matchesStatus;
+      return matchesSearch && matchesStatus;
     });
 
     // 2. Ordenamiento
     result.sort((a, b) => {
-      // CA7: Si filtro es "Todos", orden jerárquico por estado
+      // Si filtro es "Todos", orden jerárquico por estado
       if (statusFilter === 'TODOS') {
         const orderStatus = { 'ACTIVO': 1, 'PENDIENTE': 2, 'INACTIVO': 3 };
         const statusDiff = orderStatus[a.estado] - orderStatus[b.estado];
         if (statusDiff !== 0) return statusDiff;
       }
       
-      // Orden alfabético por apellido (CA2)
+      // Orden alfabético por apellido
       return (a.apellido || '').localeCompare(b.apellido || '');
     });
 
     return result;
-  }, [users, search, roleFilter, statusFilter]);
+  }, [users, search, statusFilter]);
 
   // Paginación
   const totalItems = filteredAndSortedUsers.length;
@@ -101,7 +94,6 @@ export default function GestionUsuarios() {
           </span>
         );
       case 'PENDIENTE':
-        // CA7: Pendientes resaltados con un indicador visual distintivo
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-300">
             <Clock size={14} /> Pendiente
@@ -123,7 +115,6 @@ export default function GestionUsuarios() {
   };
 
   const getRowClass = (estado) => {
-    // CA7: Inactivos con diseño opaco
     if (estado === 'INACTIVO') return 'opacity-60 bg-slate-50';
     if (estado === 'PENDIENTE') return 'bg-amber-50/30';
     return 'hover:bg-blue-50/30';
@@ -137,10 +128,10 @@ export default function GestionUsuarios() {
         <div className="sm:flex sm:items-center sm:justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              Gestion de Personal
+              Gestion de Doctores
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Control centralizado de los usuarios y roles del sistema.
+              Perfiles clínicos, especialidades y estados de los doctores.
             </p>
           </div>
           <div className="mt-4 sm:mt-0">
@@ -148,7 +139,7 @@ export default function GestionUsuarios() {
               onClick={() => navigate('/admin/usuarios/nuevo')}
               className="flex items-center gap-2 bg-[#0059B3] hover:bg-[#004494] text-white px-5 py-2.5 rounded-full font-medium transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105"
             >
-              <Plus size={18} /> Registrar usuario
+              <Plus size={18} /> Crear doctor nuevo
             </button>
           </div>
         </div>
@@ -188,7 +179,7 @@ export default function GestionUsuarios() {
                   <th className="px-6 py-4">DNI</th>
                   <th className="px-6 py-4">Nombre Completo</th>
                   <th className="px-6 py-4">Correo</th>
-                  <th className="px-6 py-4">Rol</th>
+                  <th className="px-6 py-4">Especialidad</th>
                   <th className="px-6 py-4">Estado</th>
                   <th className="px-6 py-4 text-center">Acciones</th>
                 </tr>
@@ -198,26 +189,25 @@ export default function GestionUsuarios() {
                   <tr>
                     <td colSpan="6" className="px-6 py-12 text-center text-slate-500">
                       <Loader2 size={24} className="animate-spin mx-auto mb-2 text-[#0059B3]" />
-                      Cargando personal...
+                      Cargando doctores...
                     </td>
                   </tr>
                 ) : paginatedUsers.length === 0 ? (
-                  // Si no hay coincidencias, mostrar mensaje y botón
                   <tr>
                     <td colSpan="6" className="px-6 py-16 text-center">
                       <div className="flex flex-col items-center">
                         <FileX size={48} className="text-slate-300 mb-4" />
                         <h3 className="text-lg font-medium text-slate-800 mb-1">
-                          No se encontraron usuarios con ese criterio
+                          No se encontraron doctores con ese criterio
                         </h3>
                         <p className="text-slate-500 mb-6 text-sm">
-                          Intenta ajustar los filtros de búsqueda o registra un nuevo usuario.
+                          Intenta ajustar los filtros de búsqueda o registra un nuevo doctor.
                         </p>
                         <button
                           onClick={() => navigate('/admin/usuarios/nuevo')}
                           className="flex items-center gap-2 bg-[#0059B3] hover:bg-[#004494] text-white px-5 py-2.5 rounded-full font-medium transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 text-sm"
                         >
-                          <Plus size={16} /> Registrar usuario
+                          <Plus size={16} /> Crear doctor nuevo
                         </button>
                       </div>
                     </td>
@@ -232,18 +222,15 @@ export default function GestionUsuarios() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{u.email}</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
-                          {u.nombre_rol || '—'}
-                        </span>
+                      <td className="px-6 py-4 text-slate-600">
+                        {u.especialidad ? u.especialidad : '—'}
                       </td>
                       <td className="px-6 py-4">
                         {getStatusBadge(u.estado)}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        {/* Ver detalles (ícono de ojo) */}
                         <button
-                          onClick={() => navigate(`/admin/usuarios/${u.usuario_id}`)}
+                          onClick={() => navigate(`/admin/medicos/${u.usuario_id}`)}
                           className="p-1.5 text-slate-400 hover:text-[#0059B3] hover:bg-blue-50 rounded-lg transition-colors inline-flex"
                           title="Ver detalles"
                         >
@@ -261,7 +248,7 @@ export default function GestionUsuarios() {
           {!loading && paginatedUsers.length > 0 && (
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
               <div className="text-sm text-slate-500">
-                Mostrando <span className="font-medium text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> a <span className="font-medium text-slate-800">{Math.min(currentPage * itemsPerPage, totalItems)}</span> de <span className="font-medium text-slate-800">{totalItems}</span> usuarios
+                Mostrando <span className="font-medium text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> a <span className="font-medium text-slate-800">{Math.min(currentPage * itemsPerPage, totalItems)}</span> de <span className="font-medium text-slate-800">{totalItems}</span> doctores
               </div>
               <div className="flex gap-2">
                 <button

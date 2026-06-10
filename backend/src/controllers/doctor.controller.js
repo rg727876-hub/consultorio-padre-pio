@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { logAudit } = require('../utils/audit.util');
-const { sendActivationEmail } = require('../utils/mailer');
+const { sendActivationEmail } = require('../utils/mailer.util');
 // GET /api/doctors — doctores activos (para selector)
 const getActive = async (req, res) => {
   try {

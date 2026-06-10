@@ -36,6 +36,33 @@ export default function PerfilMedico() {
     fetchServices();
   }, [id]);
 
+  const fetchUserProfile = async () => {
+    try {
+      const { data } = await api.get(`/users/${id}`);
+      setDoctor({
+        ...data,
+        servicios: data.servicios || [],
+        horarios: data.horarios || [],
+        citasFuturas: data.citasFuturas || 0,
+      });
+      setAudit(data.auditoria || []);
+      setForm({
+        nombre: data.nombre || '',
+        apellido: data.apellido || '',
+        email: data.email || '',
+        telefono: data.telefono || '',
+        direccion: data.direccion || '',
+        especialidad: data.especialidad || '',
+        nroColegiatura: data.nroColegiatura || '',
+        serviciosIds: data.servicios?.map(s => s.servicio_id) || []
+      });
+      return true;
+    } catch (err) {
+      console.error('[PerfilMedico.fetchUserProfile]', err.response?.data || err.message);
+      return false;
+    }
+  };
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
@@ -53,8 +80,25 @@ export default function PerfilMedico() {
         serviciosIds: data.servicios?.map(s => s.servicio_id) || []
       });
     } catch (err) {
-      toast.error('Error al cargar el perfil del médico. Verifica tu conexión.');
-      if (!doctor) navigate('/admin/usuarios');
+      const loaded = await fetchUserProfile();
+      if (loaded) {
+        console.warn('[PerfilMedico.fetchProfile] doctor profile failed, fallback loaded user profile', err.response?.data || err.message);
+        return;
+      }
+
+      const serverMessage = err.response?.data?.error;
+      const status = err.response?.status;
+      if (status === 404 || status === 400) {
+        toast.error(serverMessage || 'Doctor no encontrado.');
+      } else if (serverMessage) {
+        toast.error(serverMessage);
+      } else if (!navigator.onLine || err.message === 'Network Error') {
+        toast.error('Error de conexión al cargar el perfil del médico.');
+      } else {
+        toast.error(err.message || 'Error al cargar el perfil del médico.');
+      }
+
+      if (!doctor) navigate('/admin/doctores');
     } finally {
       setLoading(false);
     }
@@ -192,7 +236,7 @@ export default function PerfilMedico() {
         {/* Breadcrumb */}
         <div className="flex items-center gap-4 mb-4">
           <button 
-            onClick={() => navigate('/admin/usuarios')}
+            onClick={() => navigate('/admin/doctores')}
             className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"
           >
             <ArrowLeft size={20} />
@@ -413,6 +457,7 @@ export default function PerfilMedico() {
                   <DetailItem icon={<Mail size={16} />} label="Correo electrónico" value={doctor.email} />
                   <DetailItem icon={<Phone size={16} />} label="Teléfono" value={doctor.telefono} />
                   <DetailItem icon={<MapPin size={16} />} label="Dirección" value={doctor.direccion || 'No registrada'} />
+                  <DetailItem icon={<Calendar size={16} />} label="Fecha de Registro" value={dayjs(doctor.fecha_registro).format('DD/MM/YYYY hh:mm A')} />
                   
                   <div className="sm:col-span-2 border-t border-slate-100 pt-4">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
