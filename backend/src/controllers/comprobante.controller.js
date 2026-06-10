@@ -66,7 +66,12 @@ const generateComprobante = async (req, res) => {
     }
 
     const serie  = tipo_comprobante === 'FACTURA' ? FACTURA_SERIE : BOLETA_SERIE;
-    const numero = await comprobanteModel.getNextNumero(serie);
+    // Base = último correlativo ya emitido en NubeFact (configurable en .env),
+    // para que tras recrear la BD el número siga la secuencia real de SUNAT.
+    const numeroBase = tipo_comprobante === 'FACTURA'
+      ? Number(process.env.FACTURA_NUMERO_BASE || 0)
+      : Number(process.env.BOLETA_NUMERO_BASE  || 0);
+    const numero = await comprobanteModel.getNextNumero(serie, numeroBase);
     const monto  = Number(pago.monto_total);
 
     // Llamar a Nubefact (o mock demo)

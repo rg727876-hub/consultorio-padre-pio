@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import api       from '../../api/axios';
 import toast     from 'react-hot-toast';
-import AppLayout from '../../components/AppLayout';
+import Modal     from '../../components/Modal';
 import { estadoInfo, fmtFecha } from './citaEstados';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -24,9 +24,11 @@ const hoyISO = () => new Date().toLocaleDateString('en-CA');
 // ════════════════════════════════════════════════════════════════
 // Componente principal
 // ════════════════════════════════════════════════════════════════
-export default function DetallePaciente() {
-  const { id }   = useParams();
+export default function DetallePaciente({ id: propId, onClose }) {
+  const params   = useParams();
   const navigate = useNavigate();
+  const id       = propId ?? params.id;
+  const cerrar   = onClose ?? (() => navigate('/recepcion/pacientes'));
 
   // ── Datos ───────────────────────────────────────────────────
   const [paciente, setPaciente] = useState(null);
@@ -65,14 +67,14 @@ export default function DetallePaciente() {
   // ══════════════════════════════════════════════════════════════
   if (loading) {
     return (
-      <AppLayout>
-        <div className="px-4 py-8 max-w-3xl mx-auto space-y-4">
+      <Modal onClose={cerrar}>
+        <div className="p-6 space-y-4">
           <div className="skeleton h-8 w-52" />
           <div className="skeleton h-10 w-full rounded-2xl" />
           <div className="skeleton h-48 w-full rounded-2xl" />
           <div className="skeleton h-64 w-full rounded-2xl" />
         </div>
-      </AppLayout>
+      </Modal>
     );
   }
 
@@ -81,18 +83,18 @@ export default function DetallePaciente() {
   // ══════════════════════════════════════════════════════════════
   if (error) {
     return (
-      <AppLayout>
-        <div className="max-w-lg mx-auto px-4 py-16 text-center">
+      <Modal onClose={cerrar}>
+        <div className="px-6 py-16 text-center">
           <AlertTriangle size={40} className="text-amber-400 mx-auto mb-3" />
           <p className="text-slate-600">{error}</p>
           <button
-            onClick={() => navigate('/recepcion/pacientes')}
+            onClick={cerrar}
             className="mt-4 text-[#0059B3] text-sm font-medium hover:underline"
           >
-            ← Volver al listado
+            Cerrar
           </button>
         </div>
-      </AppLayout>
+      </Modal>
     );
   }
 
@@ -102,14 +104,14 @@ export default function DetallePaciente() {
   // Render
   // ══════════════════════════════════════════════════════════════
   return (
-    <AppLayout>
-      <div className="px-4 py-8">
-        <div className="max-w-3xl mx-auto space-y-4">
+    <Modal onClose={cerrar}>
+      <div className="p-6">
+        <div className="space-y-4">
 
           {/* ── Encabezado ── */}
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 pr-8">
             <button
-              onClick={() => navigate('/recepcion/pacientes')}
+              onClick={cerrar}
               className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 transition-colors mt-0.5"
             >
               <ArrowLeft size={18} />
@@ -348,7 +350,7 @@ export default function DetallePaciente() {
           fetchPaciente(); // recarga el perfil completo
         }}
       />
-    </AppLayout>
+    </Modal>
   );
 }
 

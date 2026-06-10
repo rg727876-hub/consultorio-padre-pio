@@ -6,12 +6,12 @@ import StaffLoginPage         from '../pages/auth/StaffLoginPage';
 import ActivateAccountPage    from '../pages/auth/ActivateAccountPage';
 import DashboardPage          from '../pages/DashboardPage';
 import RegistroUsuario        from '../pages/admin/RegistroUsuario';
+import ListaUsuarios          from '../pages/admin/ListaUsuarios';
 import RegistroServicio       from '../pages/admin/RegistroServicio';
 import GestionarServicios     from '../pages/admin/GestionarServicios';
 import HorariosDoctor         from '../pages/admin/HorariosDoctor';
 import RegistrarPaciente      from '../pages/recepcion/RegistrarPaciente';
 import ListaPacientes         from '../pages/recepcion/ListaPacientes';
-import DetallePaciente        from '../pages/recepcion/DetallePaciente';
 import AgendarCita            from '../pages/recepcion/AgendarCita';
 import GestionCitas           from '../pages/recepcion/GestionCitas';
 import DetalleCita            from '../pages/recepcion/DetalleCita';
@@ -40,6 +40,12 @@ function RouterContent() {
         } />
 
         {/* ── Solo Administrador ── */}
+        <Route path="/admin/usuarios" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <ListaUsuarios />
+          </PrivateRoute>
+        } />
+
         <Route path="/admin/usuarios/nuevo" element={
           <PrivateRoute roles={['ADMINISTRADOR']}>
             <RegistroUsuario />
@@ -74,12 +80,6 @@ function RouterContent() {
         <Route path="/recepcion/pacientes/nuevo" element={
           <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
             <RegistrarPaciente />
-          </PrivateRoute>
-        } />
-
-        <Route path="/recepcion/pacientes/:id" element={
-          <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
-            <DetallePaciente />
           </PrivateRoute>
         } />
 

@@ -11,7 +11,9 @@ const NAV = {
   ADMINISTRADOR: [
     { label: 'Inicio',               icon: Home,          ruta: '/dashboard' },
     { label: 'Registrar usuario',    icon: UserPlus,      ruta: '/admin/usuarios/nuevo' },
+    { label: 'Gestionar usuarios',   icon: Users,         ruta: '/admin/usuarios' },
     { label: 'Registrar servicio',   icon: Stethoscope,   ruta: '/admin/servicios/nuevo' },
+    { label: 'Gestionar servicios',  icon: List,          ruta: '/admin/servicios' },
     { label: 'Horarios de doctores', icon: Clock,         ruta: '/admin/horarios' },
     { label: 'Gestión de pacientes', icon: Users,         ruta: '/recepcion/pacientes' },
   ],

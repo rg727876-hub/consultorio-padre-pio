@@ -25,7 +25,6 @@ const MODULOS = {
       icon:         Users,
       color:        'bg-indigo-50 text-indigo-600',
       ruta:         '/admin/usuarios',
-      proximamente: true,
     },
     {
       label:       'Registrar servicio',
@@ -40,7 +39,6 @@ const MODULOS = {
       icon:         ClipboardList,
       color:        'bg-teal-50 text-teal-600',
       ruta:         '/admin/servicios',
-      proximamente: true,
     },
     {
       label:       'Horarios de doctores',

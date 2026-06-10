@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api      from '../../api/axios';
 import AppLayout from '../../components/AppLayout';
+import DetallePaciente from './DetallePaciente';
 
 // ── Helpers ───────────────────────────────────────────────────────
 const DOC_LABEL = { DNI: 'DNI', CE: 'C.E.', PASAPORTE: 'Pasaporte' };
@@ -27,6 +28,7 @@ export default function ListaPacientes() {
   // Filtros
   const [q,      setQ]      = useState('');
   const [estado, setEstado] = useState('ACTIVO'); // default: solo activos
+  const [detalleId, setDetalleId] = useState(null); // paciente en ventana flotante
 
   // ── Fetch ────────────────────────────────────────────────────────
   const fetchPacientes = useCallback(async (p = 1, overrides = {}) => {
@@ -67,7 +69,7 @@ export default function ListaPacientes() {
     fetchPacientes(1, { q: '', estado: 'ACTIVO' });
   };
 
-  const verPerfil = (id) => navigate(`/recepcion/pacientes/${id}`);
+  const verPerfil = (id) => setDetalleId(id);
 
   const hayFiltros = q.trim() || estado !== 'ACTIVO';
 
@@ -247,10 +249,9 @@ export default function ListaPacientes() {
                         return (
                           <tr
                             key={p.paciente_id}
-                            onClick={() => verPerfil(p.paciente_id)}
-                            className={`transition-colors cursor-pointer
+                            className={`transition-colors
                               ${inactivo
-                                ? 'opacity-50 hover:opacity-70 hover:bg-slate-50'
+                                ? 'opacity-50 hover:bg-slate-50'
                                 : 'hover:bg-slate-50'
                               }`}
                           >
@@ -296,10 +297,7 @@ export default function ListaPacientes() {
                             </td>
 
                             {/* Acciones */}
-                            <td
-                              className="px-4 py-3 whitespace-nowrap"
-                              onClick={e => e.stopPropagation()}
-                            >
+                            <td className="px-4 py-3 whitespace-nowrap">
                               <IconBtn
                                 id={`pac-ver-${p.paciente_id}`}
                                 title="Ver perfil del paciente"
@@ -352,6 +350,13 @@ export default function ListaPacientes() {
 
         </div>
       </div>
+
+      {detalleId && (
+        <DetallePaciente
+          id={detalleId}
+          onClose={() => { setDetalleId(null); fetchPacientes(page); }}
+        />
+      )}
     </AppLayout>
   );
 }
