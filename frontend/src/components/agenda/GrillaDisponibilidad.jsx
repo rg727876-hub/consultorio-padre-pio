@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ── Utilidades de fecha ──────────────────────────────────────────
@@ -55,51 +56,83 @@ const SLOT_STYLE = {
   },
 };
 
-// ── Slot individual ──────────────────────────────────────────────
-function Slot({ slot }) {
-  const [hover, setHover] = useState(false);
-  const s = SLOT_STYLE[slot.tipo] ?? SLOT_STYLE.NO_LABORAL;
-  const tieneTooltip = slot.tipo === 'OCUPADO' && slot.cita;
+// ── Fusiona celdas consecutivas del mismo tipo (y misma cita) en un solo bloque ──
+function fusionar(slots) {
+  const segs = [];
+  for (const s of slots) {
+    const prev    = segs[segs.length - 1];
+    const citaId  = s.cita?.cita_id ?? null;
+    const prevId  = prev?.cita?.cita_id ?? null;
+    if (prev && prev.tipo === s.tipo && prevId === citaId && prev.hora_fin === s.hora_inicio) {
+      prev.hora_fin = s.hora_fin;                 // extender el bloque
+    } else {
+      segs.push({ tipo: s.tipo, hora_inicio: s.hora_inicio, hora_fin: s.hora_fin, cita: s.cita });
+    }
+  }
+  return segs;
+}
+
+// ── Bloque (segmento fusionado) ──────────────────────────────────
+function Segmento({ seg }) {
+  const ref = useRef(null);
+  const [tip, setTip] = useState(null);   // { x, y, abajo } | null
+  const s = SLOT_STYLE[seg.tipo] ?? SLOT_STYLE.NO_LABORAL;
+  const tieneTooltip = seg.tipo === 'OCUPADO' && seg.cita;
+  const rango = `${seg.hora_inicio}–${seg.hora_fin}`;
+
+  const mostrar = () => {
+    if (!tieneTooltip || !ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const abajo = r.top < 170;             // si está muy arriba, mostrar el tooltip debajo
+    setTip({ x: r.left + r.width / 2, y: abajo ? r.bottom : r.top, abajo });
+  };
+  const ocultar = () => setTip(null);
+
+  const c = seg.cita;
 
   return (
     <div
-      className={`relative rounded text-[10px] leading-none select-none
-                  transition-colors duration-100 cursor-default
-                  ${s.bg}`}
-      style={{ minHeight: '26px', padding: '4px 5px' }}
-      onMouseEnter={() => tieneTooltip && setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      ref={ref}
+      className={`relative rounded text-[11px] leading-tight select-none
+                  transition-colors duration-100 cursor-default ${s.bg}`}
+      style={{ padding: '6px 8px' }}
+      onMouseEnter={mostrar}
+      onMouseLeave={ocultar}
     >
-      <span className={`font-mono ${s.text}`}>{slot.hora_inicio}</span>
+      <span className={`font-mono text-[10px] ${s.text}`}>{rango}</span>
 
-      {slot.tipo === 'OCUPADO' && slot.cita && (
-        <p className="truncate text-blue-700 font-medium mt-0.5 leading-tight text-[10px]">
-          {slot.cita.paciente_nombre?.split(' ')[0]}
+      {seg.tipo === 'OCUPADO' && c && (
+        <p className="truncate text-blue-800 font-semibold mt-0.5">
+          {c.paciente_nombre?.split(' ')[0]}
         </p>
       )}
+      {seg.tipo === 'BUFFER'     && <p className="text-amber-600 italic mt-0.5">Limpieza</p>}
+      {seg.tipo === 'DISPONIBLE' && <p className="text-emerald-600 mt-0.5">Disponible</p>}
+      {seg.tipo === 'NO_LABORAL' && <p className="text-slate-300 mt-0.5">No laboral</p>}
 
-      {slot.tipo === 'BUFFER' && (
-        <p className="text-amber-400 text-[9px] mt-0.5 italic">limpieza</p>
-      )}
-
-      {/* Tooltip al hacer hover sobre OCUPADO */}
-      {tieneTooltip && hover && (
+      {/* Tooltip en portal con posición fija → no lo recorta el scroll */}
+      {tip && c && createPortal(
         <div
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2
-                     bg-slate-800 text-white text-[11px] rounded-xl shadow-2xl
-                     px-3 py-2.5 w-52 pointer-events-none
-                     animate-[fadeSlideUp_0.15s_ease-out]"
+          style={{
+            position: 'fixed', left: tip.x, top: tip.abajo ? tip.y + 10 : tip.y - 10,
+            transform: tip.abajo ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+          }}
+          className="z-[60] w-64 bg-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 pointer-events-none"
         >
-          <p className="font-semibold truncate leading-tight">
-            {slot.cita.paciente_nombre}
-          </p>
-          <p className="text-slate-300 text-[10px] truncate mt-0.5">
-            {slot.cita.servicio_nombre}
-          </p>
-          {/* Flechita inferior */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2
-                          border-[5px] border-transparent border-t-slate-800" />
-        </div>
+          <p className="font-semibold text-sm leading-snug">{c.paciente_nombre}</p>
+          <p className="text-slate-300 text-xs mt-0.5">{c.servicio_nombre}</p>
+          <div className="mt-2 pt-2 border-t border-white/15 space-y-1 text-[11px] text-slate-300">
+            <p>Código: <span className="font-mono text-white">{c.codigo_cita}</span></p>
+            <p>Horario: <span className="text-white">{c.hora_inicio_cita}–{c.hora_fin_cita}</span></p>
+            {c.hora_fin_con_buffer && c.hora_fin_con_buffer !== c.hora_fin_cita && (
+              <p>Limpieza hasta: <span className="text-white">{c.hora_fin_con_buffer}</span></p>
+            )}
+          </div>
+          {/* Flechita */}
+          <div className={`absolute left-1/2 -translate-x-1/2 border-[6px] border-transparent
+                           ${tip.abajo ? 'bottom-full border-b-slate-800' : 'top-full border-t-slate-800'}`} />
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -140,7 +173,9 @@ function ColumnaFecha({ fecha, slots, loading, horaInicioVis, horaFinVis }) {
                 <p className="text-[10px] text-slate-300">Sin horario</p>
               </div>
             )
-            : visibles.map(s => <Slot key={s.hora_inicio} slot={s} />)
+            : fusionar(visibles).map(seg => (
+                <Segmento key={seg.tipo + seg.hora_inicio} seg={seg} />
+              ))
         }
       </div>
     </div>

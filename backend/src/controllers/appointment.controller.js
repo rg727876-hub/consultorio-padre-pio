@@ -22,6 +22,7 @@ const getDayName = (fechaStr) => {
 const generateCode = () => crypto.randomBytes(5).toString('hex').toUpperCase();
 
 // GET /api/appointments/slots?doctor_id=X&servicio_id=Y&fecha=YYYY-MM-DD
+// GET /api/appointments/slots?doctor_id=X&servicio_id=Y&fecha=YYYY-MM-DD
 const getSlots = async (req, res) => {
   const doctorId   = Number(req.query.doctor_id);
   const servicioId = Number(req.query.servicio_id);
@@ -50,38 +51,73 @@ const getSlots = async (req, res) => {
     );
     if (!horarios.length) return res.json({ slots: [] });
 
-    // Duración y buffer del servicio
-    const [[servicio]] = await pool.query(
+    // Duración y buffer del servicio NUEVO que se quiere reservar
+    const [[servicioNuevo]] = await pool.query(
       `SELECT duracion, buffer FROM SERVICIO
        WHERE  servicio_id = ? AND estado = 'ACTIVO'`,
       [servicioId]
     );
-    if (!servicio) return res.status(404).json({ error: 'Servicio no encontrado' });
+    if (!servicioNuevo) return res.status(404).json({ error: 'Servicio no encontrado' });
 
-    // Citas ya existentes ese día (para detectar solapamientos)
+    // Citas existentes ese día CON el buffer de su propio servicio
     const [booked] = await pool.query(
-      `SELECT TIME_FORMAT(hora_inicio,'%H:%i') AS hi,
-              TIME_FORMAT(hora_fin,   '%H:%i') AS hf
-       FROM   CITA
-       WHERE  doctor_id = ? AND fecha = ?
-         AND  estado IN ('RESERVADA','CONFIRMADA')`,
+      `SELECT 
+        TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+        TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+        s.buffer AS service_buffer
+       FROM   CITA c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       WHERE  c.doctor_id = ? AND c.fecha = ?
+         AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')
+       ORDER BY c.hora_inicio`,
       [doctorId, fecha]
     );
 
-    const totalMins = servicio.duracion + servicio.buffer;
+    // Paso de avance: 5 minutos para flexibilidad
+    const STEP = 5;
     const slots = [];
+
+    // Hora actual en minutos (para excluir slots ya pasados si es hoy)
+    let ahoraMins = -1;
+    if (fecha === hoy) {
+      const ahora = new Date();
+      ahoraMins = ahora.getHours() * 60 + ahora.getMinutes();
+    }
 
     for (const h of horarios) {
       let cur = timeToMins(h.hora_inicio);
       const end = timeToMins(h.hora_fin);
-      while (cur + servicio.duracion <= end) {
-        const slotEnd = cur + servicio.duracion;
-        const overlaps = booked.some(
-          b => cur < timeToMins(b.hf) && slotEnd > timeToMins(b.hi)
-        );
-        if (!overlaps)
-          slots.push({ hora_inicio: minsToTime(cur), hora_fin: minsToTime(slotEnd) });
-        cur += totalMins;
+      
+      while (cur + servicioNuevo.duracion <= end) {
+        const slotInicio = cur;
+        const slotFin = cur + servicioNuevo.duracion;
+        const slotFinConBuffer = slotFin + servicioNuevo.buffer;
+        
+        // Excluir slots ya pasados (si es hoy)
+        if (ahoraMins >= 0 && slotInicio < ahoraMins) {
+          cur += STEP;
+          continue;
+        }
+        
+        // Verifica solapamiento con citas reservadas (considerando ambos buffers)
+        const overlaps = booked.some(b => {
+          const bookedInicio = timeToMins(b.hi);
+          const bookedFin = timeToMins(b.hf);
+          const bookedFinConBuffer = bookedFin + b.service_buffer;
+          
+          // El slot propuesto (con su buffer al final) NO debe solaparse 
+          // con la cita reservada (con su buffer al final)
+          return (slotInicio < bookedFinConBuffer && slotFinConBuffer > bookedInicio);
+        });
+        
+        if (!overlaps) {
+          slots.push({ 
+            hora_inicio: minsToTime(slotInicio), 
+            hora_fin: minsToTime(slotFin) 
+          });
+        }
+        
+        cur += STEP;
       }
     }
 
@@ -124,17 +160,29 @@ const create = async (req, res) => {
 
     const hora_fin = minsToTime(timeToMins(hora_inicio) + servicio.duracion);
 
-    // Verificar solapamiento con citas existentes
-    const [[{ cnt }]] = await conn.query(
-      `SELECT COUNT(*) AS cnt FROM CITA
-       WHERE  doctor_id = ? AND fecha = ?
-         AND  estado IN ('RESERVADA','CONFIRMADA')
-         AND  hora_inicio < ? AND hora_fin > ?`,
-      [Number(doctor_id), fecha, hora_fin, hora_inicio]
+    // Verificar solapamiento con citas existentes, RESPETANDO el buffer de cada una.
+    // Cada cita reserva [inicio, fin + buffer). La nueva cita también reserva su
+    // buffer, así que dos reservas chocan si sus rangos (con buffer) se cruzan.
+    const [existentes] = await conn.query(
+      `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+              TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+              s.buffer AS buffer
+       FROM   CITA     c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       WHERE  c.doctor_id = ? AND c.fecha = ?
+         AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
+      [Number(doctor_id), fecha]
     );
-    if (cnt > 0) {
+    const nIni    = timeToMins(hora_inicio);
+    const nFinBuf = timeToMins(hora_fin) + servicio.buffer;
+    const choca = existentes.some(
+      b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
+    );
+    if (choca) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({ error: 'Ese horario ya fue reservado. Por favor elige otro.' });
+      return res.status(409).json({
+        error: 'Ese horario se cruza con otra cita o con su tiempo de limpieza (buffer). Elige otro.',
+      });
     }
 
     // Generar código único
@@ -820,23 +868,32 @@ const reschedule = async (req, res) => {
       });
     }
 
-    // ── 3. Verificar solapamiento con OTRAS citas del mismo doctor ese día ──
-    const [[{ solapamiento }]] = await conn.query(
-      `SELECT COUNT(*) AS solapamiento
-       FROM   CITA
-       WHERE  doctor_id = ?
-         AND  fecha = ?
-         AND  cita_id <> ?               -- excluir la propia cita
-         AND  UPPER(estado) IN ('RESERVADA','CONFIRMADA')
-         AND  hora_inicio < ?
-         AND  hora_fin    > ?`,
-      [cita.doctor_id, nueva_fecha, citaId, nueva_hora_fin, nueva_hora_inicio]
+    // ── 3. Verificar solapamiento con OTRAS citas, RESPETANDO buffers ──
+    const [[svcReprog]] = await conn.query(
+      'SELECT buffer FROM SERVICIO WHERE servicio_id = ?', [cita.servicio_id]
+    );
+    const bufReprog = svcReprog?.buffer || 0;
+
+    const [otras] = await conn.query(
+      `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+              TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+              s.buffer AS buffer
+       FROM   CITA     c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       WHERE  c.doctor_id = ? AND c.fecha = ? AND c.cita_id <> ?
+         AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
+      [cita.doctor_id, nueva_fecha, citaId]
+    );
+    const rIni    = timeToMins(nueva_hora_inicio);
+    const rFinBuf = timeToMins(nueva_hora_fin) + bufReprog;
+    const solapa = otras.some(
+      b => rIni < (timeToMins(b.hf) + (b.buffer || 0)) && rFinBuf > timeToMins(b.hi)
     );
 
-    if (solapamiento > 0) {
+    if (solapa) {
       await conn.query('ROLLBACK');
       return res.status(409).json({
-        error: 'El horario solicitado se solapa con una cita ya existente de ese doctor.',
+        error: 'El horario solicitado se cruza con otra cita o su tiempo de limpieza (buffer).',
       });
     }
 

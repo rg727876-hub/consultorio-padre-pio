@@ -9,7 +9,11 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    timezone: '-05:00'
+    // El servidor de BD (Railway) guarda los DATETIME en UTC. Leerlos como UTC ('Z')
+    // produce un ISO correcto y el navegador los convierte a la hora local (Perú).
+    // Con '-05:00' se malinterpretaba el valor → se mostraba +5 h adelantado.
+    timezone: 'Z',
+    dateStrings: false,
 });
 
 pool.getConnection()

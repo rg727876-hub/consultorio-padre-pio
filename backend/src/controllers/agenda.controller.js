@@ -4,7 +4,9 @@ const { logAudit } = require('../utils/audit.util');
 const isDev = process.env.NODE_ENV !== 'production';
 
 // ── Granularidad de la grilla (minutos) ──────────────────────────
-const GRANULARIDAD = 15;
+// Debe coincidir con el paso de reserva (5 min) para que el buffer de CADA
+// cita (5, 10, 15, 20 min) se muestre sin que la siguiente cita lo pise.
+const GRANULARIDAD = 5;
 
 // ── Utilidades (independientes del appointment.controller) ────────
 const timeToMins = (t) => {
@@ -174,11 +176,24 @@ const getDisponibilidad = async (req, res) => {
       }
     }
 
-    // ── 7. Generar la grilla completa del día ───────────────────────
+    // ── 7. Generar la grilla SOLO dentro del horario laboral ────────
+    // (evita scroll de horas vacías). Se extiende el fin si el buffer de
+    // alguna cita se prolonga más allá del cierre, para que se vea completo.
+    let gridIni = Infinity, gridFin = -Infinity;
+    for (const bloque of bloques) {
+      gridIni = Math.min(gridIni, Math.floor(timeToMins(bloque.inicio) / GRANULARIDAD) * GRANULARIDAD);
+      gridFin = Math.max(gridFin, Math.ceil(timeToMins(bloque.fin)     / GRANULARIDAD) * GRANULARIDAD);
+    }
+    for (const cita of citas) {
+      const bf = timeToMins(cita.hora_fin_cita) + (cita.buffer || 0);
+      gridFin = Math.max(gridFin, Math.ceil(bf / GRANULARIDAD) * GRANULARIDAD);
+    }
+    if (!isFinite(gridIni)) { gridIni = 0; gridFin = 0; } // día sin bloques laborales
+
     const slots = [];
     const resumen = { total_slots: 0, disponibles: 0, ocupados: 0, buffer: 0, no_laborales: 0, pasados: 0 };
 
-    for (let m = 0; m < 24 * 60; m += GRANULARIDAD) {
+    for (let m = gridIni; m < gridFin; m += GRANULARIDAD) {
       const slotFin = m + GRANULARIDAD;
       resumen.total_slots++;
 

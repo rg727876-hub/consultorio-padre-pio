@@ -10,48 +10,39 @@ const VISTAS = [
 export default function FiltrosAgenda({
   doctores,
   doctorId,
-  especialidad,
+  servicios,
+  servicioId,
   vista,
   onDoctorChange,
-  onEspecialidadChange,
+  onServicioChange,
   onVistaChange,
   onBuscar,
   loading,
 }) {
-  // Especialidades únicas extraídas de la lista de doctores
-  const especialidades = [...new Set(
-    doctores.map(d => d.especialidad).filter(Boolean)
-  )].sort();
-
-  // Doctores filtrados por especialidad seleccionada
-  const doctoresFiltrados = especialidad
-    ? doctores.filter(d => d.especialidad === especialidad)
-    : doctores;
-
   return (
     <section className="bg-white rounded-2xl shadow-sm p-4">
       <div className="flex flex-wrap items-end gap-3">
 
-        {/* Selector de especialidad */}
-        <div className="flex flex-col gap-1 min-w-[180px]">
-          <label className="text-xs font-medium text-slate-600">Especialidad</label>
+        {/* Selector de servicio */}
+        <div className="flex flex-col gap-1 min-w-[200px]">
+          <label className="text-xs font-medium text-slate-600">Servicio</label>
           <select
-            value={especialidad}
+            value={servicioId}
             onChange={e => {
-              onEspecialidadChange(e.target.value);
-              onDoctorChange(''); // resetear doctor al cambiar especialidad
+              onServicioChange(e.target.value);
+              onDoctorChange(''); // resetear doctor al cambiar servicio
             }}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white
                        focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40"
           >
-            <option value="">Todas las especialidades</option>
-            {especialidades.map(esp => (
-              <option key={esp} value={esp}>{esp}</option>
+            <option value="">Todos los servicios</option>
+            {(servicios ?? []).map(s => (
+              <option key={s.servicio_id} value={s.servicio_id}>{s.nombre}</option>
             ))}
           </select>
         </div>
 
-        {/* Selector de doctor */}
+        {/* Selector de doctor (filtrado por el servicio elegido) */}
         <div className="flex flex-col gap-1 min-w-[220px]">
           <label className="text-xs font-medium text-slate-600">Doctor</label>
           <select
@@ -60,11 +51,14 @@ export default function FiltrosAgenda({
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white
                        focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40"
           >
-            <option value="">— Selecciona un doctor —</option>
-            {doctoresFiltrados.map(d => (
+            <option value="">
+              {servicioId && doctores.length === 0
+                ? '— Ningún doctor atiende este servicio —'
+                : '— Selecciona un doctor —'}
+            </option>
+            {doctores.map(d => (
               <option key={d.doctor_id} value={d.doctor_id}>
                 {d.nombre} {d.apellido}
-                {d.especialidad ? ` · ${d.especialidad}` : ''}
               </option>
             ))}
           </select>
@@ -85,7 +79,7 @@ export default function FiltrosAgenda({
         {/* Limpiar selección */}
         {doctorId && (
           <button
-            onClick={() => { onDoctorChange(''); onEspecialidadChange(''); }}
+            onClick={() => { onDoctorChange(''); onServicioChange(''); }}
             className="text-xs text-slate-500 hover:text-slate-700 font-medium pb-2.5
                        flex items-center gap-1"
           >

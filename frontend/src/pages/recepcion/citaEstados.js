@@ -45,5 +45,6 @@ export const fmtFechaHora = (d) => {
   if (!d) return '—';
   return new Date(d).toLocaleString('es-PE', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: 'America/Lima',   // siempre hora de Perú, sin depender del PC del usuario
   });
 };

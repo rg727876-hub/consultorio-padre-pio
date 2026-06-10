@@ -31,11 +31,12 @@ const auditLog = (accion, detalles) => {
 // ══════════════════════════════════════════════════════════════════
 export default function AgendaMedica() {
   // ── Filtros ────────────────────────────────────────────────────
-  const [doctores,     setDoctores]     = useState([]);
-  const [doctorId,     setDoctorId]     = useState('');
-  const [especialidad, setEspecialidad] = useState('');
-  const [vista,        setVista]        = useState('diaria');   // 'diaria' | 'semanal' | 'mensual'
-  const [fecha,        setFecha]        = useState(hoy());
+  const [doctores,   setDoctores]   = useState([]);
+  const [doctorId,   setDoctorId]   = useState('');
+  const [servicios,  setServicios]  = useState([]);
+  const [servicioId, setServicioId] = useState('');
+  const [vista,      setVista]      = useState('diaria');   // 'diaria' | 'semanal' | 'mensual'
+  const [fecha,      setFecha]      = useState(hoy());
 
   // ── Doctor seleccionado (objeto completo) ──────────────────────
   const [doctorInfo, setDoctorInfo] = useState(null);
@@ -50,12 +51,20 @@ export default function AgendaMedica() {
   // Ref para cancelar fetches si el componente se desmonta
   const abortRef = useRef(null);
 
-  // ── Carga inicial de doctores ──────────────────────────────────
+  // ── Carga inicial del catálogo de servicios ───────────────────
   useEffect(() => {
-    api.get('/doctors')
-      .then(({ data }) => setDoctores(Array.isArray(data) ? data : []))
+    api.get('/services')
+      .then(({ data }) => setServicios(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
+
+  // ── Doctores según el servicio elegido (o todos si no hay filtro) ──
+  useEffect(() => {
+    const url = servicioId ? `/doctors/by-service/${servicioId}` : '/doctors';
+    api.get(url)
+      .then(({ data }) => setDoctores(Array.isArray(data) ? data : []))
+      .catch(() => setDoctores([]));
+  }, [servicioId]);
 
   // ── Actualizar doctorInfo cuando cambia doctorId ───────────────
   useEffect(() => {
@@ -206,10 +215,11 @@ export default function AgendaMedica() {
           <FiltrosAgenda
             doctores={doctores}
             doctorId={doctorId}
-            especialidad={especialidad}
+            servicios={servicios}
+            servicioId={servicioId}
             vista={vista}
             onDoctorChange={setDoctorId}
-            onEspecialidadChange={setEspecialidad}
+            onServicioChange={setServicioId}
             onVistaChange={handleVistaChange}
             onBuscar={() => fetchData(false)}
             loading={loading}

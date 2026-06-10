@@ -418,12 +418,12 @@ WHERE r.nombre_rol = 'ADMINISTRADOR'
 -- NOTA: duración (min) y costo son valores iniciales; ajústalos en "Gestionar servicios".
 INSERT INTO SERVICIO (nombre, duracion, costo, buffer) VALUES
     ('Brackets de ortodoncia', 60, 0.00, 10),
-    ('Limpieza dental',        30, 0.00, 10),
+    ('Limpieza dental',        30, 0.00,  5),
     ('Curaciones',             30, 0.00, 10),
-    ('Blanqueamiento dental',  60, 0.00, 10),
-    ('Prótesis fija',          60, 0.00, 10),
-    ('Prótesis removible',     60, 0.00, 10),
-    ('Exodoncias',             45, 0.00, 10),
-    ('Endodoncia',             60, 0.00, 10),
+    ('Blanqueamiento dental',  60, 0.00, 15),
+    ('Prótesis fija',          60, 0.00, 15),
+    ('Prótesis removible',     60, 0.00, 15),
+    ('Exodoncias',             45, 0.00, 15),
+    ('Endodoncia',             60, 0.00, 15),
     ('Odontopediatría',        30, 0.00, 10),
-    ('Implante dental',        90, 0.00, 10);
+    ('Implante dental',        90, 0.00, 20);
