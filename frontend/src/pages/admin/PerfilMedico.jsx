@@ -317,8 +317,7 @@ export default function PerfilMedico() {
             {/* CA3: Gestionar horarios */}
             <button
               onClick={() => navigate(`/admin/horarios?doctor_id=${doctor.usuario_id}`)}
-              disabled={isInactive}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0059B3]/10 text-[#0059B3] hover:bg-[#0059B3]/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0059B3]/10 text-[#0059B3] hover:bg-[#0059B3]/20 rounded-xl text-sm font-medium"
             >
               <Calendar size={16} /> Gestionar horarios
             </button>

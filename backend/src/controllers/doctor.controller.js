@@ -2,6 +2,11 @@ const crypto = require('crypto');
 const pool = require('../config/db');
 const { logAudit } = require('../utils/audit.util');
 const { sendActivationEmail } = require('../utils/mailer.util');
+
+const isBadFieldError = (err) => {
+  return err && (err.code === 'ER_BAD_FIELD_ERROR' || /Unknown column 'd\.(especialidad|nroColegiatura)'/.test(err.message));
+};
+
 // GET /api/doctors — doctores activos (para selector)
 const getActive = async (req, res) => {
   try {
@@ -19,6 +24,26 @@ const getActive = async (req, res) => {
     );
     return res.json(rows);
   } catch (err) {
+    if (isBadFieldError(err)) {
+      try {
+        const [rows] = await pool.query(
+          `SELECT u.usuario_id AS doctor_id,
+                  u.nombre, u.apellido, u.DNI,
+                  NULL AS especialidad,
+                  NULL AS nroColegiatura
+           FROM   USUARIO u
+           JOIN   ROL_USUARIO ru ON ru.usuario_id = u.usuario_id
+           JOIN   ROL r          ON r.rol_id = ru.rol_id
+           WHERE  r.nombre_rol = 'DOCTOR'
+             AND  u.estado = 'ACTIVO'
+           ORDER  BY u.apellido, u.nombre`
+        );
+        return res.json(rows);
+      } catch (fallbackErr) {
+        console.error('[doctor.getActive] fallback error]', fallbackErr);
+        return res.status(500).json({ error: 'Error interno del servidor' });
+      }
+    }
     console.error('[doctor.getActive]', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
@@ -45,6 +70,26 @@ const getByService = async (req, res) => {
     );
     return res.json(rows);
   } catch (err) {
+    if (isBadFieldError(err)) {
+      try {
+        const [rows] = await pool.query(
+          `SELECT u.usuario_id AS doctor_id,
+                  u.nombre, u.apellido,
+                  NULL AS especialidad
+           FROM   USUARIO u
+           JOIN   DOCTOR d           ON d.doctor_id    = u.usuario_id
+           JOIN   SERVICIO_DOCTOR sd ON sd.doctor_id   = u.usuario_id
+           WHERE  sd.servicio_id = ? AND sd.estado = 'ACTIVO'
+             AND  u.estado = 'ACTIVO'
+           ORDER  BY u.apellido, u.nombre`,
+          [servicioId]
+        );
+        return res.json(rows);
+      } catch (fallbackErr) {
+        console.error('[doctor.getByService] fallback error]', fallbackErr);
+        return res.status(500).json({ error: 'Error interno del servidor' });
+      }
+    }
     console.error('[doctor.getByService]', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
@@ -60,15 +105,33 @@ const getDoctorProfile = async (req, res) => {
     conn = await pool.getConnection();
     
     // 1. Datos básicos
-    const [users] = await conn.query(`
-      SELECT 
-        u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
-        u.estado, u.fecha_registro,
-        d.especialidad, d.nroColegiatura
-      FROM USUARIO u
-      JOIN DOCTOR d ON u.usuario_id = d.doctor_id
-      WHERE u.usuario_id = ?
-    `, [doctorId]);
+    let users;
+    try {
+      [users] = await conn.query(`
+        SELECT 
+          u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
+          u.estado, u.fecha_registro,
+          d.especialidad, d.nroColegiatura
+        FROM USUARIO u
+        JOIN DOCTOR d ON u.usuario_id = d.doctor_id
+        WHERE u.usuario_id = ?
+      `, [doctorId]);
+    } catch (err) {
+      if (isBadFieldError(err)) {
+        const [fallbackUsers] = await conn.query(`
+          SELECT 
+            u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
+            u.estado, u.fecha_registro,
+            NULL AS especialidad, NULL AS nroColegiatura
+          FROM USUARIO u
+          JOIN DOCTOR d ON u.usuario_id = d.doctor_id
+          WHERE u.usuario_id = ?
+        `, [doctorId]);
+        users = fallbackUsers;
+      } else {
+        throw err;
+      }
+    }
 
     if (!users.length) return res.status(404).json({ error: 'Doctor no encontrado' });
     const doctor = users[0];
