@@ -5,7 +5,6 @@ const { sendActivationEmail } = require('../utils/mailer.util');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
-// POST /api/users  — solo ADMINISTRADOR
 const register = async (req, res) => {
   const {
     nombre, apellido, DNI, email, telefono, direccion,
@@ -152,7 +151,7 @@ const register = async (req, res) => {
     });
 
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 };
 
@@ -165,7 +164,7 @@ const SUB_ESP =
       FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
      WHERE de.doctor_id = u.usuario_id)`;
 
-const ROLES_VALIDOS  = ['ADMINISTRADOR', 'RECEPCIONISTA', 'CAJERO', 'DOCTOR'];
+const ROLES_VALIDOS  = ['ADMINISTRADOR', 'RECEPCIONISTA', 'CAJERO', 'DOCTOR', 'PERSONAL'];
 const ESTADOS_VALIDOS = ['ACTIVO', 'INACTIVO', 'PENDIENTE', 'TODOS'];
 
 // ─────────────────────────────────────────────────────────────────
@@ -196,9 +195,14 @@ const list = async (req, res) => {
   }
 
   if (rol && ROLES_VALIDOS.includes(rol)) {
-    conds.push(`EXISTS (SELECT 1 FROM ROL_USUARIO ru JOIN ROL r ON r.rol_id = ru.rol_id
-                         WHERE ru.usuario_id = u.usuario_id AND r.nombre_rol = ?)`);
-    params.push(rol);
+    if (rol === 'PERSONAL') {
+      conds.push(`NOT EXISTS (SELECT 1 FROM ROL_USUARIO ru JOIN ROL r ON r.rol_id = ru.rol_id
+                             WHERE ru.usuario_id = u.usuario_id AND r.nombre_rol = 'DOCTOR')`);
+    } else {
+      conds.push(`EXISTS (SELECT 1 FROM ROL_USUARIO ru JOIN ROL r ON r.rol_id = ru.rol_id
+                           WHERE ru.usuario_id = u.usuario_id AND r.nombre_rol = ?)`);
+      params.push(rol);
+    }
   }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';

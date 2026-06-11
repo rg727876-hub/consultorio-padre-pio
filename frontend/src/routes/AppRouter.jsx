@@ -6,7 +6,10 @@ import StaffLoginPage         from '../pages/auth/StaffLoginPage';
 import ActivateAccountPage    from '../pages/auth/ActivateAccountPage';
 import DashboardPage          from '../pages/DashboardPage';
 import RegistroUsuario        from '../pages/admin/RegistroUsuario';
+import GestionDoctores        from '../pages/admin/GestionDoctores';
 import ListaUsuarios          from '../pages/admin/ListaUsuarios';
+import PerfilUsuario          from '../pages/admin/PerfilUsuario';
+import PerfilMedico           from '../pages/admin/PerfilMedico';
 import RegistroServicio       from '../pages/admin/RegistroServicio';
 import GestionarServicios     from '../pages/admin/GestionarServicios';
 import HorariosDoctor         from '../pages/admin/HorariosDoctor';
@@ -49,6 +52,30 @@ function RouterContent() {
         <Route path="/admin/usuarios/nuevo" element={
           <PrivateRoute roles={['ADMINISTRADOR']}>
             <RegistroUsuario />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/usuarios" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <ListaUsuarios />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/doctores" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <GestionDoctores />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/usuarios/:id" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <PerfilUsuario />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/medicos/:id" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <PerfilMedico />
           </PrivateRoute>
         } />
 

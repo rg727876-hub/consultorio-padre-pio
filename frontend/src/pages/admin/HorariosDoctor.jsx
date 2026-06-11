@@ -47,20 +47,21 @@ export default function HorariosDoctor() {
       .then(({ data }) => {
         const list = Array.isArray(data) ? data : [];
         setDoctors(list);
-        const pre = searchParams.get('doctor_id');
-        if (pre) {
-          const found = list.find((d) => String(d.doctor_id) === pre);
-          if (found) {
-            setDoctorId(String(found.doctor_id));
-            setDoctor(found);
-          }
-        }
       })
       .catch(() => setErrorDoc(true))
       .finally(() => setLoadingDoc(false));
   }, []);
 
   useEffect(() => { loadDoctors(); }, [loadDoctors]);
+
+  useEffect(() => {
+    const pre = searchParams.get('doctor_id');
+    if (!pre || doctors.length === 0) return;
+    const found = doctors.find((d) => String(d.doctor_id) === pre);
+    if (found) {
+      setDoctorId(String(found.doctor_id));
+    }
+  }, [searchParams, doctors]);
 
   // ── Cargar horarios cuando cambia el doctor ──────────────────────
   useEffect(() => {

@@ -20,6 +20,28 @@ Sistema web completo para la gestión integral de una clínica dental, desarroll
 
 ---
 
+## 🆕 Novedades en la rama `feature/admin`
+
+En esta rama se han implementado las funcionalidades de **Listado y control centralizado de personal** (PIO-16) y **Gestión de roles administrativos** (PIO-17).
+
+**Nuevos Endpoints (API):**
+- `GET /api/users`: Listado completo de usuarios (solo administradores).
+- `GET /api/users/:id`: Obtiene el perfil detallado del usuario junto con su historial de auditoría.
+- `PUT /api/users/:id`: Edición de datos personales (valida unicidad de correo).
+- `PUT /api/users/:id/status`: Activa/Desactiva usuarios. Evita desactivar al último administrador.
+- `POST /api/users/:id/resend-activation`: Reenvía correos de activación e invalida tokens anteriores.
+- `GET /api/doctors/:id/profile`: Obtiene la información personal, profesional, servicios vinculados, horarios y citas futuras de un doctor (PIO-19).
+- `PUT /api/doctors/:id`: Edición avanzada para doctores, asegurando la unicidad del C.O.P. y asignación de múltiples servicios (PIO-19).
+- `PUT /api/doctors/:id/status`: Activa/Desactiva doctores. Cancela automáticamente las citas futuras en estado Reservada o Confirmada (PIO-19).
+
+**Nuevas Vistas Frontend:**
+- `/admin/usuarios`: Tabla de listado de personal con filtros por rol y estado. Al seleccionar un Doctor, te redirige automáticamente a su perfil médico especializado.
+- `/admin/usuarios/:id`: Perfil general con formulario de edición bloqueado parcialmente, validaciones offline y una pestaña de **Historial de Actividad**.
+- `/admin/medicos/:id`: Perfil especializado de Doctor (PIO-19). Incluye el C.O.P., selección múltiple de servicios médicos, y un **calendario semanal de solo lectura** con sus bloques horarios.
+- Alerta inteligente de cancelación: Si se desactiva un doctor con agenda activa, se cancelan automáticamente sus citas futuras.
+
+---
+
 ## 🚀 Estado del Proyecto & Roadmap
 
 ### Sprint 1: MVP Funcional (Vertical Slice)

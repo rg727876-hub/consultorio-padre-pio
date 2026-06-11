@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
   UserPlus, Users, Calendar, Stethoscope, ClipboardList,
-  CreditCard, BarChart2, ChevronRight, Clock,
+  CreditCard, BarChart2, ChevronRight, Clock, UserCog,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDotCursor } from '../hooks/useDotCursor';
@@ -13,97 +13,104 @@ import AppLayout from '../components/AppLayout';
 const MODULOS = {
   ADMINISTRADOR: [
     {
-      label:       'Registrar usuario',
+      label: 'Registrar usuario',
       descripcion: 'Crea cuentas para doctores, recepcionistas y cajeros',
-      icon:        UserPlus,
-      color:       'bg-blue-50 text-[#0059B3]',
-      ruta:        '/admin/usuarios/nuevo',
+      icon: UserPlus,
+      color: 'bg-blue-50 text-[#0059B3]',
+      ruta: '/admin/usuarios/nuevo',
     },
     {
-      label:        'Gestionar usuarios',
+      label:        'Gestion de Personal',
       descripcion:  'Ver, editar o desactivar cuentas del personal',
       icon:         Users,
       color:        'bg-indigo-50 text-indigo-600',
       ruta:         '/admin/usuarios',
     },
     {
-      label:       'Registrar servicio',
+      label: 'Gestion de Doctores',
+      descripcion: 'Perfiles clínicos, especialidades, horarios y estados de doctores',
+      icon: UserCog,
+      color: 'bg-cyan-50 text-cyan-600',
+      ruta: '/admin/usuarios?rol=DOCTOR',
+    },
+    {
+      label: 'Registrar servicio',
       descripcion: 'Agrega nuevos servicios dentales al sistema',
-      icon:        Stethoscope,
-      color:       'bg-green-50 text-green-700',
-      ruta:        '/admin/servicios/nuevo',
+      icon: Stethoscope,
+      color: 'bg-green-50 text-green-700',
+      ruta: '/admin/servicios/nuevo',
     },
     {
-      label:        'Gestionar servicios',
-      descripcion:  'Ver, editar o cambiar el estado de los servicios',
-      icon:         ClipboardList,
-      color:        'bg-teal-50 text-teal-600',
-      ruta:         '/admin/servicios',
+      label: 'Gestionar servicios',
+      descripcion: 'Ver, editar o cambiar el estado de los servicios',
+      icon: ClipboardList,
+      color: 'bg-teal-50 text-teal-600',
+      ruta: '/admin/servicios',
     },
     {
-      label:       'Horarios de doctores',
+      label: 'Horarios de doctores',
       descripcion: 'Define los bloques de disponibilidad semanal por doctor',
-      icon:        Clock,
-      color:       'bg-orange-50 text-orange-600',
-      ruta:        '/admin/horarios',
+      icon: Clock,
+      color: 'bg-orange-50 text-orange-600',
+      ruta: '/admin/horarios',
     },
     {
-      label:        'Reportes',
-      descripcion:  'Estadísticas de atenciones y facturación',
-      icon:         BarChart2,
-      color:        'bg-purple-50 text-purple-600',
-      ruta:         '/admin/reportes',
+      label: 'Reportes',
+      descripcion: 'Estadísticas de atenciones y facturación',
+      icon: BarChart2,
+      color: 'bg-purple-50 text-purple-600',
+      ruta: '/admin/reportes',
       proximamente: true,
     },
   ],
   RECEPCIONISTA: [
     {
-      label:       'Registrar paciente',
+      label: 'Registrar paciente',
       descripcion: 'Crear historial de nuevo paciente',
-      icon:        UserPlus,
-      color:       'bg-blue-50 text-[#0059B3]',
-      ruta:        '/recepcion/pacientes/nuevo',
+      icon: UserPlus,
+      color: 'bg-blue-50 text-[#0059B3]',
+      ruta: '/recepcion/pacientes/nuevo',
     },
     {
-      label:       'Agendar cita',
+      label: 'Agendar cita',
       descripcion: 'Reservar cita con un doctor',
-      icon:        Calendar,
-      color:       'bg-green-50 text-green-700',
-      ruta:        '/recepcion/citas/nueva',
+      icon: Calendar,
+      color: 'bg-green-50 text-green-700',
+      ruta: '/recepcion/citas/nueva',
     },
     {
-      label:       'Gestión de citas',
+      label: 'Gestión de citas',
       descripcion: 'Listar, buscar, cancelar o reprogramar citas',
-      icon:        ClipboardList,
-      color:       'bg-indigo-50 text-indigo-600',
-      ruta:        '/recepcion/citas',
+      icon: ClipboardList,
+      color: 'bg-indigo-50 text-indigo-600',
+      ruta: '/recepcion/citas',
     },
   ],
   DOCTOR: [
     {
-      label:       'Mi agenda',
+      label: 'Mi agenda',
       descripcion: 'Consulta tus citas por día, semana, mes o histórico',
-      icon:        Calendar,
-      color:       'bg-blue-50 text-[#0059B3]',
-      ruta:        '/doctor/agenda',
+      icon: Calendar,
+      color: 'bg-blue-50 text-[#0059B3]',
+      ruta: '/doctor/agenda',
     },
   ],
   CAJERO: [
     {
-      label:       'Registrar pago',
+      label: 'Registrar pago',
       descripcion: 'Procesar cobros de consultas y confirmar citas',
-      icon:        CreditCard,
-      color:       'bg-green-50 text-green-700',
-      ruta:        '/caja/pagos/nuevo',
+      icon: CreditCard,
+      color: 'bg-green-50 text-green-700',
+      ruta: '/caja/pagos/nuevo',
     },
   ],
 };
 
 const ROL_LABELS = {
   ADMINISTRADOR: 'Administrador',
-  DOCTOR:        'Doctor',
+  DOCTOR: 'Doctor',
   RECEPCIONISTA: 'Recepcionista',
-  CAJERO:        'Cajero',
+  CAJERO: 'Cajero',
 };
 
 // Saludo según la hora del día
@@ -116,10 +123,10 @@ function getSaludo() {
 
 // ── Componente principal ─────────────────────────────────────────
 export default function DashboardPage() {
-  const { user }   = useAuth();
-  const navigate   = useNavigate();
-  const dots       = useDotCursor();
-  const modulos    = MODULOS[user?.rol] ?? [];
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const dots = useDotCursor();
+  const modulos = MODULOS[user?.rol] ?? [];
 
   const [stats, setStats] = useState({ servicios: null, doctores: null });
 
@@ -128,9 +135,9 @@ export default function DashboardPage() {
     Promise.all([api.get('/services'), api.get('/doctors')])
       .then(([svc, doc]) => setStats({
         servicios: Array.isArray(svc.data) ? svc.data.length : 0,
-        doctores:  Array.isArray(doc.data) ? doc.data.length  : 0,
+        doctores: Array.isArray(doc.data) ? doc.data.length : 0,
       }))
-      .catch(() => {});
+      .catch(() => { });
   }, [user?.rol]);
 
   const saludo = getSaludo();
@@ -191,9 +198,9 @@ export default function DashboardPage() {
                 className={`animate-fade-up relative text-left bg-white rounded-2xl shadow-sm p-5
                             border border-transparent transition-all duration-200
                             ${mod.proximamente
-                              ? 'opacity-60 cursor-not-allowed'
-                              : 'hover:border-[#0059B3]/30 hover:shadow-md hover:-translate-y-0.5 cursor-pointer'
-                            }`}
+                    ? 'opacity-60 cursor-not-allowed'
+                    : 'hover:border-[#0059B3]/30 hover:shadow-md hover:-translate-y-0.5 cursor-pointer'
+                  }`}
               >
                 {mod.proximamente && (
                   <span className="absolute top-3 right-3 text-[10px] font-semibold

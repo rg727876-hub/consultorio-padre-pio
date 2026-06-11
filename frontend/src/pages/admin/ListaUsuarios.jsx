@@ -40,7 +40,7 @@ export default function ListaUsuarios() {
   const [total,    setTotal]    = useState(0);
 
   const [q,      setQ]      = useState('');
-  const [rol,    setRol]    = useState('');         // '' = todos los roles
+  const [rol,    setRol]    = useState('PERSONAL');
   const [estado, setEstado] = useState('ACTIVO');   // default: solo activos (CA1)
   const [detalleId, setDetalleId] = useState(null); // usuario en ventana flotante
 
@@ -71,11 +71,11 @@ export default function ListaUsuarios() {
   useEffect(() => { fetchUsuarios(1); /* eslint-disable-next-line */ }, []);
 
   const verPerfil = (id) => setDetalleId(id);
-  const hayFiltros = q.trim() || rol || estado !== 'ACTIVO';
+  const hayFiltros = q.trim() || rol !== 'PERSONAL' || estado !== 'ACTIVO';
 
   const limpiarFiltros = () => {
-    setQ(''); setRol(''); setEstado('ACTIVO');
-    fetchUsuarios(1, { q: '', rol: '', estado: 'ACTIVO' });
+    setQ(''); setRol('PERSONAL'); setEstado('ACTIVO');
+    fetchUsuarios(1, { q: '', rol: 'PERSONAL', estado: 'ACTIVO' });
   };
 
   return (
@@ -86,7 +86,7 @@ export default function ListaUsuarios() {
           {/* Encabezado */}
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h1 className="text-xl font-bold text-[#0059B3]">Gestión de usuarios</h1>
+              <h1 className="text-xl font-bold text-[#0059B3]">Gestión de Personal</h1>
               <p className="text-sm text-slate-500">Busca, filtra y accede al perfil del personal</p>
             </div>
             <button
@@ -120,11 +120,10 @@ export default function ListaUsuarios() {
                   onChange={e => { setRol(e.target.value); fetchUsuarios(1, { rol: e.target.value }); }}
                   className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white
                              focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40">
-                  <option value="">Todos</option>
+                  <option value="PERSONAL">Todos</option>
                   <option value="ADMINISTRADOR">Administrador</option>
                   <option value="RECEPCIONISTA">Recepcionista</option>
                   <option value="CAJERO">Cajero</option>
-                  <option value="DOCTOR">Doctor</option>
                 </select>
               </div>
 
@@ -202,7 +201,7 @@ export default function ListaUsuarios() {
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        {['DNI', 'Nombre completo', 'Correo', 'Rol', 'Especialidad', 'Estado', 'Acciones'].map(h => (
+                        {['DNI', 'Nombre completo', 'Correo', 'Rol', 'Estado', 'Acciones'].map(h => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold
                                                   text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                         ))}
@@ -225,10 +224,6 @@ export default function ListaUsuarios() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-slate-600">{u.email}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-slate-600">{ROL_LABEL[u.rol] ?? u.rol ?? '—'}</td>
-                            {/* CA4: especialidad real solo para doctores */}
-                            <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">
-                              {esDoctor ? (u.especialidad || '—') : '—'}
-                            </td>
                             <td className="px-4 py-3 whitespace-nowrap"><EstadoBadge estado={u.estado} /></td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <button title="Ver detalles" onClick={() => verPerfil(u.usuario_id)}
