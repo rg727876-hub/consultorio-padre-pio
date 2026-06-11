@@ -1,10 +1,14 @@
 const pool = require('../config/db');
 
-/** Próximo número correlativo para una serie */
-async function getNextNumero(serie) {
+/** Próximo número correlativo para una serie.
+ *  `base` = último número ya emitido en NubeFact/SUNAT para esa serie (desde .env).
+ *  Garantiza que el correlativo NO retroceda aunque la tabla local se haya
+ *  reiniciado (p. ej. tras recrear la BD), evitando colisiones con SUNAT. */
+async function getNextNumero(serie, base = 0) {
   const [[row]] = await pool.query(
-    `SELECT COALESCE(MAX(numero), 0) + 1 AS siguiente FROM COMPROBANTE WHERE serie = ?`,
-    [serie]
+    `SELECT GREATEST(COALESCE(MAX(numero), 0), ?) + 1 AS siguiente
+       FROM COMPROBANTE WHERE serie = ?`,
+    [Number(base) || 0, serie]
   );
   return row.siguiente;
 }

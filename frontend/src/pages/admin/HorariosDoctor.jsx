@@ -226,7 +226,7 @@ export default function HorariosDoctor() {
               <option value="">— Selecciona un doctor —</option>
               {doctors.map((d) => (
                 <option key={d.doctor_id} value={d.doctor_id}>
-                  {d.apellido}, {d.nombre} — {d.especialidad}
+                  {d.apellido}, {d.nombre}
                 </option>
               ))}
             </select>

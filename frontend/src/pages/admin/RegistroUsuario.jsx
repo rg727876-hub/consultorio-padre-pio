@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader2, UserPlus, X } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
@@ -14,7 +14,7 @@ const ROLES = [
 const INITIAL = {
   nombre: '', apellido: '', DNI: '', email: '',
   telefono: '', direccion: '', rol: '',
-  especialidad: '', nroColegiatura: '',
+  nroColegiatura: '',
 };
 
 // ── Filtros de input ─────────────────────────────────────────────
@@ -25,6 +25,8 @@ export default function RegistroUsuario() {
   const [form, setForm]               = useState(INITIAL);
   const [servicios, setServicios]     = useState([]);
   const [selServicios, setSelServicios] = useState([]);
+  const [especialidadesCat, setEspecialidadesCat] = useState([]);
+  const [selEspecialidades, setSelEspecialidades] = useState([]);
   const [loading, setLoading]         = useState(false);
   const [loadingSvc, setLoadingSvc]   = useState(false);
   const [errors, setErrors]           = useState({});
@@ -32,13 +34,17 @@ export default function RegistroUsuario() {
 
   const esDoctor = form.rol === 'DOCTOR';
 
-  // Cargar servicios cuando se elige Doctor
+  // Cargar servicios y especialidades cuando se elige Doctor
   useEffect(() => {
-    if (!esDoctor) { setServicios([]); setSelServicios([]); return; }
+    if (!esDoctor) {
+      setServicios([]); setSelServicios([]);
+      setEspecialidadesCat([]); setSelEspecialidades([]);
+      return;
+    }
     setLoadingSvc(true);
-    api.get('/services')
-      .then(({ data }) => setServicios(data))
-      .catch(() => toast.error('No se pudieron cargar los servicios'))
+    Promise.all([api.get('/services'), api.get('/especialidades')])
+      .then(([svc, esp]) => { setServicios(svc.data); setEspecialidadesCat(esp.data); })
+      .catch(() => toast.error('No se pudieron cargar servicios o especialidades'))
       .finally(() => setLoadingSvc(false));
   }, [esDoctor]);
 
@@ -46,8 +52,12 @@ export default function RegistroUsuario() {
   const handleField = (name, rawValue) => {
     let value = rawValue;
 
-    if (name === 'nombre' || name === 'apellido' || name === 'especialidad')
+    if (name === 'nombre' || name === 'apellido')
       value = soloLetras(rawValue);
+
+    // Nombre y apellido siempre en MAYÚSCULAS para uniformar las búsquedas
+    if (name === 'nombre' || name === 'apellido')
+      value = value.toUpperCase();
 
     if (name === 'DNI')
       value = soloNumeros(rawValue, 8);
@@ -80,7 +90,7 @@ export default function RegistroUsuario() {
     if (!/^\d{9}$/.test(form.telefono)) e.telefono = 'El teléfono debe tener exactamente 9 dígitos';
     if (!form.rol)                e.rol      = 'Selecciona un rol';
     if (esDoctor) {
-      if (!form.especialidad.trim())   e.especialidad   = 'Especialidad requerida';
+      // La especialidad es opcional (puede ser un recién egresado sin especialidad)
       if (!form.nroColegiatura.trim()) e.nroColegiatura = 'C.O.P requerido';
     }
     return e;
@@ -103,15 +113,16 @@ export default function RegistroUsuario() {
         telefono:       form.telefono,
         direccion:      form.direccion.trim() || undefined,
         rol:            form.rol,
-        especialidad:   esDoctor ? form.especialidad.trim() : undefined,
-        nroColegiatura: esDoctor ? form.nroColegiatura      : undefined,
-        servicios:      esDoctor ? selServicios             : [],
+        especialidades: esDoctor ? selEspecialidades : undefined,
+        nroColegiatura: esDoctor ? form.nroColegiatura : undefined,
+        servicios:      esDoctor ? selServicios        : [],
       };
 
       const { data } = await api.post('/users', payload);
       toast.success(data.message || 'Usuario registrado correctamente');
       setForm(INITIAL);
       setSelServicios([]);
+      setSelEspecialidades([]);
       setErrors({});
     } catch (err) {
       const msg = err.response?.data?.error || 'Error al registrar el usuario';
@@ -194,11 +205,44 @@ export default function RegistroUsuario() {
                 <p className="text-sm font-semibold text-[#0059B3]">Datos del doctor</p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Especialidad *" error={errors.especialidad}
-                         hint="Solo letras">
-                    <Input name="especialidad" value={form.especialidad}
-                           onChange={handleChange}
-                           placeholder="Ej. Ortodoncia" error={errors.especialidad} />
+                  <Field label="Especialidades"
+                         hint="Opcional — puedes agregar una o varias">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        if (id) setSelEspecialidades((prev) =>
+                          prev.includes(id) ? prev : [...prev, id]);
+                      }}
+                      className={selectCls()}>
+                      <option value="">+ Agregar especialidad…</option>
+                      {especialidadesCat
+                        .filter((esp) => !selEspecialidades.includes(esp.especialidad_id))
+                        .map((esp) => (
+                          <option key={esp.especialidad_id} value={esp.especialidad_id}>
+                            {esp.nombre}
+                          </option>
+                        ))}
+                    </select>
+                    {selEspecialidades.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {selEspecialidades.map((id) => {
+                          const esp = especialidadesCat.find((e) => e.especialidad_id === id);
+                          return (
+                            <span key={id}
+                                  className="inline-flex items-center gap-1 bg-blue-50 text-[#0059B3]
+                                             text-xs font-medium px-2 py-1 rounded-lg border border-blue-200">
+                              {esp?.nombre ?? id}
+                              <button type="button"
+                                onClick={() => setSelEspecialidades((prev) => prev.filter((x) => x !== id))}
+                                className="hover:text-red-500" title="Quitar">
+                                <X size={12} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </Field>
                   <Field label="C.O.P *" error={errors.nroColegiatura}
                          hint="Solo números">

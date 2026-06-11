@@ -46,7 +46,6 @@ const MODULOS = {
       icon: ClipboardList,
       color: 'bg-teal-50 text-teal-600',
       ruta: '/admin/servicios',
-      proximamente: true,
     },
     {
       label: 'Horarios de doctores',

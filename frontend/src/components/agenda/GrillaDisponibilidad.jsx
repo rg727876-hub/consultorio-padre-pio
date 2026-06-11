@@ -1,0 +1,320 @@
+import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+
+// ── Utilidades de fecha ──────────────────────────────────────────
+const hoy = () => new Date().toLocaleDateString('en-CA');
+
+const agregarDias = (fechaStr, n) => {
+  const d = new Date(fechaStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('en-CA');
+};
+
+const semanaDesde = (fechaStr) => {
+  const [y, m, d] = fechaStr.split('-').map(Number);
+  const base = new Date(y, m - 1, d);
+  const dow = base.getDay();
+  const lunes = new Date(base);
+  lunes.setDate(base.getDate() - (dow === 0 ? 6 : dow - 1));
+  return Array.from({ length: 6 }, (_, i) => {
+    const dia = new Date(lunes);
+    dia.setDate(lunes.getDate() + i);
+    return dia.toLocaleDateString('en-CA');
+  });
+};
+
+const fmtCorto = (fechaStr) => {
+  if (!fechaStr) return '';
+  const [y, m, d] = fechaStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('es-PE', {
+    weekday: 'short', day: '2-digit', month: 'short',
+  });
+};
+
+// ── Colores por tipo de slot ─────────────────────────────────────
+const SLOT_STYLE = {
+  DISPONIBLE: {
+    bg: 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-200',
+    text: 'text-emerald-700',
+  },
+  OCUPADO: {
+    bg: 'bg-blue-100 hover:bg-blue-200 border border-blue-300',
+    text: 'text-blue-800',
+  },
+  BUFFER: {
+    bg: 'bg-amber-50 hover:bg-amber-100 border border-amber-200',
+    text: 'text-amber-600',
+  },
+  NO_LABORAL: {
+    bg: 'bg-slate-50 border border-transparent',
+    text: 'text-slate-300',
+  },
+  PASADO: {
+    bg: 'bg-slate-50 border border-transparent opacity-40',
+    text: 'text-slate-300',
+  },
+};
+
+// ── Fusiona celdas consecutivas del mismo tipo (y misma cita) en un solo bloque ──
+function fusionar(slots) {
+  const segs = [];
+  for (const s of slots) {
+    const prev    = segs[segs.length - 1];
+    const citaId  = s.cita?.cita_id ?? null;
+    const prevId  = prev?.cita?.cita_id ?? null;
+    if (prev && prev.tipo === s.tipo && prevId === citaId && prev.hora_fin === s.hora_inicio) {
+      prev.hora_fin = s.hora_fin;                 // extender el bloque
+    } else {
+      segs.push({ tipo: s.tipo, hora_inicio: s.hora_inicio, hora_fin: s.hora_fin, cita: s.cita });
+    }
+  }
+  return segs;
+}
+
+// ── Bloque (segmento fusionado) ──────────────────────────────────
+function Segmento({ seg }) {
+  const ref = useRef(null);
+  const [tip, setTip] = useState(null);   // { x, y, abajo } | null
+  const s = SLOT_STYLE[seg.tipo] ?? SLOT_STYLE.NO_LABORAL;
+  const tieneTooltip = seg.tipo === 'OCUPADO' && seg.cita;
+  const rango = `${seg.hora_inicio}–${seg.hora_fin}`;
+
+  const mostrar = () => {
+    if (!tieneTooltip || !ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const abajo = r.top < 170;             // si está muy arriba, mostrar el tooltip debajo
+    setTip({ x: r.left + r.width / 2, y: abajo ? r.bottom : r.top, abajo });
+  };
+  const ocultar = () => setTip(null);
+
+  const c = seg.cita;
+
+  return (
+    <div
+      ref={ref}
+      className={`relative rounded text-[11px] leading-tight select-none
+                  transition-colors duration-100 cursor-default ${s.bg}`}
+      style={{ padding: '6px 8px' }}
+      onMouseEnter={mostrar}
+      onMouseLeave={ocultar}
+    >
+      <span className={`font-mono text-[10px] ${s.text}`}>{rango}</span>
+
+      {seg.tipo === 'OCUPADO' && c && (
+        <p className="truncate text-blue-800 font-semibold mt-0.5">
+          {c.paciente_nombre?.split(' ')[0]}
+        </p>
+      )}
+      {seg.tipo === 'BUFFER'     && <p className="text-amber-600 italic mt-0.5">Limpieza</p>}
+      {seg.tipo === 'DISPONIBLE' && <p className="text-emerald-600 mt-0.5">Disponible</p>}
+      {seg.tipo === 'NO_LABORAL' && <p className="text-slate-300 mt-0.5">No laboral</p>}
+
+      {/* Tooltip en portal con posición fija → no lo recorta el scroll */}
+      {tip && c && createPortal(
+        <div
+          style={{
+            position: 'fixed', left: tip.x, top: tip.abajo ? tip.y + 10 : tip.y - 10,
+            transform: tip.abajo ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+          }}
+          className="z-[60] w-64 bg-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 pointer-events-none"
+        >
+          <p className="font-semibold text-sm leading-snug">{c.paciente_nombre}</p>
+          <p className="text-slate-300 text-xs mt-0.5">{c.servicio_nombre}</p>
+          <div className="mt-2 pt-2 border-t border-white/15 space-y-1 text-[11px] text-slate-300">
+            <p>Código: <span className="font-mono text-white">{c.codigo_cita}</span></p>
+            <p>Horario: <span className="text-white">{c.hora_inicio_cita}–{c.hora_fin_cita}</span></p>
+            {c.hora_fin_con_buffer && c.hora_fin_con_buffer !== c.hora_fin_cita && (
+              <p>Limpieza hasta: <span className="text-white">{c.hora_fin_con_buffer}</span></p>
+            )}
+          </div>
+          {/* Flechita */}
+          <div className={`absolute left-1/2 -translate-x-1/2 border-[6px] border-transparent
+                           ${tip.abajo ? 'bottom-full border-b-slate-800' : 'top-full border-t-slate-800'}`} />
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// ── Columna de una fecha ─────────────────────────────────────────
+function ColumnaFecha({ fecha, slots, loading, horaInicioVis, horaFinVis }) {
+  const visibles = (slots ?? []).filter(s => {
+    const [h, m] = s.hora_inicio.split(':').map(Number);
+    const mins = h * 60 + m;
+    return mins >= horaInicioVis && mins < horaFinVis;
+  });
+
+  const esHoy = fecha === hoy();
+
+  return (
+    <div className="flex flex-col bg-white min-w-0">
+      {/* Cabecera de fecha */}
+      <div className={`text-center text-xs py-2 px-1 sticky top-0 z-10
+                       border-b ${esHoy ? 'border-[#0059B3]/30 bg-[#0059B3]/5' : 'border-slate-100 bg-white'}`}>
+        <span className={`font-semibold ${esHoy ? 'text-[#0059B3]' : 'text-slate-500'}`}>
+          {fmtCorto(fecha)}
+        </span>
+        {esHoy && (
+          <span className="block w-1.5 h-1.5 rounded-full bg-[#0059B3] mx-auto mt-1" />
+        )}
+      </div>
+
+      {/* Slots */}
+      <div className="flex flex-col gap-px p-1 overflow-y-auto" style={{ maxHeight: '65vh' }}>
+        {loading
+          ? Array.from({ length: 16 }).map((_, i) => (
+            <div key={i} className="skeleton h-6 rounded" />
+          ))
+          : visibles.length === 0
+            ? (
+              <div className="py-6 text-center">
+                <p className="text-[10px] text-slate-300">Sin horario</p>
+              </div>
+            )
+            : fusionar(visibles).map(seg => (
+                <Segmento key={seg.tipo + seg.hora_inicio} seg={seg} />
+              ))
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── Leyenda ───────────────────────────────────────────────────────
+const LEYENDA = [
+  { tipo: 'DISPONIBLE', label: 'Disponible', color: 'bg-emerald-200' },
+  { tipo: 'OCUPADO', label: 'Ocupado', color: 'bg-blue-300' },
+  { tipo: 'BUFFER', label: 'Buffer', color: 'bg-amber-200' },
+  { tipo: 'NO_LABORAL', label: 'No laboral', color: 'bg-slate-200' },
+  { tipo: 'PASADO', label: 'Pasado', color: 'bg-slate-100' },
+];
+
+function Leyenda() {
+  return (
+    <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+      {LEYENDA.map(({ tipo, label, color }) => (
+        <span key={tipo} className="flex items-center gap-1.5">
+          <span className={`w-3 h-3 rounded border border-slate-200 ${color}`} />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GrillaDisponibilidad — componente presentacional puro
+// Props:
+//   doctorId     {string}  — ID del doctor (si vacío, muestra placeholder)
+//   vista        {string}  — 'diaria' | 'semanal'
+//   fecha        {string}  — YYYY-MM-DD ancla de la vista
+//   grilla       {object}  — { [fecha]: slots[] } calculado por el padre
+//   loading      {boolean} — muestra skeletons
+//   onFechaChange {fn}     — callback al navegar con las flechas
+// ══════════════════════════════════════════════════════════════════
+export default function GrillaDisponibilidad({
+  doctorId,
+  vista,
+  fecha,
+  grilla,
+  loading,
+  onFechaChange,
+}) {
+  const fechas = vista === 'diaria' ? [fecha] : semanaDesde(fecha);
+
+  // ── Rango de horas dinámico ──────────────────────────────────────
+  // Recorre todos los slots de todas las fechas para encontrar la hora
+  // más temprana y la más tardía, y así ajustar el eje Y automáticamente.
+  const { horaInicioVis, horaFinVis } = (() => {
+    const todosLosSlots = Object.values(grilla ?? {}).flat();
+    if (todosLosSlots.length === 0) {
+      return { horaInicioVis: 8 * 60, horaFinVis: 18 * 60 }; // default 08:00–18:00
+    }
+
+    let minMins = Infinity;
+    let maxMins = -Infinity;
+
+    for (const s of todosLosSlots) {
+      const [hI, mI] = s.hora_inicio.split(':').map(Number);
+      const inicioMins = hI * 60 + mI;
+      minMins = Math.min(minMins, inicioMins);
+
+      // Usar hora_fin si está disponible, si no sumar la duración al inicio
+      if (s.hora_fin) {
+        const [hF, mF] = s.hora_fin.split(':').map(Number);
+        maxMins = Math.max(maxMins, hF * 60 + mF);
+      } else {
+        maxMins = Math.max(maxMins, inicioMins + (s.duracion_minutos ?? 30));
+      }
+    }
+
+    return { horaInicioVis: minMins, horaFinVis: maxMins };
+  })();
+
+  if (!doctorId) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm flex flex-col items-center
+                      justify-center py-24 gap-3">
+        <Calendar size={44} className="text-slate-200" />
+        <p className="text-slate-400 text-sm text-center">
+          Selecciona un doctor y haz clic en<br />
+          <span className="font-semibold">Ver disponibilidad</span>
+        </p>
+      </div>
+    );
+  }
+
+  const paso = vista === 'diaria' ? 1 : 7;
+  const tituloNav = vista === 'diaria'
+    ? fmtCorto(fecha)
+    : `${fmtCorto(fechas[0])} – ${fmtCorto(fechas[fechas.length - 1])}`;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      {/* Barra de navegación de fechas */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+        <button
+          onClick={() => onFechaChange(agregarDias(fecha, -paso))}
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+          aria-label="Período anterior"
+        >
+          <ChevronLeft size={16} />
+        </button>
+
+        <p className="text-sm font-semibold text-slate-700">{tituloNav}</p>
+
+        <button
+          onClick={() => onFechaChange(agregarDias(fecha, paso))}
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+          aria-label="Período siguiente"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      {/* Grid de columnas */}
+      <div
+        className="grid divide-x divide-slate-100 overflow-x-auto"
+        style={{ gridTemplateColumns: `repeat(${fechas.length}, minmax(130px, 1fr))` }}
+      >
+        {fechas.map(f => (
+          <ColumnaFecha
+            key={f}
+            fecha={f}
+            slots={grilla[f] ?? []}
+            loading={loading || !(f in grilla)}
+            horaInicioVis={horaInicioVis}
+            horaFinVis={horaFinVis}
+          />
+        ))}
+      </div>
+
+      {/* Leyenda */}
+      <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+        <Leyenda />
+      </div>
+    </div>
+  );
+}

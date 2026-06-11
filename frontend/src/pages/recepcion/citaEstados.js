@@ -18,6 +18,21 @@ export const PAGO_ESTADOS = {
   FALLIDO:    { label: 'Fallido',    cls: 'bg-red-100 text-red-700 border-red-200' },
 };
 
+// Estado de pago a MOSTRAR en la vista de una cita, combinando el pago real con
+// el estado de la cita (el pago se crea recién al cobrar; no existe al reservar):
+//  - Hay pago registrado          → su estado real (Completado / Pendiente / Fallido)
+//  - Sin pago + RESERVADA         → "Sin pago" (todavía puede pagarse)
+//  - Sin pago + CANCELADA/EXPIRADA/NO_ASISTIO → "No aplica"
+// Si pagó y luego canceló, el pago sigue existiendo → se muestra "Completado"
+// (regla de negocio: no hay reembolso).
+export const pagoVista = (cita) => {
+  const estadoPago = cita?.pago?.estado;
+  if (estadoPago) return PAGO_ESTADOS[estadoPago] ?? PAGO_ESTADOS.PENDIENTE;
+  if (['CANCELADA', 'EXPIRADA', 'NO_ASISTIO'].includes(cita?.estado))
+    return { label: 'No aplica', cls: 'bg-slate-50 text-slate-400 border-slate-200' };
+  return { label: 'Sin pago', cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+};
+
 export const fmtFecha = (d) => {
   if (!d) return '—';
   const [y, m, day] = String(d).slice(0, 10).split('-').map(Number);
@@ -30,5 +45,6 @@ export const fmtFechaHora = (d) => {
   if (!d) return '—';
   return new Date(d).toLocaleString('es-PE', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: 'America/Lima',   // siempre hora de Perú, sin depender del PC del usuario
   });
 };

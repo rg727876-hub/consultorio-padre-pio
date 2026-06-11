@@ -383,7 +383,7 @@ export default function AgendarCita() {
                   <option value="">Selecciona un doctor</option>
                   {doctores.map(d => (
                     <option key={d.doctor_id} value={d.doctor_id}>
-                      Dr. {d.apellido}, {d.nombre} · {d.especialidad}
+                      Dr. {d.apellido}, {d.nombre}
                     </option>
                   ))}
                 </select>
@@ -479,8 +479,8 @@ export default function AgendarCita() {
                            transition-colors duration-200 shadow-sm"
               >
                 {loading
-                  ? <><Loader2 size={16} className="animate-spin" /> Agendando...</>
-                  : <><Calendar size={16} /> Confirmar cita</>}
+                  ? <><Loader2 size={16} className="animate-spin" /> Reservando...</>
+                  : <><Calendar size={16} /> Reservar cita</>}
               </button>
             </div>
           )}

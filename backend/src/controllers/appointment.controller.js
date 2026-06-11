@@ -22,6 +22,7 @@ const getDayName = (fechaStr) => {
 const generateCode = () => crypto.randomBytes(5).toString('hex').toUpperCase();
 
 // GET /api/appointments/slots?doctor_id=X&servicio_id=Y&fecha=YYYY-MM-DD
+// GET /api/appointments/slots?doctor_id=X&servicio_id=Y&fecha=YYYY-MM-DD
 const getSlots = async (req, res) => {
   const doctorId   = Number(req.query.doctor_id);
   const servicioId = Number(req.query.servicio_id);
@@ -50,38 +51,73 @@ const getSlots = async (req, res) => {
     );
     if (!horarios.length) return res.json({ slots: [] });
 
-    // Duración y buffer del servicio
-    const [[servicio]] = await pool.query(
+    // Duración y buffer del servicio NUEVO que se quiere reservar
+    const [[servicioNuevo]] = await pool.query(
       `SELECT duracion, buffer FROM SERVICIO
        WHERE  servicio_id = ? AND estado = 'ACTIVO'`,
       [servicioId]
     );
-    if (!servicio) return res.status(404).json({ error: 'Servicio no encontrado' });
+    if (!servicioNuevo) return res.status(404).json({ error: 'Servicio no encontrado' });
 
-    // Citas ya existentes ese día (para detectar solapamientos)
+    // Citas existentes ese día CON el buffer de su propio servicio
     const [booked] = await pool.query(
-      `SELECT TIME_FORMAT(hora_inicio,'%H:%i') AS hi,
-              TIME_FORMAT(hora_fin,   '%H:%i') AS hf
-       FROM   CITA
-       WHERE  doctor_id = ? AND fecha = ?
-         AND  estado IN ('RESERVADA','CONFIRMADA')`,
+      `SELECT 
+        TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+        TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+        s.buffer AS service_buffer
+       FROM   CITA c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       WHERE  c.doctor_id = ? AND c.fecha = ?
+         AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')
+       ORDER BY c.hora_inicio`,
       [doctorId, fecha]
     );
 
-    const totalMins = servicio.duracion + servicio.buffer;
+    // Paso de avance: 5 minutos para flexibilidad
+    const STEP = 5;
     const slots = [];
+
+    // Hora actual en minutos (para excluir slots ya pasados si es hoy)
+    let ahoraMins = -1;
+    if (fecha === hoy) {
+      const ahora = new Date();
+      ahoraMins = ahora.getHours() * 60 + ahora.getMinutes();
+    }
 
     for (const h of horarios) {
       let cur = timeToMins(h.hora_inicio);
       const end = timeToMins(h.hora_fin);
-      while (cur + servicio.duracion <= end) {
-        const slotEnd = cur + servicio.duracion;
-        const overlaps = booked.some(
-          b => cur < timeToMins(b.hf) && slotEnd > timeToMins(b.hi)
-        );
-        if (!overlaps)
-          slots.push({ hora_inicio: minsToTime(cur), hora_fin: minsToTime(slotEnd) });
-        cur += totalMins;
+      
+      while (cur + servicioNuevo.duracion <= end) {
+        const slotInicio = cur;
+        const slotFin = cur + servicioNuevo.duracion;
+        const slotFinConBuffer = slotFin + servicioNuevo.buffer;
+        
+        // Excluir slots ya pasados (si es hoy)
+        if (ahoraMins >= 0 && slotInicio < ahoraMins) {
+          cur += STEP;
+          continue;
+        }
+        
+        // Verifica solapamiento con citas reservadas (considerando ambos buffers)
+        const overlaps = booked.some(b => {
+          const bookedInicio = timeToMins(b.hi);
+          const bookedFin = timeToMins(b.hf);
+          const bookedFinConBuffer = bookedFin + b.service_buffer;
+          
+          // El slot propuesto (con su buffer al final) NO debe solaparse 
+          // con la cita reservada (con su buffer al final)
+          return (slotInicio < bookedFinConBuffer && slotFinConBuffer > bookedInicio);
+        });
+        
+        if (!overlaps) {
+          slots.push({ 
+            hora_inicio: minsToTime(slotInicio), 
+            hora_fin: minsToTime(slotFin) 
+          });
+        }
+        
+        cur += STEP;
       }
     }
 
@@ -124,17 +160,29 @@ const create = async (req, res) => {
 
     const hora_fin = minsToTime(timeToMins(hora_inicio) + servicio.duracion);
 
-    // Verificar solapamiento con citas existentes
-    const [[{ cnt }]] = await conn.query(
-      `SELECT COUNT(*) AS cnt FROM CITA
-       WHERE  doctor_id = ? AND fecha = ?
-         AND  estado IN ('RESERVADA','CONFIRMADA')
-         AND  hora_inicio < ? AND hora_fin > ?`,
-      [Number(doctor_id), fecha, hora_fin, hora_inicio]
+    // Verificar solapamiento con citas existentes, RESPETANDO el buffer de cada una.
+    // Cada cita reserva [inicio, fin + buffer). La nueva cita también reserva su
+    // buffer, así que dos reservas chocan si sus rangos (con buffer) se cruzan.
+    const [existentes] = await conn.query(
+      `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+              TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+              s.buffer AS buffer
+       FROM   CITA     c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       WHERE  c.doctor_id = ? AND c.fecha = ?
+         AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
+      [Number(doctor_id), fecha]
     );
-    if (cnt > 0) {
+    const nIni    = timeToMins(hora_inicio);
+    const nFinBuf = timeToMins(hora_fin) + servicio.buffer;
+    const choca = existentes.some(
+      b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
+    );
+    if (choca) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({ error: 'Ese horario ya fue reservado. Por favor elige otro.' });
+      return res.status(409).json({
+        error: 'Ese horario se cruza con otra cita o con su tiempo de limpieza (buffer). Elige otro.',
+      });
     }
 
     // Generar código único
@@ -283,7 +331,7 @@ const list = async (req, res) => {
          pat.tipo_documento, pat.numero_documento,
          pat.telefono AS paciente_telefono, pat.email AS paciente_email,
          CONCAT(u.nombre,' ',u.apellido)     AS doctor_nombre,
-         d.especialidad,
+         (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ') FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id WHERE de.doctor_id = d.doctor_id) AS especialidad,
          s.nombre AS servicio_nombre, s.duracion
        FROM   CITA     c
        JOIN   PACIENTE pat ON c.paciente_id = pat.paciente_id
@@ -332,14 +380,14 @@ const getById = async (req, res) => {
   try {
     const [[cita]] = await pool.query(
       `SELECT
-         c.cita_id, c.codigo_cita, c.fecha,
+         c.cita_id, c.codigo_cita, c.fecha, c.doctor_id,
          TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
          TIME_FORMAT(c.hora_fin,   '%H:%i') AS hora_fin,
          c.estado, c.precio_aplicado, c.creado_por, c.fecha_creacion,
          CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre,
          pat.tipo_documento, pat.numero_documento,
          pat.telefono AS paciente_telefono, pat.email AS paciente_email,
-         CONCAT(u.nombre,' ',u.apellido)  AS doctor_nombre, d.especialidad,
+         CONCAT(u.nombre,' ',u.apellido)  AS doctor_nombre, (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ') FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id WHERE de.doctor_id = d.doctor_id) AS especialidad,
          s.nombre AS servicio_nombre, s.duracion,
          CONCAT(cre.nombre,' ',cre.apellido) AS creado_por_nombre
        FROM   CITA     c
@@ -521,4 +569,392 @@ const marcarNoAsistio = async (req, res) => {
   }
 };
 
-module.exports = { getSlots, create, list, getById, agenda, marcarNoAsistio };
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/appointments/:id/cancel  (rol RECEPCIONISTA | ADMINISTRADOR)
+// Cancela una cita cuyo estado sea RESERVADA o CONFIRMADA.
+//
+// Transacción SQL:
+//  1. SELECT … FOR UPDATE → obtiene la cita y bloquea la fila.
+//  2. Valida que el estado sea RESERVADA o CONFIRMADA; si no → 400.
+//  3. UPDATE CITA → estado = 'CANCELADA'.
+//     (La tabla PAGO NO se toca: la regla financiera retiene el ingreso.)
+//  4. INSERT AUDITORIA → accion = 'CANCELACION_CITA' dentro de la txn.
+//  5. COMMIT → libera el slot del doctor para nuevas reservas.
+// ─────────────────────────────────────────────────────────────────
+const cancel = async (req, res) => {
+  const citaId   = Number(req.params.id);
+  const usuarioId = req.user?.id ?? null;          // recepcionista del JWT
+
+  if (!citaId || !Number.isInteger(citaId))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+
+  const ESTADOS_CANCELABLES = ['RESERVADA', 'CONFIRMADA'];
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query('START TRANSACTION');
+
+    // ── 1. Leer y bloquear la fila ──────────────────────────────────
+    const [[cita]] = await conn.query(
+      `SELECT cita_id, paciente_id, doctor_id, codigo_cita, estado
+       FROM   CITA
+       WHERE  cita_id = ?
+       FOR UPDATE`,
+      [citaId]
+    );
+
+    if (!cita) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+
+    // ── 2. Validar estado cancelable ────────────────────────────────
+    if (!ESTADOS_CANCELABLES.includes(cita.estado)) {
+      await conn.query('ROLLBACK');
+      return res.status(400).json({
+        error: `No se puede cancelar una cita en estado '${cita.estado}'. ` +
+               `Solo se permiten cancelar citas en estado: ${ESTADOS_CANCELABLES.join(', ')}.`,
+      });
+    }
+
+    // ── 3. Cancelar la cita ─────────────────────────────────────────
+    // Se marca como CANCELADA. No se modifica PAGO (retención financiera).
+    await conn.query(
+      `UPDATE CITA
+       SET    estado = 'CANCELADA'
+       WHERE  cita_id = ?`,
+      [citaId]
+    );
+
+    // ── 4. Registrar auditoría dentro de la misma transacción ───────
+    await conn.query(
+      `INSERT INTO AUDITORIA
+         (usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen)
+       VALUES (?, ?, 'CANCELACION_CITA', 'CITA', ?, ?, ?)`,
+      [
+        usuarioId,
+        cita.paciente_id,
+        citaId,
+        JSON.stringify({
+          codigo_cita:    cita.codigo_cita,
+          estado_previo:  cita.estado,
+          cancelado_por:  usuarioId,
+        }),
+        req.ip ?? null,
+      ]
+    );
+
+    // ── 5. Confirmar transacción ─────────────────────────────────────
+    await conn.query('COMMIT');
+
+    return res.status(200).json({
+      message:     'Cita cancelada exitosamente',
+      cita_id:     citaId,
+      codigo_cita: cita.codigo_cita,
+      estado:      'CANCELADA',
+    });
+
+  } catch (err) {
+    if (conn) {
+      try { await conn.query('ROLLBACK'); } catch (_) {}
+    }
+    console.error('[appointment.cancel]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+module.exports = { getSlots, create, list, getById, agenda, marcarNoAsistio, cancel };
+
+// =================================================================
+// PIO-30: Reprogramación de Citas
+// =================================================================
+
+// ── Mapa de bloqueos temporales (en memoria, por proceso) ───────────
+// Clave  : `${doctorId}:${fecha}:${horaInicio}` (identifica el slot)
+// Valor  : { citaId, expiresAt, timer }
+//
+// Los bloqueos expiran automáticamente a los 10 minutos.
+// Nota: este mecanismo in-memory es adecuado para un servidor
+// de instancia única. Para multi-instancia se debería usar Redis.
+const LOCK_TTL_MS = 10 * 60 * 1000; // 10 minutos
+const locks = new Map();
+
+const lockKey = (doctorId, fecha, horaInicio) =>
+  `${doctorId}:${fecha}:${horaInicio}`;
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/appointments/:id/lock
+//
+// Bloquea un slot de horario durante LOCK_TTL_MS (10 min) para que
+// ningún otro usuario pueda reprogramar otra cita a ese mismo
+// doctor/fecha/hora mientras el primero llena el formulario.
+//
+// Body:  { nueva_fecha, nueva_hora_inicio }
+// 200  : { message, expires_at }   → slot reservado
+// 409  : slot ya bloqueado por otro
+// ─────────────────────────────────────────────────────────────────
+const lockSlot = async (req, res) => {
+  const citaId = Number(req.params.id);
+  if (!citaId || !Number.isInteger(citaId))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+
+  const { nueva_fecha, nueva_hora_inicio } = req.body;
+  if (!nueva_fecha || !nueva_hora_inicio)
+    return res.status(400).json({ error: 'nueva_fecha y nueva_hora_inicio son requeridos' });
+
+  try {
+    // Obtener el doctor de la cita
+    const [[cita]] = await pool.query(
+      'SELECT cita_id, doctor_id, estado FROM CITA WHERE cita_id = ?',
+      [citaId]
+    );
+    if (!cita)
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    if (!['RESERVADA', 'CONFIRMADA'].includes(cita.estado))
+      return res.status(409).json({
+        error: `Solo se pueden reprogramar citas en estado RESERVADA o CONFIRMADA (estado actual: ${cita.estado})`,
+      });
+
+    const key        = lockKey(cita.doctor_id, nueva_fecha, nueva_hora_inicio);
+    const ahora      = Date.now();
+    const existente  = locks.get(key);
+
+    // Rechazar si ya está bloqueado por OTRA cita y el lock no expiró
+    if (existente && existente.expiresAt > ahora && existente.citaId !== citaId) {
+      return res.status(409).json({
+        error: 'Horario no disponible: otro usuario ya está reservando este slot.',
+      });
+    }
+
+    // Limpiar timer anterior si existía (mismo citaId o expirado)
+    if (existente?.timer) clearTimeout(existente.timer);
+
+    const expiresAt = ahora + LOCK_TTL_MS;
+
+    // Timer de auto-expiración
+    const timer = setTimeout(() => locks.delete(key), LOCK_TTL_MS);
+    // Permitir que el proceso de Node.js termine sin esperar este timer
+    if (timer.unref) timer.unref();
+
+    locks.set(key, { citaId, expiresAt, timer });
+
+    return res.json({
+      message:    'Slot bloqueado correctamente',
+      expires_at: new Date(expiresAt).toISOString(),
+      ttl_secs:   LOCK_TTL_MS / 1000,
+    });
+
+  } catch (err) {
+    console.error('[appointment.lockSlot]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/appointments/:id/unlock
+//
+// Libera el bloqueo manualmente (usuario cancela la reprogramación).
+// Body:  { nueva_fecha, nueva_hora_inicio }  (el mismo slot que se bloqueó)
+// 200  : { message }
+// ─────────────────────────────────────────────────────────────────
+const unlockSlot = async (req, res) => {
+  const citaId = Number(req.params.id);
+  const { nueva_fecha, nueva_hora_inicio } = req.body;
+
+  if (!citaId || !nueva_fecha || !nueva_hora_inicio)
+    return res.status(400).json({ error: 'citaId, nueva_fecha y nueva_hora_inicio son requeridos' });
+
+  try {
+    const [[cita]] = await pool.query(
+      'SELECT doctor_id FROM CITA WHERE cita_id = ?', [citaId]
+    );
+    if (!cita)
+      return res.status(404).json({ error: 'Cita no encontrada' });
+
+    const key      = lockKey(cita.doctor_id, nueva_fecha, nueva_hora_inicio);
+    const existente = locks.get(key);
+
+    if (existente && existente.citaId === citaId) {
+      if (existente.timer) clearTimeout(existente.timer);
+      locks.delete(key);
+    }
+    // Si no existía o pertenecía a otro, se ignora silenciosamente
+
+    return res.json({ message: 'Bloqueo liberado' });
+
+  } catch (err) {
+    console.error('[appointment.unlockSlot]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/appointments/:id/reschedule  (PIO-30)
+//
+// Reprograma la cita: solo modifica fecha, hora_inicio y hora_fin.
+// NO toca doctor_id, servicio_id, codigo_cita, precio, estado ni pagos.
+//
+// Body  : { nueva_fecha, nueva_hora_inicio, nueva_hora_fin }
+// 200   : { message, cita_id, codigo_cita, ... }
+// 409   : solapamiento con otra cita
+// 409   : lock perdido / expirado
+// ─────────────────────────────────────────────────────────────────
+const reschedule = async (req, res) => {
+  const citaId = Number(req.params.id);
+  if (!citaId || !Number.isInteger(citaId))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+
+  const { nueva_fecha, nueva_hora_inicio, nueva_hora_fin } = req.body;
+
+  if (!nueva_fecha || !nueva_hora_inicio || !nueva_hora_fin)
+    return res.status(400).json({
+      error: 'nueva_fecha, nueva_hora_inicio y nueva_hora_fin son requeridos',
+    });
+
+  // Validar formato de fecha
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nueva_fecha) || isNaN(Date.parse(nueva_fecha)))
+    return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' });
+
+  // Validar que hora_inicio < hora_fin
+  if (nueva_hora_inicio >= nueva_hora_fin)
+    return res.status(400).json({ error: 'La hora de inicio debe ser anterior a la hora de fin' });
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query('START TRANSACTION');
+
+    // ── 1. Leer y bloquear la cita original ──────────────────────────────
+    const [[cita]] = await conn.query(
+      `SELECT cita_id, codigo_cita, doctor_id, servicio_id, estado,
+              DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
+              TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
+              TIME_FORMAT(hora_fin,    '%H:%i') AS hora_fin
+       FROM   CITA
+       WHERE  cita_id = ?
+       FOR UPDATE`,
+      [citaId]
+    );
+
+    if (!cita) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+
+    if (!['RESERVADA', 'CONFIRMADA'].includes(cita.estado)) {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({
+        error: `Solo se pueden reprogramar citas en estado RESERVADA o CONFIRMADA (estado actual: ${cita.estado})`,
+      });
+    }
+
+    // ── 2. Verificar que el lock pertenece a esta cita o está libre ─────
+    const key      = lockKey(cita.doctor_id, nueva_fecha, nueva_hora_inicio);
+    const lockData = locks.get(key);
+
+    if (lockData && lockData.expiresAt > Date.now() && lockData.citaId !== citaId) {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({
+        error: 'Horario no disponible: otro usuario está reservando este slot.',
+      });
+    }
+
+    // ── 3. Verificar solapamiento con OTRAS citas, RESPETANDO buffers ──
+    const [[svcReprog]] = await conn.query(
+      'SELECT buffer FROM SERVICIO WHERE servicio_id = ?', [cita.servicio_id]
+    );
+    const bufReprog = svcReprog?.buffer || 0;
+
+    const [otras] = await conn.query(
+      `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+              TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+              s.buffer AS buffer
+       FROM   CITA     c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       WHERE  c.doctor_id = ? AND c.fecha = ? AND c.cita_id <> ?
+         AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
+      [cita.doctor_id, nueva_fecha, citaId]
+    );
+    const rIni    = timeToMins(nueva_hora_inicio);
+    const rFinBuf = timeToMins(nueva_hora_fin) + bufReprog;
+    const solapa = otras.some(
+      b => rIni < (timeToMins(b.hf) + (b.buffer || 0)) && rFinBuf > timeToMins(b.hi)
+    );
+
+    if (solapa) {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({
+        error: 'El horario solicitado se cruza con otra cita o su tiempo de limpieza (buffer).',
+      });
+    }
+
+    // ── 4. Actualizar SOLO fecha/hora (sin tocar estado, doc, servicio, precio, código) ─
+    await conn.query(
+      `UPDATE CITA
+       SET fecha       = ?,
+           hora_inicio = ?,
+           hora_fin    = ?
+       WHERE cita_id   = ?`,
+      [nueva_fecha, nueva_hora_inicio, nueva_hora_fin, citaId]
+    );
+
+    await conn.query('COMMIT');
+
+    // ── 5. Liberar el lock ──────────────────────────────────────────────
+    const lockEntry = locks.get(key);
+    if (lockEntry?.citaId === citaId) {
+      if (lockEntry.timer) clearTimeout(lockEntry.timer);
+      locks.delete(key);
+    }
+
+    // ── 6. Auditoría ───────────────────────────────────────────────────────
+    await logAudit({
+      usuario_id: req.user?.id,
+      accion:     'REPROGRAMACION_CITA',
+      entidad:    'CITA',
+      entidad_id: citaId,
+      detalles:   JSON.stringify({
+        codigo_cita:        cita.codigo_cita,
+        fecha_anterior:     cita.fecha,
+        hora_inicio_antes:  cita.hora_inicio,
+        hora_fin_antes:     cita.hora_fin,
+        nueva_fecha,
+        nueva_hora_inicio,
+        nueva_hora_fin,
+      }),
+      ip_origen: req.ip,
+    });
+
+    return res.json({
+      message:          'Cita reprogramada correctamente',
+      cita_id:          citaId,
+      codigo_cita:      cita.codigo_cita,
+      fecha_anterior:   `${cita.fecha} ${cita.hora_inicio}`,
+      nueva_fecha_hora: `${nueva_fecha} ${nueva_hora_inicio}`,
+    });
+
+  } catch (err) {
+    if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    console.error('[appointment.reschedule]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+module.exports = {
+  getSlots, create, list, getById, agenda, marcarNoAsistio, cancel,
+  lockSlot, unlockSlot, reschedule,
+};

@@ -27,8 +27,8 @@ export default function GestionDoctores() {
       try {
         setLoading(true);
         // Solo traer doctores
-        const { data } = await api.get('/users?rol=DOCTOR');
-        setUsers(data);
+        const { data } = await api.get('/users', { params: { rol: 'DOCTOR' } });
+        setUsers(data.data ?? []);
       } catch (err) {
         console.error('fetchDoctores error', err);
         toast.error('Error al cargar la lista de doctores');

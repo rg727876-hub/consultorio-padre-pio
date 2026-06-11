@@ -27,7 +27,9 @@ const searchAppointment = async (req, res) => {
         p.telefono                                  AS paciente_telefono,
         s.nombre                                    AS servicio_nombre,
         CONCAT('Dr. ', u.apellido, ', ', u.nombre)    AS doctor_nombre,
-        d.especialidad
+        (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+           FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+          WHERE de.doctor_id = d.doctor_id) AS especialidad
       FROM  CITA     c
       JOIN  PACIENTE p ON c.paciente_id = p.paciente_id
       JOIN  SERVICIO s ON c.servicio_id  = s.servicio_id

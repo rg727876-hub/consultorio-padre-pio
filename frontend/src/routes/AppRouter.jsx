@@ -6,18 +6,21 @@ import StaffLoginPage         from '../pages/auth/StaffLoginPage';
 import ActivateAccountPage    from '../pages/auth/ActivateAccountPage';
 import DashboardPage          from '../pages/DashboardPage';
 import RegistroUsuario        from '../pages/admin/RegistroUsuario';
-import GestionUsuarios        from '../pages/admin/GestionUsuarios';
 import GestionDoctores        from '../pages/admin/GestionDoctores';
+import ListaUsuarios          from '../pages/admin/ListaUsuarios';
 import PerfilUsuario          from '../pages/admin/PerfilUsuario';
 import PerfilMedico           from '../pages/admin/PerfilMedico';
 import RegistroServicio       from '../pages/admin/RegistroServicio';
 import GestionarServicios     from '../pages/admin/GestionarServicios';
 import HorariosDoctor         from '../pages/admin/HorariosDoctor';
 import RegistrarPaciente      from '../pages/recepcion/RegistrarPaciente';
+import ListaPacientes         from '../pages/recepcion/ListaPacientes';
 import AgendarCita            from '../pages/recepcion/AgendarCita';
 import GestionCitas           from '../pages/recepcion/GestionCitas';
 import DetalleCita            from '../pages/recepcion/DetalleCita';
+import AgendaMedica           from '../pages/agenda/AgendaMedica';
 import MiAgenda               from '../pages/doctor/MiAgenda';
+import RegistrarAtencion      from '../pages/doctor/RegistrarAtencion';
 import RegistrarPago          from '../pages/caja/RegistrarPago';
 import ListaPagos             from '../pages/caja/ListaPagos';
 import GenerarComprobante     from '../pages/caja/GenerarComprobante';
@@ -40,6 +43,12 @@ function RouterContent() {
         } />
 
         {/* ── Solo Administrador ── */}
+        <Route path="/admin/usuarios" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <ListaUsuarios />
+          </PrivateRoute>
+        } />
+
         <Route path="/admin/usuarios/nuevo" element={
           <PrivateRoute roles={['ADMINISTRADOR']}>
             <RegistroUsuario />
@@ -48,7 +57,7 @@ function RouterContent() {
 
         <Route path="/admin/usuarios" element={
           <PrivateRoute roles={['ADMINISTRADOR']}>
-            <GestionUsuarios />
+            <ListaUsuarios />
           </PrivateRoute>
         } />
 
@@ -89,6 +98,12 @@ function RouterContent() {
         } />
 
         {/* ── Recepcionista y Administrador ── */}
+        <Route path="/recepcion/pacientes" element={
+          <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
+            <ListaPacientes />
+          </PrivateRoute>
+        } />
+
         <Route path="/recepcion/pacientes/nuevo" element={
           <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
             <RegistrarPaciente />
@@ -113,10 +128,22 @@ function RouterContent() {
           </PrivateRoute>
         } />
 
+        <Route path="/recepcion/agenda" element={
+          <PrivateRoute roles={['RECEPCIONISTA', 'ADMINISTRADOR']}>
+            <AgendaMedica />
+          </PrivateRoute>
+        } />
+
         {/* ── Doctor ── */}
         <Route path="/doctor/agenda" element={
           <PrivateRoute roles={['DOCTOR']}>
             <MiAgenda />
+          </PrivateRoute>
+        } />
+
+        <Route path="/doctor/atencion/:citaId" element={
+          <PrivateRoute roles={['DOCTOR']}>
+            <RegistrarAtencion />
           </PrivateRoute>
         } />
 
