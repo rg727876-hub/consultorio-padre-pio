@@ -292,9 +292,12 @@ export default function UsuarioModal({ id, onClose, onChanged }) {
                       {acting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Reactivar
                     </button>
                   ) : (
-                    <button onClick={() => setConfirmDesact(true)} disabled={acting}
-                      className="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-600 disabled:opacity-60
-                                 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                    <button onClick={() => setConfirmDesact(true)} disabled={acting || pendiente}
+                      title={pendiente ? 'No se puede desactivar un usuario pendiente' : 'Desactivar usuario'}
+                      className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg transition-colors
+                        ${pendiente 
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
+                          : 'bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white'}`}>
                       <Power size={14} /> Desactivar
                     </button>
                   )}
