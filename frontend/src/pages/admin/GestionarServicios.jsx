@@ -82,7 +82,6 @@ export default function GestionarServicios() {
       duracion:    String(servicio.duracion),
       costo:       String(servicio.costo),
       buffer:      String(servicio.buffer ?? 0),
-      imagen:      servicio.imagen ?? '',
       estado:      servicio.estado,
     });
     setEditErrors({});
@@ -142,7 +141,6 @@ export default function GestionarServicios() {
         duracion:    Number(editForm.duracion),
         costo:       Number(editForm.costo),
         buffer:      Number(editForm.buffer),
-        imagen:      editForm.imagen.trim() || undefined,
         estado:      editForm.estado,
       });
       toast.success('Servicio actualizado');
@@ -156,7 +154,6 @@ export default function GestionarServicios() {
                 duracion:    Number(editForm.duracion),
                 costo:       Number(editForm.costo),
                 buffer:      Number(editForm.buffer),
-                imagen:      editForm.imagen.trim() || null,
                 estado:      editForm.estado,
               }
             : s
@@ -360,13 +357,16 @@ export default function GestionarServicios() {
                       />
                     </EField>
                     <EField label="Buffer" error={editErrors.buffer} hint="min">
-                      <input
+                      <select
                         name="buffer"
                         value={editForm.buffer}
                         onChange={handleEditChange}
-                        inputMode="numeric"
                         className={inputCls(editErrors.buffer)}
-                      />
+                      >
+                        {[5, 10, 15, 20, 25, 30].map((v) => (
+                          <option key={v} value={String(v)}>{v}</option>
+                        ))}
+                      </select>
                     </EField>
                     <EField label="Precio *" error={editErrors.costo} hint="S/">
                       <div className="relative">
@@ -382,15 +382,6 @@ export default function GestionarServicios() {
                       </div>
                     </EField>
                   </div>
-
-                  <EField label="URL de imagen" hint="opcional">
-                    <input
-                      name="imagen"
-                      value={editForm.imagen}
-                      onChange={handleEditChange}
-                      className={inputCls()}
-                    />
-                  </EField>
 
                   <EField label="Estado">
                     <div className="flex gap-4">
