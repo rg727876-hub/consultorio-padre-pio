@@ -25,6 +25,7 @@ const searchAppointment = async (req, res) => {
         p.tipo_documento,
         p.numero_documento,
         p.telefono                                  AS paciente_telefono,
+        p.email                                     AS paciente_email,
         s.nombre                                    AS servicio_nombre,
         CONCAT('Dr. ', u.apellido, ', ', u.nombre)    AS doctor_nombre,
         (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
@@ -178,6 +179,7 @@ const getPayments = async (req, res) => {
     const [[{ total }]] = await pool.query(
       `SELECT COUNT(*) AS total
        FROM PAGO p
+       JOIN COMPROBANTE comp ON comp.pago_id = p.pago_id AND comp.estado = 'EMITIDO'
        WHERE p.estado = 'COMPLETADO' ${dateFilter}`,
       params
     );
@@ -207,8 +209,8 @@ const getPayments = async (req, res) => {
        JOIN   CITA     c   ON p.cita_id     = c.cita_id
        JOIN   PACIENTE pat ON c.paciente_id  = pat.paciente_id
        JOIN   SERVICIO s   ON c.servicio_id  = s.servicio_id
-       LEFT JOIN COMPROBANTE comp ON comp.pago_id = p.pago_id
-                                  AND comp.estado = 'EMITIDO'
+       JOIN   COMPROBANTE comp ON comp.pago_id = p.pago_id
+                              AND comp.estado = 'EMITIDO'
        WHERE  p.estado = 'COMPLETADO' ${dateFilter}
        ORDER  BY p.fecha_pago DESC
        LIMIT  ? OFFSET ?`,
