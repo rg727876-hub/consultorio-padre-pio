@@ -169,7 +169,9 @@ export default function GestionCitas() {
                     <span className="truncate text-slate-700">
                       {estado.length === 0
                         ? 'Todos'
-                        : `${estado.length} seleccionado${estado.length > 1 ? 's' : ''}`}
+                        : estado.length === 1
+                          ? ESTADOS[estado[0]]?.label || estado[0]
+                          : `${estado.length} seleccionados`}
                     </span>
                     <ChevronDown size={16} className={`text-slate-500 transition-transform ${isOpenEstado ? 'rotate-180' : ''}`} />
                   </div>
