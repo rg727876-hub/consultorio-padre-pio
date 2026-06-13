@@ -58,6 +58,12 @@ export default function RegistrarPago() {
     setSinResultados(false); resetPago(); setConfirmado(null);
   };
 
+  const volverABusqueda = () => {
+    setCita(null);
+    resetPago();
+    setConfirmado(null);
+  };
+
   const resetAll = () => {
     resetCita(); setConfirmado(null);
   };
@@ -81,8 +87,6 @@ export default function RegistrarPago() {
 
   const selectCita = (c) => {
     setCita(c);
-    setResultados([]);
-    setBusqueda('');
     setSinResultados(false);
     resetPago();
   };
@@ -98,6 +102,12 @@ export default function RegistrarPago() {
         e.montoRecibido = 'Ingresa el monto recibido';
       else if (rec < Number(cita.precio_aplicado))
         e.montoRecibido = `Monto insuficiente. Total a cobrar: ${fmt(cita.precio_aplicado)}`;
+    }
+
+    if (['YAPE', 'PLIN'].includes(metodo)) {
+      const num = numeroOperacion.trim();
+      if (!num) e.numeroOperacion = 'Ingresa el número de operación';
+      else if (!/^\d{6,8}$/.test(num)) e.numeroOperacion = 'Debe tener entre 6 y 8 dígitos';
     }
 
     if (metodo === 'TARJETA_PRESENCIAL') {
@@ -213,7 +223,7 @@ export default function RegistrarPago() {
                 </div>
 
                 {cita ? (
-                  <CitaCard cita={cita} onCambiar={resetCita} />
+                  <CitaCard cita={cita} onCambiar={volverABusqueda} />
                 ) : (
                   <>
                     <div className="flex gap-2">
@@ -256,7 +266,7 @@ export default function RegistrarPago() {
                                     {c.servicio_nombre} · {c.doctor_nombre}
                                   </p>
                                   <p className="text-xs text-slate-400 mt-0.5">
-                                    {new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-PE', {
+                                    {new Date(c.fecha.split('T')[0] + 'T00:00:00').toLocaleDateString('es-PE', {
                                       weekday: 'short', day: 'numeric', month: 'short',
                                     })} · {c.hora_inicio}
                                   </p>
@@ -365,12 +375,17 @@ export default function RegistrarPago() {
                   )}
 
                   {(metodo === 'YAPE' || metodo === 'PLIN') && (
-                    <Field label="Número de operación" hint="opcional">
+                    <Field label="Número de operación *" error={formErrors.numeroOperacion}>
                       <input
                         value={numeroOperacion}
-                        onChange={e => setNumeroOperacion(e.target.value)}
-                        placeholder="Ej. 123456789"
-                        className={fieldCls()}
+                        onChange={e => {
+                          setNumeroOperacion(e.target.value.replace(/\D/g, '').slice(0, 8));
+                          setFormErrors(p => ({ ...p, numeroOperacion: '' }));
+                        }}
+                        maxLength={8}
+                        inputMode="numeric"
+                        placeholder="Ej. 12345678"
+                        className={fieldCls(formErrors.numeroOperacion)}
                       />
                     </Field>
                   )}
@@ -453,7 +468,7 @@ function CitaCard({ cita, onCambiar }) {
           <p className="text-xs text-slate-600 font-medium mt-1">{cita.servicio_nombre}</p>
           <p className="text-xs text-slate-500">{cita.doctor_nombre} · {cita.especialidad}</p>
           <p className="text-xs text-slate-500">
-            {new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-PE', {
+            {new Date(cita.fecha.split('T')[0] + 'T00:00:00').toLocaleDateString('es-PE', {
               weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
             })}{' '}
             · {cita.hora_inicio} – {cita.hora_fin}
