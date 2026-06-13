@@ -16,7 +16,7 @@ const VISTAS = [
 ];
 
 // Estados que el doctor puede filtrar (sin RESERVADA)
-const ESTADOS_FILTRO = ['CONFIRMADA', 'ATENDIDA', 'NO_ASISTIO', 'CANCELADA', 'EXPIRADA'];
+const ESTADOS_FILTRO = ['CONFIRMADA', 'ATENDIDA', 'NO_ASISTIO', 'CANCELADA'];
 
 export default function MiAgenda() {
   const navigate = useNavigate();
