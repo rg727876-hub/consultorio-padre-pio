@@ -25,8 +25,11 @@ export default function MiAgenda() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
-  const [vista,       setVista]       = useState('semana');
-  const [estado,      setEstado]      = useState(['CONFIRMADA']);
+  const [vista,       setVista]       = useState(() => sessionStorage.getItem('agenda_vista') || 'semana');
+  const [estado,      setEstado]      = useState(() => {
+    const saved = sessionStorage.getItem('agenda_estado');
+    return saved ? JSON.parse(saved) : ['CONFIRMADA'];
+  });
   const [isOpenEstado, setIsOpenEstado] = useState(false);
   const estadoRef = useRef(null);
 
@@ -40,8 +43,15 @@ export default function MiAgenda() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin,    setFechaFin]    = useState('');
+  const [fechaInicio, setFechaInicio] = useState(() => sessionStorage.getItem('agenda_fechaInicio') || '');
+  const [fechaFin,    setFechaFin]    = useState(() => sessionStorage.getItem('agenda_fechaFin') || '');
+
+  useEffect(() => {
+    sessionStorage.setItem('agenda_vista', vista);
+    sessionStorage.setItem('agenda_estado', JSON.stringify(estado));
+    sessionStorage.setItem('agenda_fechaInicio', fechaInicio);
+    sessionStorage.setItem('agenda_fechaFin', fechaFin);
+  }, [vista, estado, fechaInicio, fechaFin]);
 
   const [confirmar, setConfirmar] = useState(null); // cita a marcar no asistió
   const [saving,    setSaving]    = useState(false);
