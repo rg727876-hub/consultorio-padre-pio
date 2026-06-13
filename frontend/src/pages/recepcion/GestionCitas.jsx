@@ -286,8 +286,7 @@ export default function GestionCitas() {
                         const est = estadoInfo(c.estado);
                         return (
                           <tr key={c.cita_id}
-                            onClick={() => verDetalle(c.cita_id)}
-                            className="hover:bg-slate-50 transition-colors cursor-pointer">
+                            className="hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
                               {c.codigo_cita}
                             </td>
@@ -308,7 +307,7 @@ export default function GestionCitas() {
                                 {est.label}
                               </span>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                            <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-1">
                                 <IconBtn title="Ver detalles" onClick={() => verDetalle(c.cita_id)}
                                   className="text-slate-500 hover:bg-slate-100"><Eye size={15} /></IconBtn>
