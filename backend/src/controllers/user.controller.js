@@ -374,13 +374,17 @@ const update = async (req, res) => {
   if (!id || !Number.isInteger(id))
     return res.status(400).json({ error: 'ID de usuario inválido' });
 
-  const { nombre, apellido, email, telefono, direccion } = req.body;
+  let { nombre, apellido, email, telefono, direccion } = req.body;
+  nombre = String(nombre || '').trim();
+  apellido = String(apellido || '').trim();
+  const nuevoEmail = String(email || '').trim().toLowerCase();
+  const telLimpio = String(telefono || '').replace(/\D/g, '');
+  direccion = direccion && String(direccion).trim() !== '' ? String(direccion).trim() : null;
 
-  if (!nombre?.trim() || !apellido?.trim())
+  if (!nombre || !apellido)
     return res.status(400).json({ error: 'Nombre y apellido son obligatorios' });
-  if (!email || !RE_EMAIL.test(String(email).trim()))
+  if (!nuevoEmail || !RE_EMAIL.test(nuevoEmail))
     return res.status(400).json({ error: 'El correo electrónico no es válido' });
-  const telLimpio = String(telefono ?? '').replace(/\D/g, '');
   if (!/^\d{9,}$/.test(telLimpio))
     return res.status(400).json({ error: 'El teléfono debe tener al menos 9 dígitos' });
 
@@ -389,28 +393,24 @@ const update = async (req, res) => {
     conn = await pool.getConnection();
     await conn.query('START TRANSACTION');
 
-    const [[user]] = await conn.query(
+    const [rows] = await conn.query(
       'SELECT usuario_id, nombre, apellido, email, estado FROM USUARIO WHERE usuario_id = ? FOR UPDATE',
       [id]
     );
-    if (!user) { await conn.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
+    if (!rows.length) { await conn.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
+    const user = rows[0];
 
-    const nuevoEmail = String(email).trim().toLowerCase();
-
-    // CA5: correo único (no debe pertenecer a otro usuario)
-    const [[dup]] = await conn.query(
+    // CA5: correo único
+    const [dups] = await conn.query(
       'SELECT usuario_id FROM USUARIO WHERE email = ? AND usuario_id <> ? LIMIT 1',
       [nuevoEmail, id]
     );
-    if (dup) { await conn.query('ROLLBACK'); return res.status(409).json({ error: 'El correo ya está registrado por otro usuario' }); }
+    if (dups.length > 0) { await conn.query('ROLLBACK'); return res.status(409).json({ error: 'El correo ya está registrado por otro usuario' }); }
 
     await conn.query(
       `UPDATE USUARIO SET nombre = ?, apellido = ?, email = ?, telefono = ?, direccion = ?
         WHERE usuario_id = ?`,
-      [
-        String(nombre).trim(), String(apellido).trim(), nuevoEmail, telLimpio,
-        direccion ? String(direccion).trim() : null, id,
-      ]
+      [nombre, apellido, nuevoEmail, telLimpio, direccion, id]
     );
 
     // CA8: si era PENDIENTE y cambió el correo → reenviar activación al nuevo correo
@@ -422,27 +422,27 @@ const update = async (req, res) => {
       reinvitado = true;
     }
 
+    const detallesAudit = JSON.stringify({ nombre, apellido, email: nuevoEmail, emailCambio, reinvitado });
     await conn.query(
       `INSERT INTO AUDITORIA (usuario_id, accion, entidad, entidad_id, detalles, ip_origen)
        VALUES (?, 'EDICION_USUARIO', 'USUARIO', ?, ?, ?)`,
-      [req.user?.id ?? null, id,
-       JSON.stringify({ nombre, apellido, email: nuevoEmail, emailCambio, reinvitado }), req.ip ?? null]
+      [req.user?.id ?? null, id, detallesAudit, req.ip ?? null]
     );
 
     await conn.query('COMMIT');
 
     if (reinvitado) {
-      sendActivationEmail(nuevoEmail, String(nombre).trim(), nuevoToken)
+      sendActivationEmail(nuevoEmail, nombre, nuevoToken)
         .catch(e => console.error('[mailer] reinvitación:', e.message));
     }
 
     return res.json({ message: 'Datos actualizados correctamente', reinvitado });
   } catch (err) {
     if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
-    console.error('[user.update]', err.message);
+    console.error('[user.update]', err);
     if (err.code === 'ER_DUP_ENTRY')
       return res.status(409).json({ error: 'El correo ya está registrado por otro usuario' });
-    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+    return res.status(500).json({ error: 'Error interno del servidor', detail: err.message });
   } finally {
     if (conn) conn.release();
   }

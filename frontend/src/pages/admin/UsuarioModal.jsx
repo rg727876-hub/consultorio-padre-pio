@@ -106,10 +106,10 @@ export default function UsuarioModal({ id, onClose, onChanged }) {
 
   const validar = () => {                              // CA5 (tiempo real al guardar)
     const e = {};
-    if (!form.nombre.trim())   e.nombre   = 'Requerido';
-    if (!form.apellido.trim()) e.apellido = 'Requerido';
-    if (!RE_EMAIL.test(form.email.trim())) e.email = 'Correo inválido';
-    if (!/^\d{9,}$/.test(form.telefono.replace(/\D/g, ''))) e.telefono = 'Mínimo 9 dígitos';
+    if (!(form.nombre || '').trim())   e.nombre   = 'Requerido';
+    if (!(form.apellido || '').trim()) e.apellido = 'Requerido';
+    if (!RE_EMAIL.test((form.email || '').trim())) e.email = 'Correo inválido';
+    if (!/^\d{9,}$/.test((form.telefono || '').replace(/\D/g, ''))) e.telefono = 'Mínimo 9 dígitos';
     return e;
   };
 
@@ -120,9 +120,11 @@ export default function UsuarioModal({ id, onClose, onChanged }) {
     setSaving(true); setNetError('');
     try {
       const { data } = await api.put(`/users/${id}`, {
-        nombre: form.nombre.trim(), apellido: form.apellido.trim(),
-        email: form.email.trim(), telefono: form.telefono,
-        direccion: form.direccion.trim() || undefined,
+        nombre: (form.nombre || '').trim(), 
+        apellido: (form.apellido || '').trim(),
+        email: (form.email || '').trim(), 
+        telefono: form.telefono,
+        direccion: (form.direccion || '').trim() || undefined,
       });
       toast.success(data.message || 'Datos actualizados correctamente'); // CA6
       if (data.reinvitado) toast('Se reenvió la activación al nuevo correo', { icon: '✉️' }); // CA8
