@@ -129,7 +129,7 @@ export default function RegistroServicio() {
               <Field label="Tiempo de espera" hint="minutos">
                 <select name="buffer" value={form.buffer} onChange={handleChange}
                         className={selectCls()}>
-                  {[0, 5, 10, 15, 20].map((v) => (
+                  {[5, 10, 15, 20, 25, 30].map((v) => (
                     <option key={v} value={String(v)}>{v}</option>
                   ))}
                 </select>
