@@ -115,7 +115,7 @@ export default function MiAgenda() {
             {VISTAS.map(v => (
               <button key={v.key} onClick={() => cambiarVista(v.key)}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors
-                            ${vista === v.key && !fechaInicio && !fechaFin && estado.length === 1 && estado[0] === 'CONFIRMADA'
+                            ${vista === v.key && !fechaInicio && !fechaFin
                               ? 'bg-[#0059B3] text-white shadow-sm'
                               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
                 {v.label}
