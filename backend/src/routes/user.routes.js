@@ -1,4 +1,4 @@
-const { Router }    = require('express');
+const { Router } = require('express');
 const {
   register, list, getById, update, deactivate, reactivate, resendActivation, getActivity,
 } = require('../controllers/user.controller');

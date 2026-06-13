@@ -116,7 +116,13 @@ const getDoctorProfile = async (req, res) => {
         SELECT 
           u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
           u.estado, u.fecha_registro,
-          d.especialidad, d.nroColegiatura
+          (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+             FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+            WHERE de.doctor_id = u.usuario_id) AS especialidad,
+          (SELECT GROUP_CONCAT(e.especialidad_id)
+             FROM DOCTOR_ESPECIALIDAD de
+            WHERE de.doctor_id = u.usuario_id) AS especialidadesIds,
+          d.nroColegiatura
         FROM USUARIO u
         JOIN DOCTOR d ON u.usuario_id = d.doctor_id
         WHERE u.usuario_id = ?
@@ -127,7 +133,7 @@ const getDoctorProfile = async (req, res) => {
           SELECT 
             u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
             u.estado, u.fecha_registro,
-            NULL AS especialidad, NULL AS nroColegiatura
+            NULL AS especialidad, NULL AS especialidadesIds, NULL AS nroColegiatura
           FROM USUARIO u
           JOIN DOCTOR d ON u.usuario_id = d.doctor_id
           WHERE u.usuario_id = ?
@@ -140,10 +146,17 @@ const getDoctorProfile = async (req, res) => {
 
     if (!users.length) return res.status(404).json({ error: 'Doctor no encontrado' });
     const doctor = users[0];
+    
+    // Parse especialidadesIds back to array
+    if (doctor.especialidadesIds) {
+      doctor.especialidadesIds = doctor.especialidadesIds.split(',').map(Number);
+    } else {
+      doctor.especialidadesIds = [];
+    }
 
     // 2. Servicios
     const [servicios] = await conn.query(`
-      SELECT s.servicio_id, s.nombre_servicio 
+      SELECT s.servicio_id, s.nombre AS nombre_servicio 
       FROM SERVICIO s
       JOIN SERVICIO_DOCTOR sd ON s.servicio_id = sd.servicio_id
       WHERE sd.doctor_id = ? AND sd.estado = 'ACTIVO'
@@ -190,7 +203,7 @@ const getDoctorProfile = async (req, res) => {
 // PUT /api/doctors/:id
 const updateDoctorProfile = async (req, res) => {
   const doctorId = Number(req.params.id);
-  const { nombre, apellido, email, telefono, direccion, especialidad, nroColegiatura, serviciosIds } = req.body;
+  const { nombre, apellido, email, telefono, direccion, nroColegiatura, serviciosIds, especialidadesIds } = req.body;
   let conn;
 
   try {
@@ -230,9 +243,18 @@ const updateDoctorProfile = async (req, res) => {
 
     // Actualizar DOCTOR
     await conn.query(
-      'UPDATE DOCTOR SET especialidad=?, nroColegiatura=? WHERE doctor_id=?',
-      [especialidad, nroColegiatura, doctorId]
+      'UPDATE DOCTOR SET nroColegiatura=? WHERE doctor_id=?',
+      [nroColegiatura, doctorId]
     );
+
+    // Actualizar ESPECIALIDADES
+    if (Array.isArray(especialidadesIds)) {
+      await conn.query('DELETE FROM DOCTOR_ESPECIALIDAD WHERE doctor_id = ?', [doctorId]);
+      if (especialidadesIds.length > 0) {
+        const values = especialidadesIds.map(id => [doctorId, id]);
+        await conn.query('INSERT INTO DOCTOR_ESPECIALIDAD (doctor_id, especialidad_id) VALUES ?', [values]);
+      }
+    }
 
     // Actualizar SERVICIOS
     // CA6: Se asume que serviciosIds viene como array y tiene al menos 1 por la validación del front

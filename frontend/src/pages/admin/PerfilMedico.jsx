@@ -17,6 +17,7 @@ export default function PerfilMedico() {
   const [doctor, setDoctor] = useState(null);
   const [audit, setAudit] = useState([]);
   const [allServices, setAllServices] = useState([]);
+  const [allEspecialidades, setAllEspecialidades] = useState([]);
   
   // UI states
   const [isEditing, setIsEditing] = useState(false);
@@ -27,13 +28,14 @@ export default function PerfilMedico() {
 
   // Form states
   const [form, setForm] = useState({
-    nombre: '', apellido: '', email: '', telefono: '', direccion: '', especialidad: '', nroColegiatura: '', serviciosIds: []
+    nombre: '', apellido: '', email: '', telefono: '', direccion: '', especialidadesIds: [], nroColegiatura: '', serviciosIds: []
   });
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchProfile();
     fetchServices();
+    fetchEspecialidades();
   }, [id]);
 
   const fetchUserProfile = async () => {
@@ -52,7 +54,7 @@ export default function PerfilMedico() {
         email: data.email || '',
         telefono: data.telefono || '',
         direccion: data.direccion || '',
-        especialidad: data.especialidad || '',
+        especialidadesIds: data.especialidadesIds || [],
         nroColegiatura: data.nroColegiatura || '',
         serviciosIds: data.servicios?.map(s => s.servicio_id) || []
       });
@@ -75,7 +77,7 @@ export default function PerfilMedico() {
         email: data.email || '',
         telefono: data.telefono || '',
         direccion: data.direccion || '',
-        especialidad: data.especialidad || '',
+        especialidadesIds: data.especialidadesIds || [],
         nroColegiatura: data.nroColegiatura || '',
         serviciosIds: data.servicios?.map(s => s.servicio_id) || []
       });
@@ -110,6 +112,15 @@ export default function PerfilMedico() {
       setAllServices(data);
     } catch (err) {
       console.error('Error al cargar servicios', err);
+    }
+  };
+
+  const fetchEspecialidades = async () => {
+    try {
+      const { data } = await api.get('/especialidades');
+      setAllEspecialidades(data);
+    } catch (err) {
+      console.error('Error al cargar especialidades', err);
     }
   };
 
@@ -160,7 +171,7 @@ export default function PerfilMedico() {
       email: doctor.email || '',
       telefono: doctor.telefono || '',
       direccion: doctor.direccion || '',
-      especialidad: doctor.especialidad || '',
+      especialidadesIds: doctor.especialidadesIds || [],
       nroColegiatura: doctor.nroColegiatura || '',
       serviciosIds: doctor.servicios?.map(s => s.servicio_id) || []
     });
@@ -388,8 +399,26 @@ export default function PerfilMedico() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Especialidad</label>
-                      <input type="text" value={form.especialidad} onChange={e => setForm({...form, especialidad: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-[#0059B3]/40" />
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Especialidades</label>
+                      <div className="border border-slate-300 rounded-lg p-3 max-h-48 overflow-y-auto bg-slate-50">
+                        {allEspecialidades.map(esp => (
+                          <label key={esp.especialidad_id} className="flex items-center gap-2 mb-2 last:mb-0 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="rounded text-[#0059B3] focus:ring-[#0059B3]"
+                              checked={form.especialidadesIds.includes(esp.especialidad_id)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setForm(prev => ({
+                                  ...prev,
+                                  especialidadesIds: checked ? [...prev.especialidadesIds, esp.especialidad_id] : prev.especialidadesIds.filter(id => id !== esp.especialidad_id)
+                                }));
+                              }}
+                            />
+                            <span className="text-sm text-slate-700">{esp.nombre}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">C.O.P.</label>
