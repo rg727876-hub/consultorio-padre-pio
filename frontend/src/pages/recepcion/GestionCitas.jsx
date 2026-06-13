@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, ChevronLeft, ChevronRight, CalendarX2, AlertTriangle,
-  Eye, Ban, CalendarClock,
+  Eye, Ban, CalendarClock, ChevronDown
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -27,7 +27,20 @@ export default function GestionCitas() {
   const [q,           setQ]           = useState('');
   const [codigo,      setCodigo]      = useState('');
   const [doctorId,    setDoctorId]    = useState('');
-  const [estado,      setEstado]      = useState('');
+  const [estado,      setEstado]      = useState([]);
+  const [isOpenEstado, setIsOpenEstado] = useState(false);
+  const estadoRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (estadoRef.current && !estadoRef.current.contains(event.target)) {
+        setIsOpenEstado(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin,    setFechaFin]    = useState('');
 
@@ -48,7 +61,7 @@ export default function GestionCitas() {
       if (f.q?.trim())      params.q            = f.q.trim();
       if (f.codigo?.trim()) params.codigo       = f.codigo.trim();
       if (f.doctorId)       params.doctor_id    = f.doctorId;
-      if (f.estado)         params.estado       = f.estado;
+      if (f.estado?.length > 0) params.estado = f.estado.join(',');
       if (f.fechaInicio)    params.fecha_inicio = f.fechaInicio;
       if (f.fechaFin)       params.fecha_fin    = f.fechaFin;
 
@@ -71,9 +84,9 @@ export default function GestionCitas() {
   useEffect(() => { fetchCitas(1); /* eslint-disable-next-line */ }, []);
 
   const limpiarFiltros = () => {
-    setQ(''); setCodigo(''); setDoctorId(''); setEstado('');
+    setQ(''); setCodigo(''); setDoctorId(''); setEstado([]);
     setFechaInicio(''); setFechaFin('');
-    fetchCitas(1, { q: '', codigo: '', doctorId: '', estado: '', fechaInicio: '', fechaFin: '' });
+    fetchCitas(1, { q: '', codigo: '', doctorId: '', estado: [], fechaInicio: '', fechaFin: '' });
   };
 
   const proximamente = (accion) =>
@@ -81,7 +94,7 @@ export default function GestionCitas() {
 
   const verDetalle = (id) => navigate(`/recepcion/citas/${id}`);
 
-  const hayFiltros = q || codigo || doctorId || estado || fechaInicio || fechaFin;
+  const hayFiltros = q || codigo || doctorId || estado.length > 0 || fechaInicio || fechaFin;
 
   return (
     <AppLayout>
@@ -145,19 +158,57 @@ export default function GestionCitas() {
                   ))}
                 </select>
               </div>
-              <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-xs font-medium text-slate-600">Estado</label>
-                <select
-                  value={estado}
-                  onChange={e => { setEstado(e.target.value); fetchCitas(1, { estado: e.target.value }); }}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white
-                             focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40"
-                >
-                  <option value="">Todos</option>
-                  {Object.entries(ESTADOS).map(([val, { label }]) => (
-                    <option key={val} value={val}>{label}</option>
-                  ))}
-                </select>
+              <div className="flex flex-col gap-1 min-w-[200px]" ref={estadoRef}>
+                <label className="text-xs font-medium text-slate-600">Estado(s)</label>
+                <div className="relative">
+                  <div
+                    className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white
+                               cursor-pointer flex items-center justify-between hover:bg-slate-50 transition-colors"
+                    onClick={() => setIsOpenEstado(!isOpenEstado)}
+                  >
+                    <span className="truncate text-slate-700">
+                      {estado.length === 0
+                        ? 'Todos'
+                        : `${estado.length} seleccionado${estado.length > 1 ? 's' : ''}`}
+                    </span>
+                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${isOpenEstado ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isOpenEstado && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 
+                                    rounded-lg shadow-lg z-10 py-1 max-h-60 overflow-y-auto">
+                      <label className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={estado.length === 0}
+                          onChange={() => { setEstado([]); fetchCitas(1, { estado: [] }); setIsOpenEstado(false); }}
+                          className="rounded text-[#0059B3] focus:ring-[#0059B3]"
+                        />
+                        Todos
+                      </label>
+                      {Object.entries(ESTADOS).map(([val, { label }]) => (
+                        <label key={val} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={estado.includes(val)}
+                            onChange={(e) => {
+                              let nuevosEstados;
+                              if (e.target.checked) {
+                                nuevosEstados = [...estado, val];
+                              } else {
+                                nuevosEstados = estado.filter(s => s !== val);
+                              }
+                              setEstado(nuevosEstados);
+                              fetchCitas(1, { estado: nuevosEstados });
+                            }}
+                            className="rounded text-[#0059B3] focus:ring-[#0059B3]"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-600">Desde</label>

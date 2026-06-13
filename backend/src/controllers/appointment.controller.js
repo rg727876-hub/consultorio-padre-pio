@@ -286,9 +286,13 @@ const list = async (req, res) => {
     conds.push('c.doctor_id = ?');
     params.push(Number(doctor_id));
   }
-  if (estado && ESTADOS_VALIDOS.includes(estado)) {
-    conds.push('c.estado = ?');
-    params.push(estado);
+  if (estado) {
+    const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
+    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e));
+    if (validEstados.length > 0) {
+      conds.push(`c.estado IN (${validEstados.map(() => '?').join(',')})`);
+      params.push(...validEstados);
+    }
   }
   if (fecha_inicio && fecha_fin) {
     conds.push('c.fecha BETWEEN ? AND ?');
