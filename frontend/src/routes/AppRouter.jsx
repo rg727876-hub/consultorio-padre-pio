@@ -21,6 +21,8 @@ import DetalleCita            from '../pages/recepcion/DetalleCita';
 import AgendaMedica           from '../pages/agenda/AgendaMedica';
 import MiAgenda               from '../pages/doctor/MiAgenda';
 import RegistrarAtencion      from '../pages/doctor/RegistrarAtencion';
+import HistorialClinico       from '../pages/doctor/HistorialClinico';
+import HistorialPaciente      from '../pages/doctor/HistorialPaciente';
 import RegistrarPago          from '../pages/caja/RegistrarPago';
 import ListaPagos             from '../pages/caja/ListaPagos';
 import GenerarComprobante     from '../pages/caja/GenerarComprobante';
@@ -144,6 +146,18 @@ function RouterContent() {
         <Route path="/doctor/atencion/:citaId" element={
           <PrivateRoute roles={['DOCTOR']}>
             <RegistrarAtencion />
+          </PrivateRoute>
+        } />
+
+        <Route path="/doctor/historial" element={
+          <PrivateRoute roles={['DOCTOR']}>
+            <HistorialClinico />
+          </PrivateRoute>
+        } />
+
+        <Route path="/doctor/historial/:pacienteId" element={
+          <PrivateRoute roles={['DOCTOR']}>
+            <HistorialPaciente />
           </PrivateRoute>
         } />
 

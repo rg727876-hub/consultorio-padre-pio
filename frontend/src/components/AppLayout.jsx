@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   UserPlus, Calendar, Stethoscope, CreditCard,
   LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List, CalendarSearch, LayoutGrid, Users,
-  UserCog,
+  UserCog, FileClock,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/images/Logo-Consultorio-Padre-Pio.png';
@@ -28,8 +28,9 @@ const NAV = {
     { label: 'Agenda médica',        icon: LayoutGrid,    ruta: '/recepcion/agenda' },
   ],
   DOCTOR: [
-    { label: 'Inicio',    icon: Home,     ruta: '/dashboard' },
-    { label: 'Mi agenda', icon: Calendar, ruta: '/doctor/agenda' },
+    { label: 'Inicio',            icon: Home,      ruta: '/dashboard' },
+    { label: 'Mi agenda',         icon: Calendar,  ruta: '/doctor/agenda' },
+    { label: 'Historial clínico', icon: FileClock, ruta: '/doctor/historial' },
   ],
   CAJERO: [
     { label: 'Inicio',           icon: Home,       ruta: '/dashboard'           },

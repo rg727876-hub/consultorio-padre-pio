@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Loader2, Stethoscope, ArrowLeft, Lock, AlertTriangle, Save, CheckCircle2,
+  Loader2, Stethoscope, ArrowLeft, Lock, AlertTriangle, Save, CheckCircle2, FileClock,
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -142,20 +142,29 @@ export default function RegistrarAtencion() {
         <div className="max-w-4xl mx-auto space-y-4">
 
           {/* Encabezado */}
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/doctor/agenda')}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-              <ArrowLeft size={18} />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold text-[#0059B3] flex items-center gap-2">
-                <Stethoscope size={20} />
-                Historia Clínica Odontológica
-              </h1>
-              <p className="text-sm text-slate-500">
-                {bloqueado ? 'Registro clínico (solo lectura)' : 'Documenta la atención de esta cita'}
-              </p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate('/doctor/agenda')}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold text-[#0059B3] flex items-center gap-2">
+                  <Stethoscope size={20} />
+                  Historia Clínica Odontológica
+                </h1>
+                <p className="text-sm text-slate-500">
+                  {bloqueado ? 'Registro clínico (solo lectura)' : 'Documenta la atención de esta cita'}
+                </p>
+              </div>
             </div>
+            {cita && (
+              <button onClick={() => navigate(`/doctor/historial/${cita.paciente_id}`)}
+                className="inline-flex items-center gap-2 border border-[#0059B3] text-[#0059B3]
+                           hover:bg-blue-50 font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors">
+                <FileClock size={16} /> Ver historial clínico
+              </button>
+            )}
           </div>
 
           <PageLoader loading={loading} error={error} onRetry={cargar}>
