@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CalendarX2, AlertTriangle, Stethoscope, UserX, FileText, X,
+  CalendarX2, AlertTriangle, Stethoscope, UserX, FileText, X, ChevronDown
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -26,7 +26,20 @@ export default function MiAgenda() {
   const [error,   setError]   = useState('');
 
   const [vista,       setVista]       = useState('semana');
-  const [estado,      setEstado]      = useState('');
+  const [estado,      setEstado]      = useState(['CONFIRMADA']);
+  const [isOpenEstado, setIsOpenEstado] = useState(false);
+  const estadoRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (estadoRef.current && !estadoRef.current.contains(event.target)) {
+        setIsOpenEstado(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin,    setFechaFin]    = useState('');
 
@@ -39,7 +52,7 @@ export default function MiAgenda() {
     setError('');
     try {
       const params = { vista: f.vista };
-      if (f.estado)      params.estado       = f.estado;
+      if (f.estado?.length > 0) params.estado = f.estado.join(',');
       if (f.fechaInicio) params.fecha_inicio = f.fechaInicio;
       if (f.fechaFin)    params.fecha_fin    = f.fechaFin;
       const { data } = await api.get('/appointments/agenda', { params });
@@ -57,13 +70,13 @@ export default function MiAgenda() {
 
   const cambiarVista = (v) => {
     setVista(v);
-    setEstado(''); setFechaInicio(''); setFechaFin('');
-    fetchAgenda({ vista: v, estado: '', fechaInicio: '', fechaFin: '' });
+    setEstado(['CONFIRMADA']); setFechaInicio(''); setFechaFin('');
+    fetchAgenda({ vista: v, estado: ['CONFIRMADA'], fechaInicio: '', fechaFin: '' });
   };
 
   const limpiarFiltros = () => {
-    setEstado(''); setFechaInicio(''); setFechaFin('');
-    fetchAgenda({ estado: '', fechaInicio: '', fechaFin: '' });
+    setEstado(['CONFIRMADA']); setFechaInicio(''); setFechaFin('');
+    fetchAgenda({ estado: ['CONFIRMADA'], fechaInicio: '', fechaFin: '' });
   };
 
   const atender     = (id) => navigate(`/doctor/atencion/${id}`);
@@ -84,7 +97,7 @@ export default function MiAgenda() {
     }
   };
 
-  const hayFiltros = estado || fechaInicio || fechaFin;
+  const hayFiltros = (estado.length > 0 && !(estado.length === 1 && estado[0] === 'CONFIRMADA')) || fechaInicio || fechaFin;
 
   return (
     <AppLayout>
@@ -102,7 +115,7 @@ export default function MiAgenda() {
             {VISTAS.map(v => (
               <button key={v.key} onClick={() => cambiarVista(v.key)}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors
-                            ${vista === v.key && !fechaInicio && !fechaFin && !estado
+                            ${vista === v.key && !fechaInicio && !fechaFin && estado.length === 1 && estado[0] === 'CONFIRMADA'
                               ? 'bg-[#0059B3] text-white shadow-sm'
                               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
                 {v.label}
@@ -113,17 +126,59 @@ export default function MiAgenda() {
           {/* Filtros adicionales */}
           <section className="bg-white rounded-2xl shadow-sm p-4">
             <div className="flex flex-wrap items-end gap-3">
-              <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-xs font-medium text-slate-600">Estado</label>
-                <select value={estado}
-                  onChange={e => { setEstado(e.target.value); fetchAgenda({ estado: e.target.value }); }}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white
-                             focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40">
-                  <option value="">Todos</option>
-                  {ESTADOS_FILTRO.map(val => (
-                    <option key={val} value={val}>{ESTADOS[val]?.label ?? val}</option>
-                  ))}
-                </select>
+              <div className="flex flex-col gap-1 min-w-[200px]" ref={estadoRef}>
+                <label className="text-xs font-medium text-slate-600">Estado(s)</label>
+                <div className="relative">
+                  <div
+                    className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white
+                               cursor-pointer flex items-center justify-between hover:bg-slate-50 transition-colors"
+                    onClick={() => setIsOpenEstado(!isOpenEstado)}
+                  >
+                    <span className="truncate text-slate-700">
+                      {estado.length === 0
+                        ? 'Todos'
+                        : estado.length === 1
+                          ? ESTADOS[estado[0]]?.label || estado[0]
+                          : `${estado.length} seleccionados`}
+                    </span>
+                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${isOpenEstado ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isOpenEstado && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 
+                                    rounded-lg shadow-lg z-10 py-1 max-h-60 overflow-y-auto">
+                      <label className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={estado.length === 0}
+                          onChange={() => { setEstado([]); fetchAgenda({ estado: [] }); setIsOpenEstado(false); }}
+                          className="rounded text-[#0059B3] focus:ring-[#0059B3]"
+                        />
+                        Todos
+                      </label>
+                      {ESTADOS_FILTRO.map(val => (
+                        <label key={val} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={estado.includes(val)}
+                            onChange={(e) => {
+                              let nuevosEstados;
+                              if (e.target.checked) {
+                                nuevosEstados = [...estado, val];
+                              } else {
+                                nuevosEstados = estado.filter(s => s !== val);
+                              }
+                              setEstado(nuevosEstados);
+                              fetchAgenda({ estado: nuevosEstados });
+                            }}
+                            className="rounded text-[#0059B3] focus:ring-[#0059B3]"
+                          />
+                          {ESTADOS[val]?.label ?? val}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-600">Desde</label>

@@ -481,9 +481,13 @@ const agenda = async (req, res) => {
   const conds  = ['c.doctor_id = ?', "c.estado NOT IN ('RESERVADA', 'EXPIRADA')"];
   const params = [doctorId];
 
-  if (estado && ESTADOS_VALIDOS.includes(estado) && !['RESERVADA', 'EXPIRADA'].includes(estado)) {
-    conds.push('c.estado = ?');
-    params.push(estado);
+  if (estado) {
+    const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
+    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e) && !['RESERVADA', 'EXPIRADA'].includes(e));
+    if (validEstados.length > 0) {
+      conds.push(`c.estado IN (${validEstados.map(() => '?').join(',')})`);
+      params.push(...validEstados);
+    }
   }
 
   const hoy = new Date().toLocaleDateString('en-CA');
@@ -497,7 +501,7 @@ const agenda = async (req, res) => {
     conds.push('c.fecha >= ?'); params.push(fecha_inicio);
   } else if (fecha_fin) {
     conds.push('c.fecha <= ?'); params.push(fecha_fin);
-  } else if (estado && ESTADOS_VALIDOS.includes(estado) && !['RESERVADA', 'EXPIRADA'].includes(estado)) {
+  } else if (estado && (Array.isArray(estado) ? estado : estado.split(',')).some(e => ESTADOS_VALIDOS.includes(e) && !['RESERVADA', 'EXPIRADA'].includes(e))) {
     // Sin rango de fechas: el filtro de estado abarca toda la agenda
   } else if (vista === 'semana') {
     const { ini, fin } = rangoSemana(); conds.push('c.fecha BETWEEN ? AND ?'); params.push(ini, fin);
