@@ -26,9 +26,14 @@ export default function ListaPacientes() {
   const [total,     setTotal]     = useState(0);
 
   // Filtros
-  const [q,      setQ]      = useState('');
-  const [estado, setEstado] = useState('ACTIVO'); // default: solo activos
+  const [q,      setQ]      = useState(() => sessionStorage.getItem('listaPacientes_q') || '');
+  const [estado, setEstado] = useState(() => sessionStorage.getItem('listaPacientes_estado') || 'ACTIVO'); // default: solo activos
   const [detalleId, setDetalleId] = useState(null); // paciente en ventana flotante
+
+  useEffect(() => {
+    sessionStorage.setItem('listaPacientes_q', q);
+    sessionStorage.setItem('listaPacientes_estado', estado);
+  }, [q, estado]);
 
   // ── Fetch ────────────────────────────────────────────────────────
   const fetchPacientes = useCallback(async (p = 1, overrides = {}) => {
