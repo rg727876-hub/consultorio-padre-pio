@@ -238,7 +238,7 @@ export default function PerfilMedico() {
     acc[h.dia_semana].push(h);
     return acc;
   }, {});
-  const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
+  const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
 
   return (
     <AppLayout>
@@ -325,13 +325,7 @@ export default function PerfilMedico() {
               </button>
             )}
 
-            {/* CA3: Gestionar horarios */}
-            <button
-              onClick={() => navigate(`/admin/horarios?doctor_id=${doctor.usuario_id}`)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0059B3]/10 text-[#0059B3] hover:bg-[#0059B3]/20 rounded-xl text-sm font-medium"
-            >
-              <Calendar size={16} /> Gestionar horarios
-            </button>
+
 
             {!isEditing && (
               <button
@@ -509,6 +503,12 @@ export default function PerfilMedico() {
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <Calendar size={20} className="text-[#8BC63F]" /> Horario de Trabajo (Semanal)
                 </h3>
+                <button
+                  onClick={() => navigate(`/admin/horarios?doctor_id=${doctor.usuario_id}`)}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#0059B3]/10 text-[#0059B3] hover:bg-[#0059B3]/20 rounded-xl text-sm font-medium"
+                >
+                  <Calendar size={16} /> Gestionar horarios
+                </button>
               </div>
               
               {doctor.horarios?.length === 0 ? (
@@ -519,7 +519,7 @@ export default function PerfilMedico() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <div className="grid divide-x divide-slate-100 min-w-[800px]" style={{ gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))' }}>
+                  <div className="grid divide-x divide-slate-100 min-w-[700px]" style={{ gridTemplateColumns: 'repeat(6, minmax(110px, 1fr))' }}>
                     {diasSemana.map(dia => {
                       const turns = groupedSchedule[dia] || [];
                       return (
@@ -566,7 +566,7 @@ export default function PerfilMedico() {
                 </h3>
               </div>
               
-              <div className="flex-1 overflow-y-auto pr-2 relative">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 relative">
                 {audit.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-8">No hay actividad reciente registrada.</p>
                 ) : (
@@ -579,7 +579,7 @@ export default function PerfilMedico() {
                           <p className="text-sm font-semibold text-slate-800">{formatAccion(log.accion)}</p>
                           <p className="text-sm text-slate-600 mt-1">Autor: <span className="font-medium text-slate-700">{log.autor || 'Sistema'}</span></p>
                           {log.detalles && (
-                            <div className="mt-2 bg-slate-50 rounded-lg p-2 text-xs text-slate-500 font-mono">
+                            <div className="mt-2 bg-slate-50 rounded-lg p-2 text-xs text-slate-500 font-mono break-words whitespace-pre-wrap">
                               {log.detalles.length > 100 ? log.detalles.substring(0, 100) + '...' : log.detalles}
                             </div>
                           )}
