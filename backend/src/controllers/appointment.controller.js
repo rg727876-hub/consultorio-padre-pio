@@ -294,6 +294,11 @@ const list = async (req, res) => {
       params.push(...validEstados);
     }
   }
+  // Cuando no hay NINGÚN filtro, el listado por defecto muestra todas las
+  // citas CONFIRMADAS (de todas las fechas), con las de hoy primero y
+  // descendiendo hacia las pasadas (las futuras, si existen, van al final).
+  let ordenPorDefecto = false;
+
   if (fecha_inicio && fecha_fin) {
     conds.push('c.fecha BETWEEN ? AND ?');
     params.push(fecha_inicio, fecha_fin);
@@ -304,12 +309,19 @@ const list = async (req, res) => {
     conds.push('c.fecha <= ?');
     params.push(fecha_fin);
   } else if (!codigo && !q && !doctor_id && !estado) {
-    // Sin ningún filtro → por defecto las citas de hoy
-    conds.push('c.fecha = ?');
-    params.push(new Date().toLocaleDateString('en-CA'));
+    // Sin ningún filtro → por defecto todas las citas confirmadas
+    conds.push("c.estado = 'CONFIRMADA'");
+    ordenPorDefecto = true;
   }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+  // Orden: por defecto, hoy primero → pasado (futuras al final);
+  // con filtros, orden cronológico ascendente como siempre.
+  const orderBy = ordenPorDefecto
+    ? 'ORDER BY (c.fecha > ?) ASC, c.fecha DESC, c.hora_inicio ASC'
+    : 'ORDER BY c.fecha ASC, c.hora_inicio ASC';
+  const orderParams = ordenPorDefecto ? [new Date().toLocaleDateString('en-CA')] : [];
 
   try {
     const [[{ total }]] = await pool.query(
@@ -343,9 +355,9 @@ const list = async (req, res) => {
        JOIN   USUARIO  u   ON c.doctor_id   = u.usuario_id
        LEFT JOIN DOCTOR d  ON d.doctor_id   = u.usuario_id
        ${where}
-       ORDER  BY c.fecha ASC, c.hora_inicio ASC
+       ${orderBy}
        LIMIT  ? OFFSET ?`,
-      [...params, limit, offset]
+      [...params, ...orderParams, limit, offset]
     );
 
     // Auditoría de la consulta

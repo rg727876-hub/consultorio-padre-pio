@@ -80,7 +80,7 @@ export default function GestionCitas() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, codigo, doctorId, estado, fechaInicio, fechaFin]);
 
-  // Carga inicial (citas de hoy)
+  // Carga inicial: por defecto, todas las citas confirmadas (hoy primero → pasadas)
   useEffect(() => { fetchCitas(1); /* eslint-disable-next-line */ }, []);
 
   const limpiarFiltros = () => {

@@ -18,6 +18,7 @@ const LIMITE_MIN = Number(process.env.RESERVA_LIMITE_MIN) || 20;
  */
 const startCronJobs = () => {
   cron.schedule('* * * * *', async () => {
+    // 1. RESERVADA sin pago → EXPIRADA (pasados LIMITE_MIN desde su creación)
     try {
       const [result] = await pool.execute(
         `UPDATE CITA
@@ -33,9 +34,32 @@ const startCronJobs = () => {
     } catch (err) {
       console.error('[CRON] Error expirando citas:', err.message);
     }
+
+    // 2. CONFIRMADA cuya hora de fin ya pasó → NO_ASISTIO
+    //    El doctor no registró atención (eso la habría puesto en ATENDIDA) ni
+    //    marcó inasistencia, así que se asume que el paciente no llegó. El pago
+    //    se mantiene (sin reembolso), igual que en la marca manual.
+    //    fecha/hora_fin están en hora local del consultorio (Lima); se compara
+    //    contra la hora actual de Lima para no adelantar/atrasar la transición.
+    try {
+      const ahoraLima = new Date().toLocaleString('sv-SE', { timeZone: 'America/Lima' });
+      const [result] = await pool.execute(
+        `UPDATE CITA
+           SET estado = 'NO_ASISTIO'
+         WHERE estado = 'CONFIRMADA'
+           AND TIMESTAMP(fecha, hora_fin) < ?`,
+        [ahoraLima]
+      );
+
+      if (result.affectedRows > 0) {
+        console.log(`[CRON] ${result.affectedRows} cita(s) confirmada(s) vencida(s) marcada(s) como NO_ASISTIO`);
+      }
+    } catch (err) {
+      console.error('[CRON] Error marcando citas como NO_ASISTIO:', err.message);
+    }
   });
 
-  console.log(`Job de expiración de citas iniciado (límite ${LIMITE_MIN} min, cada minuto)`);
+  console.log(`Jobs de citas iniciados: expiración de reservas (${LIMITE_MIN} min) y NO_ASISTIO automático, cada minuto`);
 };
 
 module.exports = { startCronJobs };
