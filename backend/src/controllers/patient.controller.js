@@ -115,10 +115,10 @@ const search = async (req, res) => {
               telefono, sexo, fecha_nacimiento
        FROM   PACIENTE
        WHERE  estado = 'ACTIVO'
-         AND  (numero_documento LIKE ? OR nombre LIKE ? OR apellido LIKE ?)
-       ORDER  BY apellido, nombre
-       LIMIT  10`,
-      [like, like, like]
+         AND  (numero_documento LIKE ? OR nombre LIKE ? OR apellido LIKE ? OR CONCAT(nombre, ' ', apellido) LIKE ?)
+       ORDER BY apellido, nombre
+       LIMIT  15`,
+      [like, like, like, like]
     );
     return res.json(rows);
   } catch (err) {
@@ -166,8 +166,8 @@ const list = async (req, res) => {
   // Búsqueda parcial
   if (q.length >= 2) {
     const like = `%${q}%`;
-    conds.push('(numero_documento LIKE ? OR nombre LIKE ? OR apellido LIKE ?)');
-    params.push(like, like, like);
+    conds.push('(numero_documento LIKE ? OR nombre LIKE ? OR apellido LIKE ? OR CONCAT(nombre, \' \', apellido) LIKE ?)');
+    params.push(like, like, like, like);
   }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';

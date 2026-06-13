@@ -190,8 +190,8 @@ const list = async (req, res) => {
 
   if (q.length >= 2) {
     const like = `%${q}%`;
-    conds.push('(u.DNI LIKE ? OR u.nombre LIKE ? OR u.apellido LIKE ?)');
-    params.push(like, like, like);
+    conds.push('(u.DNI LIKE ? OR u.nombre LIKE ? OR u.apellido LIKE ? OR CONCAT(u.nombre, \' \', u.apellido) LIKE ?)');
+    params.push(like, like, like, like);
   }
 
   if (rol && ROLES_VALIDOS.includes(rol)) {
