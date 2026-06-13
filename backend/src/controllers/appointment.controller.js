@@ -489,8 +489,6 @@ const agenda = async (req, res) => {
     conds.push('c.fecha >= ?'); params.push(fecha_inicio);
   } else if (fecha_fin) {
     conds.push('c.fecha <= ?'); params.push(fecha_fin);
-  } else if (estado && (Array.isArray(estado) ? estado : estado.split(',')).some(e => ESTADOS_VALIDOS.includes(e) && !['RESERVADA', 'EXPIRADA'].includes(e))) {
-    // Sin rango de fechas: el filtro de estado abarca toda la agenda
   } else if (vista === 'semana') {
     const { ini, fin } = rangoSemana(); conds.push('c.fecha BETWEEN ? AND ?'); params.push(ini, fin);
   } else if (vista === 'mes') {
