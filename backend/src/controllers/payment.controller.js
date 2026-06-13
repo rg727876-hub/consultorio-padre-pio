@@ -75,6 +75,12 @@ const registerPayment = async (req, res) => {
     return res.status(400).json({ error: 'Método de pago no válido' });
   }
 
+  if (['YAPE', 'PLIN'].includes(metodo_pago)) {
+    if (!numero_operacion || !/^\d{6,8}$/.test(numero_operacion)) {
+      return res.status(400).json({ error: 'Número de operación inválido (debe tener entre 6 y 8 dígitos numéricos)' });
+    }
+  }
+
   if (Number(monto_total) <= 0) {
     return res.status(400).json({ error: 'El monto debe ser mayor a 0' });
   }
