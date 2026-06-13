@@ -27,7 +27,7 @@ export default function GestionCitas() {
   const [q,           setQ]           = useState('');
   const [codigo,      setCodigo]      = useState('');
   const [doctorId,    setDoctorId]    = useState('');
-  const [estado,      setEstado]      = useState([]);
+  const [estado,      setEstado]      = useState(['CONFIRMADA']);
   const [isOpenEstado, setIsOpenEstado] = useState(false);
   const estadoRef = useRef(null);
 
@@ -84,9 +84,9 @@ export default function GestionCitas() {
   useEffect(() => { fetchCitas(1); /* eslint-disable-next-line */ }, []);
 
   const limpiarFiltros = () => {
-    setQ(''); setCodigo(''); setDoctorId(''); setEstado([]);
+    setQ(''); setCodigo(''); setDoctorId(''); setEstado(['CONFIRMADA']);
     setFechaInicio(''); setFechaFin('');
-    fetchCitas(1, { q: '', codigo: '', doctorId: '', estado: [], fechaInicio: '', fechaFin: '' });
+    fetchCitas(1, { q: '', codigo: '', doctorId: '', estado: ['CONFIRMADA'], fechaInicio: '', fechaFin: '' });
   };
 
   const proximamente = (accion) =>
@@ -94,7 +94,7 @@ export default function GestionCitas() {
 
   const verDetalle = (id) => navigate(`/recepcion/citas/${id}`);
 
-  const hayFiltros = q || codigo || doctorId || estado.length > 0 || fechaInicio || fechaFin;
+  const hayFiltros = q || codigo || doctorId || (estado.length > 0 && !(estado.length === 1 && estado[0] === 'CONFIRMADA')) || fechaInicio || fechaFin;
 
   return (
     <AppLayout>
@@ -169,7 +169,9 @@ export default function GestionCitas() {
                     <span className="truncate text-slate-700">
                       {estado.length === 0
                         ? 'Todos'
-                        : `${estado.length} seleccionado${estado.length > 1 ? 's' : ''}`}
+                        : estado.length === 1
+                          ? ESTADOS[estado[0]]?.label || estado[0]
+                          : `${estado.length} seleccionados`}
                     </span>
                     <ChevronDown size={16} className={`text-slate-500 transition-transform ${isOpenEstado ? 'rotate-180' : ''}`} />
                   </div>
