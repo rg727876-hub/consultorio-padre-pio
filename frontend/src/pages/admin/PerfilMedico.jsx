@@ -504,36 +504,54 @@ export default function PerfilMedico() {
             </div>
 
             {/* CA2: Calendario Semanal */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
-                <Calendar size={20} className="text-[#8BC63F]" /> Horario Semanal (Solo Lectura)
-              </h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Calendar size={20} className="text-[#8BC63F]" /> Horario de Trabajo (Semanal)
+                </h3>
+              </div>
               
               {doctor.horarios?.length === 0 ? (
-                <div className="text-center py-8">
+                <div className="text-center py-12 bg-slate-50/50">
                   <Calendar size={48} className="mx-auto text-slate-200 mb-3" />
                   <p className="text-slate-500 font-medium">Sin horarios registrados aún</p>
                   <p className="text-sm text-slate-400 mt-1">Usa el botón "Gestionar horarios" para asignar la agenda.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {diasSemana.map(dia => {
-                    const turns = groupedSchedule[dia];
-                    if (!turns) return null;
-                    return (
-                      <div key={dia} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                        <h4 className="font-semibold text-slate-700 text-sm mb-2">{dia}</h4>
-                        <div className="space-y-2">
-                          {turns.map((t, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-xs font-medium bg-white px-3 py-2 rounded border border-slate-100 text-[#0059B3]">
-                              <Clock size={14} className="text-[#8BC63F]" />
-                              {t.hora_inicio.substring(0, 5)} - {t.hora_fin.substring(0, 5)}
-                            </div>
-                          ))}
+                <div className="overflow-x-auto">
+                  <div className="grid divide-x divide-slate-100 min-w-[800px]" style={{ gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))' }}>
+                    {diasSemana.map(dia => {
+                      const turns = groupedSchedule[dia] || [];
+                      return (
+                        <div key={dia} className="flex flex-col bg-white">
+                          <div className="text-center py-3 border-b border-slate-100 bg-slate-50/50">
+                            <h4 className="font-semibold text-slate-600 text-[11px] uppercase tracking-wider">{dia}</h4>
+                          </div>
+                          <div className="p-2 space-y-1.5 flex-1 bg-white" style={{ minHeight: '120px' }}>
+                            {turns.length === 0 ? (
+                              <div className="flex items-center justify-center h-full">
+                                <p className="text-[10px] text-slate-300">Descanso</p>
+                              </div>
+                            ) : (
+                              turns.map((t, idx) => (
+                                <div key={idx} className="bg-blue-50 border border-blue-100 rounded-md p-2 hover:bg-blue-100 transition-colors">
+                                  <div className="flex items-center gap-1.5 text-blue-700 mb-1">
+                                    <Clock size={12} className="text-blue-500" />
+                                    <span className="text-[11px] font-bold">
+                                      {t.hora_inicio.substring(0, 5)}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-blue-600/80 font-medium ml-4">
+                                    hasta {t.hora_fin.substring(0, 5)}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
