@@ -24,10 +24,13 @@ export default function GestionCitas() {
   const [citaCancelar, setCitaCancelar] = useState(null);
 
   // Filtros
-  const [q,           setQ]           = useState('');
-  const [codigo,      setCodigo]      = useState('');
-  const [doctorId,    setDoctorId]    = useState('');
-  const [estado,      setEstado]      = useState(['CONFIRMADA']);
+  const [q,           setQ]           = useState(() => sessionStorage.getItem('gestion_q') || '');
+  const [codigo,      setCodigo]      = useState(() => sessionStorage.getItem('gestion_codigo') || '');
+  const [doctorId,    setDoctorId]    = useState(() => sessionStorage.getItem('gestion_doctorId') || '');
+  const [estado,      setEstado]      = useState(() => {
+    const saved = sessionStorage.getItem('gestion_estado');
+    return saved ? JSON.parse(saved) : ['CONFIRMADA'];
+  });
   const [isOpenEstado, setIsOpenEstado] = useState(false);
   const estadoRef = useRef(null);
 
@@ -41,8 +44,17 @@ export default function GestionCitas() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin,    setFechaFin]    = useState('');
+  const [fechaInicio, setFechaInicio] = useState(() => sessionStorage.getItem('gestion_fechaInicio') || '');
+  const [fechaFin,    setFechaFin]    = useState(() => sessionStorage.getItem('gestion_fechaFin') || '');
+
+  useEffect(() => {
+    sessionStorage.setItem('gestion_q', q);
+    sessionStorage.setItem('gestion_codigo', codigo);
+    sessionStorage.setItem('gestion_doctorId', doctorId);
+    sessionStorage.setItem('gestion_estado', JSON.stringify(estado));
+    sessionStorage.setItem('gestion_fechaInicio', fechaInicio);
+    sessionStorage.setItem('gestion_fechaFin', fechaFin);
+  }, [q, codigo, doctorId, estado, fechaInicio, fechaFin]);
 
   const [doctores, setDoctores] = useState([]);
 
