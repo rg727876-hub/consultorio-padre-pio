@@ -39,10 +39,16 @@ export default function ListaUsuarios() {
   const [pages,    setPages]    = useState(1);
   const [total,    setTotal]    = useState(0);
 
-  const [q,      setQ]      = useState('');
-  const [rol,    setRol]    = useState('PERSONAL');
-  const [estado, setEstado] = useState('ACTIVO');   // default: solo activos (CA1)
+  const [q,      setQ]      = useState(() => sessionStorage.getItem('listaUsuarios_q') || '');
+  const [rol,    setRol]    = useState(() => sessionStorage.getItem('listaUsuarios_rol') || 'PERSONAL');
+  const [estado, setEstado] = useState(() => sessionStorage.getItem('listaUsuarios_estado') || 'ACTIVO');   // default: solo activos (CA1)
   const [detalleId, setDetalleId] = useState(null); // usuario en ventana flotante
+
+  useEffect(() => {
+    sessionStorage.setItem('listaUsuarios_q', q);
+    sessionStorage.setItem('listaUsuarios_rol', rol);
+    sessionStorage.setItem('listaUsuarios_estado', estado);
+  }, [q, rol, estado]);
 
   const fetchUsuarios = useCallback(async (p = 1, overrides = {}) => {
     const f = { q, rol, estado, ...overrides };
