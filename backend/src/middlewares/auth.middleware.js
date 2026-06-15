@@ -9,7 +9,8 @@ const verifyToken = (req, res, next) => {
 
     try {
         const token = header.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Algoritmo fijo HS256: bloquea tokens con alg:none o algoritmo alterado.
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         req.user = decoded;
         next();
     } catch (err) {

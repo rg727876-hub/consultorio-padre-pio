@@ -110,6 +110,24 @@ const registerPayment = async (req, res) => {
       });
     }
 
+    // ── Integridad financiera ────────────────────────────────────────────
+    // El precio es el que dicta el servidor (precio_aplicado de la cita), no el
+    // cliente. Se rechaza cualquier monto que no cubra exactamente ese precio,
+    // evitando manipulación del importe desde el navegador.
+    const precioReal = Number(cita.precio_aplicado);
+    const montoRecibido = Number(monto_total);
+    if (!Number.isFinite(precioReal) || precioReal <= 0) {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({ error: 'La cita no tiene un precio válido asignado' });
+    }
+    // Tolerancia de 1 céntimo por redondeo de punto flotante.
+    if (Math.abs(montoRecibido - precioReal) > 0.01) {
+      await conn.query('ROLLBACK');
+      return res.status(400).json({
+        error: `El monto no coincide con el precio de la cita (S/ ${precioReal.toFixed(2)})`,
+      });
+    }
+
     const [[existingPago]] = await conn.query(
       `SELECT pago_id FROM PAGO WHERE cita_id = ?`,
       [Number(cita_id)]
@@ -128,7 +146,7 @@ const registerPayment = async (req, res) => {
       [
         Number(cita_id),
         req.user?.id    ?? null,
-        Number(monto_total),
+        precioReal,                 // monto autoritativo del servidor, no del cliente
         metodo_pago,
         Number(cambio),
         numero_operacion  || null,

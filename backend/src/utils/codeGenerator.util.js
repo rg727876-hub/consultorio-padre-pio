@@ -1,15 +1,19 @@
+const crypto = require('crypto');
+
 /**
- * Genera código de cita: CIT-XXXNNN (10 caracteres)
- * Ejemplo: CIT-ABC1234, CIT-XYZ0089
- * Formato según el documento del proyecto
+ * Genera código de cita: CITXXXNNN (10 caracteres)
+ * Ejemplo: CITABC1234, CITXYZ0089
+ *
+ * Usa crypto.randomInt (CSPRNG) en lugar de Math.random para que el código no
+ * sea predecible y no se pueda enumerar/adivinar códigos de otras citas.
  */
 const generateAppointmentCode = () => {
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const letterPart = Array.from({ length: 3 }, () =>
-    letters.charAt(Math.floor(Math.random() * letters.length))
+        letters.charAt(crypto.randomInt(letters.length))
     ).join('');
 
-     const numberPart = Math.floor(Math.random() * 10000)
+    const numberPart = crypto.randomInt(10000)
         .toString()
         .padStart(4, '0');
 

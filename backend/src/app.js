@@ -2,8 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const hpp = require('hpp');
 const morgan = require('morgan');
 const { errorHandler } = require('./middlewares/error.middleware');
+const {
+  validateEnv, corsOptions, globalLimiter, authLimiter,
+} = require('./config/security');
+
+// Valida secretos críticos antes de levantar nada (fail-fast en producción).
+validateEnv();
 
 // Rutas
 const authStaffRoutes = require('./routes/authStaff.routes');
@@ -25,27 +32,43 @@ const especialidadRoutes = require('./routes/especialidad.routes');
 
 const app = express();
 
-// Middlewares globales
-app.use(helmet());
-app.use(cors({
-    origin: [
-        process.env.FRONTEND_URL || 'http://localhost:5173',
-        /\.vercel\.app$/,
-    ],
-    credentials: true,
+// Detrás del proxy de Railway/Vercel: confía en 1 salto para obtener la IP
+// real del cliente (necesario para rate-limiting y auditoría correctos).
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// ── Cabeceras de seguridad (helmet) ─────────────────────────────────────────
+app.use(helmet({
+    // HSTS: fuerza HTTPS durante 180 días (solo aplica si se sirve por HTTPS).
+    hsts: { maxAge: 15552000, includeSubDomains: true },
+    // La API no sirve HTML; estas políticas reducen superficie de ataque.
+    crossOriginResourcePolicy: { policy: 'same-site' },
+    referrerPolicy: { policy: 'no-referrer' },
 }));
-app.use(morgan('dev'));
-app.use(express.json());
+
+// ── CORS estricto (allowlist en config/security.js) ─────────────────────────
+app.use(cors(corsOptions));
+
+// ── Límite global de peticiones por IP ──────────────────────────────────────
+app.use(globalLimiter);
+
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// ── Body parser con límite de tamaño (mitiga DoS por payload gigante) ───────
+app.use(express.json({ limit: '100kb' }));
+
+// ── Protección contra HTTP Parameter Pollution ─────────────────────────────
+app.use(hpp());
 
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// ===== AUTH (dos sistemas separados) =====
-app.use('/api/auth/staff', authStaffRoutes);       // Staff: email + password
-app.use('/api/auth/patient', authPatientRoutes);   // Paciente: doc + password
-app.use('/api/auth/activate', activationRoutes);   // Activación de cuentas
+// ===== AUTH (dos sistemas separados) — con rate-limit estricto anti fuerza-bruta =====
+app.use('/api/auth/staff', authLimiter, authStaffRoutes);     // Staff: email + password
+app.use('/api/auth/patient', authLimiter, authPatientRoutes); // Paciente: doc + password
+app.use('/api/auth/activate', authLimiter, activationRoutes); // Activación de cuentas
 
 // ===== RECURSOS =====
 app.use('/api/users', userRoutes);
