@@ -138,22 +138,19 @@ git clone <URL_DEL_REPOSITORIO>
 cd consultorio-padre-pio
 ```
 
-### 2️⃣ Instalar pnpm
+### 2️⃣ Verificar Node.js y npm
 
+Asegúrate de tener Node.js (incluye npm) instalado:
 ```bash
-npm install -g pnpm
-```
-
-Verifica que se instaló correctamente:
-```bash
-pnpm --version
+node --version
+npm --version
 ```
 
 ### 3️⃣ Instalar Dependencias del Backend
 
 ```bash
 cd backend
-pnpm install
+npm install
 ```
 
 ---
@@ -162,7 +159,7 @@ pnpm install
 
 ```bash
 cd ../frontend
-pnpm install
+npm install
 ```
 
 ---
@@ -240,7 +237,7 @@ source database/seed.sql
 
 ```bash
 cd backend
-pnpm dev
+npm run dev
 ```
 
 Esperarás ver:
@@ -254,7 +251,7 @@ MySQL conectado — BD: clinica_padre_pio
 
 ```bash
 cd frontend
-pnpm dev
+npm run dev
 ```
 
 Verás:
@@ -271,7 +268,7 @@ VITE v8.0.10  ready in 234 ms
 
 ```bash
 cd frontend
-pnpm build
+npm run build
 ```
 
 Esto generará una carpeta `dist/` con los archivos optimizados.
@@ -280,7 +277,7 @@ Esto generará una carpeta `dist/` con los archivos optimizados.
 
 ```bash
 cd backend
-NODE_ENV=production pnpm start
+NODE_ENV=production npm start
 ```
 
 ---
