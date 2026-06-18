@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import RegisterPage from '../pages/auth/RegisterPage';
 
-// Componente temporal mientras construimos las páginas
 function Placeholder({ titulo }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -18,11 +18,11 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Placeholder titulo="Login Paciente (HU002)" />} />
-        <Route path="/register" element={<Placeholder titulo="Registro Paciente (HU001)" />} />
+        <Route path="/login"    element={<Placeholder titulo="Login Paciente (HU002)" />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/mis-citas" element={<Placeholder titulo="Mis Citas (HU005)" />} />
-        <Route path="/" element={<Navigate to="/login" />} />
-        <Route path="*" element={<Placeholder titulo="404 - Página no encontrada" />} />
+        <Route path="/"         element={<Navigate to="/login" />} />
+        <Route path="*"         element={<Placeholder titulo="404 - Página no encontrada" />} />
       </Routes>
     </BrowserRouter>
   );
