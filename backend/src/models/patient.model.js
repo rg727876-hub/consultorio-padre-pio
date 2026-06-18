@@ -25,4 +25,44 @@ const create = async (data) => {
   return result.insertId;
 };
 
-module.exports = { create };
+const findByDocument = async (tipo_documento, numero_documento) => {
+  const [[row]] = await pool.query(
+    `SELECT paciente_id, estado_cuenta
+     FROM   PACIENTE
+     WHERE  tipo_documento = ? AND numero_documento = ?`,
+    [tipo_documento, numero_documento]
+  );
+  return row ?? null;
+};
+
+const findByEmailCuenta = async (email_cuenta) => {
+  const [[row]] = await pool.query(
+    `SELECT paciente_id FROM PACIENTE WHERE email_cuenta = ?`,
+    [email_cuenta]
+  );
+  return row ?? null;
+};
+
+const registerWebAccount = async (data) => {
+  const [result] = await pool.query(
+    `INSERT INTO PACIENTE
+     (nombre, apellido, tipo_documento, numero_documento, telefono, sexo,
+      email, email_cuenta, fecha_nacimiento, password_hash, estado_cuenta, fecha_creacion_cuenta)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO', NOW())`,
+    [
+      data.nombre,
+      data.apellido,
+      data.tipo_documento,
+      data.numero_documento,
+      data.telefono,
+      data.sexo,
+      data.email_cuenta,  // email operativo (comprobantes, notificaciones internas)
+      data.email_cuenta,  // email_cuenta (login web, UNIQUE)
+      data.fecha_nacimiento ?? null,
+      data.password_hash,
+    ]
+  );
+  return result.insertId;
+};
+
+module.exports = { create, findByDocument, findByEmailCuenta, registerWebAccount };
