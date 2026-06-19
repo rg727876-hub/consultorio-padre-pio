@@ -1,5 +1,7 @@
 const bcrypt = require('bcryptjs');
-const { findByDocument, findByEmailCuenta, registerWebAccount } = require('../models/patient.model');
+const pool   = require('../config/db');
+const { findByDocument, findByEmailCuenta, registerWebAccount, findByDocumentForLogin } = require('../models/patient.model');
+const { generateToken } = require('../utils/jwt.util');
 const { logAudit } = require('../utils/audit.util');
 const { sendWelcomePatientEmail } = require('../utils/mailer.util');
 
@@ -185,4 +187,155 @@ const register = async (req, res) => {
   }
 };
 
-module.exports = { register };
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/login   — Login con documento + contraseña
+// ─────────────────────────────────────────────────────────────────────────────
+const MAX_INTENTOS = 5;
+const BLOQUEO_MIN  = 15;
+const GENERIC_ERROR = 'Documento o contraseña incorrectos.';
+
+const login = async (req, res) => {
+  const { tipo_documento, numero_documento, password } = req.body;
+
+  if (!tipo_documento || !numero_documento?.trim() || !password)
+    return res.status(400).json({ error: 'Complete todos los campos.' });
+
+  if (!TIPOS_DOCUMENTO.includes(tipo_documento))
+    return res.status(400).json({ error: 'Tipo de documento no válido' });
+
+  const docLimpio = String(numero_documento).trim();
+  if (!validarDocumento(tipo_documento, docLimpio))
+    return res.status(400).json({ error: MSG_DOCUMENTO[tipo_documento] });
+
+  try {
+    const paciente = await findByDocumentForLogin(tipo_documento, docLimpio);
+
+    // Paciente no existe o no tiene cuenta ACTIVA → mensaje genérico (no revelar motivo)
+    if (!paciente || paciente.estado_cuenta !== 'ACTIVO') {
+      await logAudit({
+        accion:    'LOGIN_PACIENTE_FALLIDO',
+        entidad:   'PACIENTE',
+        detalles:  JSON.stringify({ tipo_documento, numero_documento: docLimpio, motivo: paciente ? paciente.estado_cuenta : 'NO_EXISTE' }),
+        ip_origen: req.ip,
+      });
+      return res.status(401).json({ error: GENERIC_ERROR });
+    }
+
+    // Cuenta bloqueada temporalmente
+    if (paciente.bloqueado_hasta && new Date(paciente.bloqueado_hasta) > new Date()) {
+      const minutosRestantes = Math.ceil(
+        (new Date(paciente.bloqueado_hasta) - new Date()) / 60000
+      );
+      await logAudit({
+        paciente_id: paciente.paciente_id,
+        accion:      'LOGIN_PACIENTE_BLOQUEADO',
+        entidad:     'PACIENTE',
+        entidad_id:  paciente.paciente_id,
+        detalles:    JSON.stringify({ minutosRestantes }),
+        ip_origen:   req.ip,
+      });
+      return res.status(403).json({
+        error: `Cuenta bloqueada temporalmente. Intente nuevamente en ${minutosRestantes} minuto${minutosRestantes === 1 ? '' : 's'}.`,
+        codigo: 'CUENTA_BLOQUEADA',
+        bloqueado_hasta: new Date(paciente.bloqueado_hasta).toISOString(),
+      });
+    }
+
+    // Verificar contraseña
+    const passwordOk = await bcrypt.compare(password, paciente.password_hash);
+
+    if (!passwordOk) {
+      const nuevosIntentos = (paciente.intentos_fallidos ?? 0) + 1;
+
+      if (nuevosIntentos >= MAX_INTENTOS) {
+        const bloqueoHasta = new Date(Date.now() + BLOQUEO_MIN * 60 * 1000);
+        await pool.query(
+          `UPDATE PACIENTE SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE paciente_id = ?`,
+          [nuevosIntentos, bloqueoHasta, paciente.paciente_id]
+        );
+        await logAudit({
+          paciente_id: paciente.paciente_id,
+          accion:      'LOGIN_PACIENTE_BLOQUEADO_TEMP',
+          entidad:     'PACIENTE',
+          entidad_id:  paciente.paciente_id,
+          detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+          ip_origen:   req.ip,
+        });
+        return res.status(403).json({
+          error: `Cuenta bloqueada temporalmente. Intente nuevamente en ${BLOQUEO_MIN} minutos.`,
+          codigo: 'CUENTA_BLOQUEADA',
+          bloqueado_hasta: bloqueoHasta.toISOString(),
+        });
+      }
+
+      await pool.query(
+        `UPDATE PACIENTE SET intentos_fallidos = ? WHERE paciente_id = ?`,
+        [nuevosIntentos, paciente.paciente_id]
+      );
+      await logAudit({
+        paciente_id: paciente.paciente_id,
+        accion:      'LOGIN_PACIENTE_FALLIDO',
+        entidad:     'PACIENTE',
+        entidad_id:  paciente.paciente_id,
+        detalles:    JSON.stringify({ intento: nuevosIntentos, tipo_documento, numero_documento: docLimpio }),
+        ip_origen:   req.ip,
+      });
+      return res.status(401).json({ error: GENERIC_ERROR });
+    }
+
+    // Login exitoso: resetear intentos
+    await pool.query(
+      `UPDATE PACIENTE SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE paciente_id = ?`,
+      [paciente.paciente_id]
+    );
+
+    const payload = {
+      id:       paciente.paciente_id,
+      nombre:   paciente.nombre,
+      apellido: paciente.apellido,
+      tipo:     'PACIENTE',
+    };
+
+    const token = generateToken(payload);
+
+    await logAudit({
+      paciente_id: paciente.paciente_id,
+      accion:      'LOGIN_PACIENTE_EXITOSO',
+      entidad:     'PACIENTE',
+      entidad_id:  paciente.paciente_id,
+      detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+      ip_origen:   req.ip,
+    });
+
+    return res.json({ token, user: payload });
+
+  } catch (err) {
+    console.error('[authPatient.login]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/logout  — Solo auditoría; la invalidación es client-side
+// ─────────────────────────────────────────────────────────────────────────────
+const logout = async (req, res) => {
+  try {
+    const paciente_id = req.user?.id ?? null;
+    await logAudit({
+      paciente_id,
+      accion:    'LOGOUT_PACIENTE',
+      entidad:   'PACIENTE',
+      entidad_id: paciente_id,
+      ip_origen: req.ip,
+    });
+    return res.json({ message: 'Sesión cerrada' });
+  } catch (err) {
+    console.error('[authPatient.logout]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { register, login, logout };

@@ -65,4 +65,16 @@ const registerWebAccount = async (data) => {
   return result.insertId;
 };
 
-module.exports = { create, findByDocument, findByEmailCuenta, registerWebAccount };
+const findByDocumentForLogin = async (tipo_documento, numero_documento) => {
+  const [[row]] = await pool.query(
+    `SELECT paciente_id, nombre, apellido, email_cuenta,
+            password_hash, estado_cuenta,
+            intentos_fallidos, bloqueado_hasta
+     FROM   PACIENTE
+     WHERE  tipo_documento = ? AND numero_documento = ?`,
+    [tipo_documento, numero_documento]
+  );
+  return row ?? null;
+};
+
+module.exports = { create, findByDocument, findByEmailCuenta, registerWebAccount, findByDocumentForLogin };
