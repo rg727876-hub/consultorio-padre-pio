@@ -106,6 +106,8 @@ const register = async (req, res) => {
   if (isNaN(dob.getTime()) || dob >= hoy)
     return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
   const edad = Math.floor((hoy - dob) / (1000 * 60 * 60 * 24 * 365.25));
+  if (edad < 18)
+    return res.status(400).json({ error: 'Debes ser mayor de 18 años para crear una cuenta' });
   if (edad > 120)
     return res.status(400).json({ error: 'La fecha de nacimiento no es válida' });
 
@@ -117,6 +119,12 @@ const register = async (req, res) => {
         return res.status(409).json({
           error: 'Este documento ya tiene una cuenta activa. Inicia sesión.',
           codigo: 'DOC_CUENTA_ACTIVA',
+        });
+
+      if (existente.estado_cuenta === 'FAMILIAR')
+        return res.status(409).json({
+          error: 'Este documento está registrado como familiar de otro paciente. Puedes activar tu propia cuenta de acceso.',
+          codigo: 'DOC_FAMILIAR',
         });
 
       // estado_cuenta = 'SIN_CUENTA': paciente registrado internamente sin cuenta web

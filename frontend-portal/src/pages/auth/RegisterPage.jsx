@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { registerPatient } from '../../services/authPatient.service';
+import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
 // ── Reglas de validación (espejo del backend) ────────────────────────────────
 const RE_DNI       = /^\d{8}$/;
@@ -54,6 +55,7 @@ function validarCampo(nombre, valor, form) {
       const dob = new Date(valor + 'T00:00:00');
       if (dob >= hoy) return 'Debe ser anterior al día de hoy';
       const edad = Math.floor((hoy - dob) / (1000 * 60 * 60 * 24 * 365.25));
+      if (edad < 18) return 'Debes ser mayor de 18 años para registrarte';
       if (edad > 120) return 'Fecha de nacimiento no válida';
       return '';
     }
@@ -139,6 +141,7 @@ export default function RegisterPage() {
   const [success, setSuccess]     = useState(false);
   const [showPass, setShowPass]   = useState(false);
   const [showPass2, setShowPass2] = useState(false);
+  const [showPolicy, setShowPolicy] = useState(false);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleChange = (e) => {
@@ -222,11 +225,23 @@ export default function RegisterPage() {
     }
   };
 
+  const handlePolicyAccept = () => {
+    setForm((prev) => ({ ...prev, acepta_politica: true }));
+    setShowPolicy(false);
+  };
+
   // ── Render éxito ─────────────────────────────────────────────────────────────
   if (success) return <SuccessScreen email={form.email.trim().toLowerCase()} />;
 
   // ── Render formulario ────────────────────────────────────────────────────────
   return (
+    <>
+    {showPolicy && (
+      <PrivacyPolicyModal
+        onClose={() => setShowPolicy(false)}
+        onAccept={handlePolicyAccept}
+      />
+    )}
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-start py-10 px-4">
 
       {/* Cabecera */}
@@ -255,6 +270,13 @@ export default function RegisterPage() {
               <p className="mt-1">
                 <Link to="/vincular" className="underline font-semibold">
                   Vincular mi cuenta →
+                </Link>
+              </p>
+            )}
+            {serverError.codigo === 'DOC_FAMILIAR' && (
+              <p className="mt-1">
+                <Link to="/vincular" className="underline font-semibold">
+                  Activar mi cuenta propia →
                 </Link>
               </p>
             )}
@@ -333,7 +355,7 @@ export default function RegisterPage() {
                 value={form.fecha_nacimiento}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                max={new Date().toISOString().split('T')[0]}
+                max={(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 18); return d.toISOString().split('T')[0]; })()}
                 min={(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 120); return d.toISOString().split('T')[0]; })()}
                 className={inputCls(touched.fecha_nacimiento, errors.fecha_nacimiento)}
               />
@@ -457,9 +479,13 @@ export default function RegisterPage() {
             />
             <label htmlFor="acepta_politica" className="text-sm text-slate-600 cursor-pointer">
               He leído y acepto la{' '}
-              <a href="#" className="text-primary underline hover:text-blue-700">
+              <button
+                type="button"
+                onClick={() => setShowPolicy(true)}
+                className="text-primary underline hover:text-blue-700 font-medium"
+              >
                 Política de Privacidad
-              </a>{' '}
+              </button>{' '}
               del Consultorio Padre Pio
             </label>
           </div>
@@ -487,5 +513,6 @@ export default function RegisterPage() {
         </form>
       </div>
     </div>
+    </>
   );
 }
