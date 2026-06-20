@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
 const pool   = require('../config/db');
-const { findByDocument, findByEmailCuenta, registerWebAccount, findByDocumentForLogin } = require('../models/patient.model');
+const {
+  findByDocument, findByEmailCuenta, registerWebAccount,
+  findByDocumentForLogin, findByDocumentPreview, linkWebAccount,
+} = require('../models/patient.model');
 const { generateToken } = require('../utils/jwt.util');
 const { logAudit } = require('../utils/audit.util');
 const { sendWelcomePatientEmail } = require('../utils/mailer.util');
@@ -338,4 +341,152 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { register, login, logout };
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/preview  — Datos anonimizados para reconocimiento
+// ─────────────────────────────────────────────────────────────────────────────
+const preview = async (req, res) => {
+  const { tipo_documento, numero_documento } = req.body;
+
+  if (!tipo_documento || !numero_documento?.trim())
+    return res.status(400).json({ error: 'Tipo y número de documento requeridos' });
+
+  if (!TIPOS_DOCUMENTO.includes(tipo_documento))
+    return res.status(400).json({ error: 'Tipo de documento no válido' });
+
+  const docLimpio = String(numero_documento).trim();
+
+  try {
+    // Verificar si ya tiene cuenta activa
+    const existente = await findByDocument(tipo_documento, docLimpio);
+    if (existente?.estado_cuenta === 'ACTIVO')
+      return res.status(409).json({
+        error: 'Este documento ya tiene una cuenta activa. Inicia sesión.',
+        codigo: 'CUENTA_ACTIVA',
+      });
+
+    const paciente = await findByDocumentPreview(tipo_documento, docLimpio);
+    if (!paciente)
+      return res.status(404).json({ error: 'No se encontró un registro vinculable con ese documento' });
+
+    // Verificar mayoría de edad del paciente en BD
+    const dobBD = paciente.fecha_nacimiento instanceof Date
+      ? paciente.fecha_nacimiento.toISOString().split('T')[0]
+      : String(paciente.fecha_nacimiento).split('T')[0];
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const edadPaciente = Math.floor((hoy - new Date(dobBD + 'T00:00:00')) / (1000 * 60 * 60 * 24 * 365.25));
+    if (edadPaciente < 18)
+      return res.status(403).json({
+        error: 'Usted ya es paciente pero no cumple con los requisitos de registro. Revise la política de privacidad.',
+        codigo: 'MENOR_DE_EDAD',
+      });
+
+    const iniciales = `${paciente.nombre.charAt(0)}.${paciente.apellido.charAt(0)}.`;
+    const docLen = docLimpio.length;
+    const documento_parcial = '*'.repeat(Math.max(docLen - 4, 0)) + docLimpio.slice(-4);
+
+    return res.json({ iniciales, tipo_documento: paciente.tipo_documento, documento_parcial });
+  } catch (err) {
+    console.error('[authPatient.preview]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/vincular  — Vincula cuenta web con historial existente
+// ─────────────────────────────────────────────────────────────────────────────
+const vincular = async (req, res) => {
+  const {
+    tipo_documento, numero_documento, fecha_nacimiento,
+    email, password, confirmar_password, acepta_politica,
+  } = req.body;
+
+  if (!tipo_documento || !numero_documento?.trim() || !fecha_nacimiento ||
+      !email?.trim() || !password || !confirmar_password)
+    return res.status(400).json({ error: 'Todos los campos son requeridos' });
+
+  if (!acepta_politica)
+    return res.status(400).json({ error: 'Debes aceptar la Política de Privacidad' });
+
+  if (!TIPOS_DOCUMENTO.includes(tipo_documento))
+    return res.status(400).json({ error: 'Tipo de documento no válido' });
+
+  const docLimpio = String(numero_documento).trim();
+  if (!validarDocumento(tipo_documento, docLimpio))
+    return res.status(400).json({ error: MSG_DOCUMENTO[tipo_documento] });
+
+  const emailLower = String(email).trim().toLowerCase();
+  if (!RE_EMAIL.test(emailLower))
+    return res.status(400).json({ error: 'El correo electrónico no tiene un formato válido' });
+
+  if (!RE_PASSWORD.test(password))
+    return res.status(400).json({
+      error: 'La contraseña debe tener mínimo 8 caracteres, al menos una mayúscula, un número y un carácter especial',
+    });
+
+  if (password !== confirmar_password)
+    return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+
+  try {
+    // Validar mayoría de edad antes de comparar con BD
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const dobIngresada = new Date(fecha_nacimiento + 'T00:00:00');
+    if (isNaN(dobIngresada.getTime()) || dobIngresada >= hoy)
+      return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
+    const edad = Math.floor((hoy - dobIngresada) / (1000 * 60 * 60 * 24 * 365.25));
+    if (edad < 18)
+      return res.status(400).json({ error: 'Debes ser mayor de 18 años para vincular tu cuenta' });
+    if (edad > 120)
+      return res.status(400).json({ error: 'La fecha de nacimiento no es válida' });
+
+    const existente = await findByDocument(tipo_documento, docLimpio);
+    if (existente?.estado_cuenta === 'ACTIVO')
+      return res.status(409).json({
+        error: 'Este documento ya tiene una cuenta activa. Inicia sesión.',
+        codigo: 'CUENTA_ACTIVA',
+      });
+
+    const paciente = await findByDocumentPreview(tipo_documento, docLimpio);
+    if (!paciente)
+      return res.status(404).json({ error: 'No se encontró un registro vinculable con ese documento' });
+
+    // Comparar fecha de nacimiento como string YYYY-MM-DD para evitar problemas de zona horaria
+    const dobBD = paciente.fecha_nacimiento instanceof Date
+      ? paciente.fecha_nacimiento.toISOString().split('T')[0]
+      : String(paciente.fecha_nacimiento).split('T')[0];
+
+    if (dobBD !== fecha_nacimiento)  // fecha_nacimiento ya validada arriba
+      return res.status(400).json({
+        error: 'Los datos no coinciden. Si tienes problemas, comunícate con el consultorio.',
+        codigo: 'FECHA_NO_COINCIDE',
+      });
+
+    const emailExiste = await findByEmailCuenta(emailLower);
+    if (emailExiste)
+      return res.status(409).json({ error: 'El correo electrónico ya se encuentra registrado.', codigo: 'EMAIL_DUPLICADO' });
+
+    const password_hash = await bcrypt.hash(password, 12);
+    await linkWebAccount(paciente.paciente_id, { email_cuenta: emailLower, password_hash });
+
+    sendWelcomePatientEmail(emailLower, paciente.nombre).catch((err) =>
+      console.error('[authPatient.vincular] Correo de bienvenida falló:', err.message)
+    );
+
+    await logAudit({
+      paciente_id: paciente.paciente_id,
+      accion:      'VINCULACION_CUENTA_WEB',
+      entidad:     'PACIENTE',
+      entidad_id:  paciente.paciente_id,
+      detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+      ip_origen:   req.ip,
+    });
+
+    return res.json({ message: 'Cuenta vinculada exitosamente. Ya puedes iniciar sesión.' });
+  } catch (err) {
+    console.error('[authPatient.vincular]', err.message);
+    if (err.code === 'ER_DUP_ENTRY')
+      return res.status(409).json({ error: 'El correo electrónico ya se encuentra registrado.' });
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  }
+};
+
+module.exports = { register, login, logout, preview, vincular };
