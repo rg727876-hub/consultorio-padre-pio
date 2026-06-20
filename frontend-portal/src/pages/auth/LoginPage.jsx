@@ -158,7 +158,7 @@ export default function LoginPage() {
       });
 
       login(data.token, data.user);
-      navigate('/mis-citas', { replace: true });
+      navigate('/perfil', { replace: true });
 
     } catch (err) {
       const data   = err.response?.data;
