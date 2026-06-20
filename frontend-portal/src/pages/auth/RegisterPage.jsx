@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { registerPatient } from '../../services/authPatient.service';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
@@ -268,16 +269,18 @@ export default function RegisterPage() {
             )}
             {serverError.codigo === 'DOC_SIN_CUENTA' && (
               <p className="mt-1">
-                <Link to="/vincular" className="underline font-semibold">
+                <button
+                  type="button"
+                  onClick={() => navigate('/vincular', {
+                    state: {
+                      tipo_documento:   form.tipo_documento,
+                      numero_documento: form.numero_documento.trim(),
+                    },
+                  })}
+                  className="underline font-semibold"
+                >
                   Vincular mi cuenta →
-                </Link>
-              </p>
-            )}
-            {serverError.codigo === 'DOC_FAMILIAR' && (
-              <p className="mt-1">
-                <Link to="/vincular" className="underline font-semibold">
-                  Activar mi cuenta propia →
-                </Link>
+                </button>
               </p>
             )}
           </div>
@@ -502,11 +505,17 @@ export default function RegisterPage() {
             {loading ? 'Creando cuenta...' : 'Crear mi cuenta'}
           </button>
 
-          {/* Link al login */}
+          {/* Links de navegación */}
           <p className="mt-4 text-center text-sm text-slate-500">
             ¿Ya tienes cuenta?{' '}
             <Link to="/login" className="text-primary font-medium hover:underline">
               Inicia sesión
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-sm text-slate-500">
+            ¿Ya eres paciente del consultorio?{' '}
+            <Link to="/vincular" className="text-primary font-medium hover:underline">
+              Vincula tu cuenta
             </Link>
           </p>
 
