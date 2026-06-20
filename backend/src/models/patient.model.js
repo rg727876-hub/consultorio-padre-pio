@@ -98,4 +98,30 @@ const updateContactInfo = async (paciente_id, { telefono, direccion, ocupacion, 
   );
 };
 
-module.exports = { create, findByDocument, findByEmailCuenta, registerWebAccount, findByDocumentForLogin, findProfileById, updateContactInfo };
+const findByDocumentPreview = async (tipo_documento, numero_documento) => {
+  const [[row]] = await pool.query(
+    `SELECT paciente_id, nombre, apellido, tipo_documento, numero_documento,
+            fecha_nacimiento, estado_cuenta
+     FROM   PACIENTE
+     WHERE  tipo_documento = ? AND numero_documento = ?
+       AND  estado_cuenta = 'SIN_CUENTA'`,
+    [tipo_documento, numero_documento]
+  );
+  return row ?? null;
+};
+
+const linkWebAccount = async (paciente_id, { email_cuenta, password_hash }) => {
+  await pool.query(
+    `UPDATE PACIENTE
+     SET email_cuenta = ?, email = ?, password_hash = ?,
+         estado_cuenta = 'ACTIVO', intentos_fallidos = 0, bloqueado_hasta = NULL
+     WHERE paciente_id = ?`,
+    [email_cuenta, email_cuenta, password_hash, paciente_id]
+  );
+};
+
+module.exports = {
+  create, findByDocument, findByEmailCuenta, registerWebAccount,
+  findByDocumentForLogin, findProfileById, updateContactInfo,
+  findByDocumentPreview, linkWebAccount,
+};
