@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { PatientAuthProvider, usePatientAuth } from '../context/PatientAuthContext';
-import RegisterPage from '../pages/auth/RegisterPage';
-import LoginPage    from '../pages/auth/LoginPage';
-import ProfilePage  from '../pages/profile/ProfilePage';
+import RegisterPage    from '../pages/auth/RegisterPage';
+import LoginPage       from '../pages/auth/LoginPage';
+import VinculacionPage from '../pages/auth/VinculacionPage';
+import ProfilePage     from '../pages/profile/ProfilePage';
 
 function ProtectedRoute({ children }) {
   const { user } = usePatientAuth();
@@ -21,8 +22,9 @@ export default function AppRouter() {
     <PatientAuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+          <Route path="/login"     element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/register"  element={<PublicRoute><RegisterPage /></PublicRoute>} />
+          <Route path="/vincular"  element={<PublicRoute><VinculacionPage /></PublicRoute>} />
           <Route path="/perfil"   element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/"         element={<Navigate to="/perfil" replace />} />
           <Route path="*"         element={
