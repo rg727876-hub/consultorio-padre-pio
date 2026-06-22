@@ -116,7 +116,7 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
   });
 
   describe('WEB-HU001: Registro de Paciente Web', () => {
-    it('Camino Feliz - Paciente nuevo', async () => {
+    it('CP-45: Dado un paciente nuevo sin registros previos, cuando llena todos los campos obligatorios con un formato válido, contraseñas seguras y acepta la política. Entonces el sistema activa la cuenta, registra el evento, muestra el mensaje de éxito, envía el correo y redirige al login.', async () => {
       // No existe paciente previo
       mockConnection.query.mockResolvedValueOnce([[]]); 
       // Insert paciente
@@ -131,16 +131,18 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
           numero_documento: '99999999',
           sexo: 'MASCULINO',
           telefono: '999999999',
-          email_cuenta: 'nuevo@paciente.com',
+          email: 'nuevo@paciente.com',
           password: 'Password123!',
+          confirmar_password: 'Password123!',
+          acepta_politica: true,
           fecha_nacimiento: '1990-01-01'
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.message).toContain('Cuenta creada exitosamente');
+      expect(response.body.message).toContain('Registro exitoso');
     });
 
-    it('Redirección - DNI ya existe sin cuenta web', async () => {
+    it('CP-48: Dado un paciente que solo tiene registro fisico en la clínica, cuando ingresa su número de documento en el formulario web. Entonces el sistema alerta: "Este documento está registrado... vincúlala con tu registro existente." y provee el botón para la vinculación.', async () => {
       // Paciente existe físicamente pero sin cuenta web
       mockConnection.query.mockResolvedValueOnce([[{ 
         paciente_id: 10, 
@@ -156,8 +158,10 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
           numero_documento: '88888888',
           sexo: 'MASCULINO',
           telefono: '999999999',
-          email_cuenta: 'fisico@paciente.com',
+          email: 'fisico@paciente.com',
           password: 'Password123!',
+          confirmar_password: 'Password123!',
+          acepta_politica: true,
           fecha_nacimiento: '1990-01-01'
         });
 
@@ -166,7 +170,7 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
       expect(response.body.error).toContain('vincular');
     });
 
-    it('Seguridad - Contraseñas no seguras', async () => {
+    it('CP-46: Dado un paciente llenando el formulario, cuando ingresa una contraseña que no cumple los requisitos mínimos o las contraseñas no coinciden. Entonces el sistema detiene el registro y exige corregir los campos según las reglas de seguridad.', async () => {
       const response = await request(app)
         .post('/api/auth/patient/register')
         .send({
@@ -176,16 +180,19 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
           numero_documento: '99999999',
           sexo: 'MASCULINO',
           telefono: '999999999',
-          email_cuenta: 'nuevo@paciente.com',
+          email: 'nuevo@paciente.com',
           password: '123', // Insegura
+          confirmar_password: '123',
+          acepta_politica: true,
           fecha_nacimiento: '1990-01-01'
         });
 
-      // El backend debe validar la seguridad (podría ser 400 Bad Request)
+      // El backend debe validar la seguridad
       expect(response.status).toBe(400);
+      expect(response.body.error).toContain('La contraseña debe tener mínimo 8 caracteres');
     });
 
-    it('Regla Negocio - Documento ya tiene cuenta activa', async () => {
+    it('CP-47: Dado un paciente que ya posee una cuenta web habilitada, cuando intenta registrarse nuevamente utilizando el mismo número de documento. Entonces el sistema detiene el registro y muestra la alerta: "Este documento ya tiene una cuenta activa. Inicia sesión."', async () => {
       // Paciente existe y ya tiene cuenta
       mockConnection.query.mockResolvedValueOnce([[{ 
         paciente_id: 10, 
@@ -201,8 +208,10 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
           numero_documento: '88888888',
           sexo: 'MASCULINO',
           telefono: '999999999',
-          email_cuenta: 'fisico@paciente.com',
+          email: 'fisico@paciente.com',
           password: 'Password123!',
+          confirmar_password: 'Password123!',
+          acepta_politica: true,
           fecha_nacimiento: '1990-01-01'
         });
 
@@ -210,7 +219,7 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
       expect(response.body.error).toContain('Inicia sesión');
     });
 
-    it('Validación - Correo en uso', async () => {
+    it('CP-49: Dado un paciente llenando el formulario, cuando ingresa un correo electrónico que ya está en uso por otra cuenta. Entonces el sisterna bloquea el registro y muestra la alerta: "El correo electrónico ya se encuentra registrado."', async () => {
       // Documento no existe
       mockConnection.query.mockResolvedValueOnce([[]]); 
       // Correo ya existe
@@ -225,13 +234,15 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
           numero_documento: '99999998',
           sexo: 'MASCULINO',
           telefono: '999999999',
-          email_cuenta: 'enuso@paciente.com',
+          email: 'enuso@paciente.com',
           password: 'Password123!',
+          confirmar_password: 'Password123!',
+          acepta_politica: true,
           fecha_nacimiento: '1990-01-01'
         });
 
       expect(response.status).toBe(409);
-      expect(response.body.error).toContain('correo electrónico ya se encuentra registrado');
+      expect(response.body.error).toContain('El correo electrónico ya se encuentra registrado.');
     });
   });
 
