@@ -1,226 +1,492 @@
-const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
+const pool   = require('../config/db');
+const {
+  findByDocument, findByEmailCuenta, registerWebAccount,
+  findByDocumentForLogin, findByDocumentPreview, linkWebAccount,
+} = require('../models/patient.model');
 const { generateToken } = require('../utils/jwt.util');
 const { logAudit } = require('../utils/audit.util');
+const { sendWelcomePatientEmail } = require('../utils/mailer.util');
 
+const isDev = process.env.NODE_ENV !== 'production';
+
+// ── Reglas de validación ─────────────────────────────────────────────────────
+const TIPOS_DOCUMENTO = ['DNI', 'CE', 'PASAPORTE'];
+const RE_DNI       = /^\d{8}$/;
+const RE_CE        = /^[A-Za-z0-9]{9,12}$/;
+const RE_PASAPORTE = /^[A-Za-z0-9]{6,12}$/;
+const RE_EMAIL     = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RE_TELEFONO  = /^\d{9}$/;
+const RE_PASSWORD  = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+const validarDocumento = (tipo, numero) => {
+  if (tipo === 'DNI')       return RE_DNI.test(numero);
+  if (tipo === 'CE')        return RE_CE.test(numero);
+  if (tipo === 'PASAPORTE') return RE_PASAPORTE.test(numero);
+  return false;
+};
+
+const MSG_DOCUMENTO = {
+  DNI:       'El DNI debe tener exactamente 8 dígitos numéricos',
+  CE:        'El CE debe tener entre 9 y 12 caracteres alfanuméricos',
+  PASAPORTE: 'El Pasaporte debe tener entre 6 y 12 caracteres alfanuméricos',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/register   — Registro de cuenta web del paciente
+// Ruta pública (sin token). Rate-limited por authLimiter en app.js.
+// ─────────────────────────────────────────────────────────────────────────────
+const register = async (req, res) => {
+  const {
+    tipo_documento,
+    numero_documento,
+    nombre,
+    apellido,
+    fecha_nacimiento,
+    sexo,
+    telefono,
+    email,
+    password,
+    confirmar_password,
+    acepta_politica,
+  } = req.body;
+
+  // ── Campos obligatorios ───────────────────────────────────────────────────
+  if (
+    !tipo_documento     ||
+    !numero_documento?.trim() ||
+    !nombre?.trim()     ||
+    !apellido?.trim()   ||
+    !fecha_nacimiento   ||
+    !sexo               ||
+    !telefono           ||
+    !email?.trim()      ||
+    !password           ||
+    !confirmar_password
+  ) return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' });
+
+  if (!acepta_politica)
+    return res.status(400).json({ error: 'Debes aceptar la Política de Privacidad' });
+
+  // ── Nombre y apellido ─────────────────────────────────────────────────────
+  const nombreLimpio  = String(nombre).trim().toUpperCase();
+  const apellidoLimpio = String(apellido).trim().toUpperCase();
+
+  if (nombreLimpio.length < 2 || nombreLimpio.length > 30)
+    return res.status(400).json({ error: 'El nombre debe tener entre 2 y 30 caracteres' });
+
+  if (apellidoLimpio.length < 2 || apellidoLimpio.length > 30)
+    return res.status(400).json({ error: 'El apellido debe tener entre 2 y 30 caracteres' });
+
+  // ── Tipo de documento ─────────────────────────────────────────────────────
+  if (!TIPOS_DOCUMENTO.includes(tipo_documento))
+    return res.status(400).json({ error: 'Tipo de documento no válido' });
+
+  const docLimpio = String(numero_documento).trim();
+  if (!validarDocumento(tipo_documento, docLimpio))
+    return res.status(400).json({ error: MSG_DOCUMENTO[tipo_documento] });
+
+  // ── Email ─────────────────────────────────────────────────────────────────
+  const emailLower = String(email).trim().toLowerCase();
+  if (!RE_EMAIL.test(emailLower))
+    return res.status(400).json({ error: 'El correo electrónico no tiene un formato válido' });
+
+  // ── Teléfono ──────────────────────────────────────────────────────────────
+  const telefonoLimpio = String(telefono).replace(/\D/g, '');
+  if (!RE_TELEFONO.test(telefonoLimpio))
+    return res.status(400).json({ error: 'El celular debe tener exactamente 9 dígitos' });
+
+  // ── Contraseña ────────────────────────────────────────────────────────────
+  if (!RE_PASSWORD.test(password))
+    return res.status(400).json({
+      error: 'La contraseña debe tener mínimo 8 caracteres, al menos una mayúscula, un número y un carácter especial',
+    });
+
+  if (password !== confirmar_password)
+    return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+
+  // ── Fecha de nacimiento ───────────────────────────────────────────────────
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const dob = new Date(fecha_nacimiento + 'T00:00:00');
+  if (isNaN(dob.getTime()) || dob >= hoy)
+    return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
+  const edad = Math.floor((hoy - dob) / (1000 * 60 * 60 * 24 * 365.25));
+  if (edad < 18)
+    return res.status(400).json({ error: 'Debes ser mayor de 18 años para crear una cuenta' });
+  if (edad > 120)
+    return res.status(400).json({ error: 'La fecha de nacimiento no es válida' });
+
+  try {
+    // ── Verificar documento (tipo + número) ───────────────────────────────
+    const existente = await findByDocument(tipo_documento, docLimpio);
+    if (existente) {
+      if (existente.estado_cuenta === 'ACTIVO')
+        return res.status(409).json({
+          error: 'Este documento ya tiene una cuenta activa. Inicia sesión.',
+          codigo: 'DOC_CUENTA_ACTIVA',
+        });
+
+      if (existente.estado_cuenta === 'FAMILIAR')
+        return res.status(409).json({
+          error: 'Este documento está registrado como familiar de otro paciente. Puedes activar tu propia cuenta de acceso.',
+          codigo: 'DOC_FAMILIAR',
+        });
+
+      // estado_cuenta = 'SIN_CUENTA': paciente registrado internamente sin cuenta web
+      return res.status(409).json({
+        error: 'Este documento está registrado en el consultorio. Para crear tu cuenta web, vincúlala con tu registro existente.',
+        codigo: 'DOC_SIN_CUENTA',
+      });
+    }
+
+    // ── Verificar email_cuenta (único para login web) ──────────────────────
+    const emailExiste = await findByEmailCuenta(emailLower);
+    if (emailExiste)
+      return res.status(409).json({
+        error: 'El correo electrónico ya se encuentra registrado.',
+        codigo: 'EMAIL_DUPLICADO',
+      });
+
+    // ── Crear cuenta ───────────────────────────────────────────────────────
+    const password_hash = await bcrypt.hash(password, 12);
+
+    const paciente_id = await registerWebAccount({
+      nombre:           nombreLimpio,
+      apellido:         apellidoLimpio,
+      tipo_documento,
+      numero_documento: docLimpio,
+      telefono:         telefonoLimpio,
+      sexo,
+      email_cuenta:     emailLower,
+      fecha_nacimiento,
+      password_hash,
+    });
+
+    // ── Email de bienvenida (fire-and-forget, no bloquea la respuesta) ─────
+    sendWelcomePatientEmail(emailLower, String(nombre).trim()).catch((err) =>
+      console.error('[authPatient.register] Correo de bienvenida falló:', err.message)
+    );
+
+    // ── Auditoría ──────────────────────────────────────────────────────────
+    await logAudit({
+      paciente_id,
+      accion:     'REGISTRO_WEB_PACIENTE',
+      entidad:    'PACIENTE',
+      entidad_id: paciente_id,
+      detalles:   JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+      ip_origen:  req.ip,
+    });
+
+    return res.status(201).json({ message: 'Registro exitoso' });
+
+  } catch (err) {
+    console.error('[authPatient.register]', err.message);
+    if (err.code === 'ER_DUP_ENTRY')
+      return res.status(409).json({ error: 'El correo electrónico ya se encuentra registrado.' });
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
+    });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/login   — Login con documento + contraseña
+// ─────────────────────────────────────────────────────────────────────────────
 const MAX_INTENTOS = 5;
-const BLOQUEO_MINUTOS = 15;
+const BLOQUEO_MIN  = 15;
+const GENERIC_ERROR = 'Documento o contraseña incorrectos.';
 
 const login = async (req, res) => {
   const { tipo_documento, numero_documento, password } = req.body;
 
-  if (!tipo_documento || !numero_documento || !password) {
-    return res.status(400).json({ error: 'Faltan credenciales' });
-  }
+  if (!tipo_documento || !numero_documento?.trim() || !password)
+    return res.status(400).json({ error: 'Complete todos los campos.' });
 
-  let conn;
+  if (!TIPOS_DOCUMENTO.includes(tipo_documento))
+    return res.status(400).json({ error: 'Tipo de documento no válido' });
+
+  const docLimpio = String(numero_documento).trim();
+  if (!validarDocumento(tipo_documento, docLimpio))
+    return res.status(400).json({ error: MSG_DOCUMENTO[tipo_documento] });
+
   try {
-    conn = await pool.getConnection();
-    await conn.query('START TRANSACTION');
+    const paciente = await findByDocumentForLogin(tipo_documento, docLimpio);
 
-    const [[paciente]] = await conn.query(
-      `SELECT paciente_id, nombre, apellido, email_cuenta, password_hash, estado_cuenta, estado, intentos_fallidos, bloqueado_hasta
-       FROM PACIENTE 
-       WHERE tipo_documento = ? AND numero_documento = ? FOR UPDATE`,
-      [tipo_documento, numero_documento]
-    );
-
+    // Paciente no existe o no tiene cuenta ACTIVA → mensaje genérico (no revelar motivo)
     if (!paciente || paciente.estado_cuenta !== 'ACTIVO') {
-      await conn.query('ROLLBACK');
-      return res.status(401).json({ error: 'Documento o contraseña incorrectos.' });
+      await logAudit({
+        accion:    'LOGIN_PACIENTE_FALLIDO',
+        entidad:   'PACIENTE',
+        detalles:  JSON.stringify({ tipo_documento, numero_documento: docLimpio, motivo: paciente ? paciente.estado_cuenta : 'NO_EXISTE' }),
+        ip_origen: req.ip,
+      });
+      return res.status(401).json({ error: GENERIC_ERROR });
     }
 
-    if (paciente.estado !== 'ACTIVO') {
-      await conn.query('ROLLBACK');
-      return res.status(403).json({ error: 'Cuenta de paciente inactiva. Comunícate con la clínica.' });
+    // Cuenta bloqueada temporalmente
+    if (paciente.bloqueado_hasta && new Date(paciente.bloqueado_hasta) > new Date()) {
+      const minutosRestantes = Math.ceil(
+        (new Date(paciente.bloqueado_hasta) - new Date()) / 60000
+      );
+      await logAudit({
+        paciente_id: paciente.paciente_id,
+        accion:      'LOGIN_PACIENTE_BLOQUEADO',
+        entidad:     'PACIENTE',
+        entidad_id:  paciente.paciente_id,
+        detalles:    JSON.stringify({ minutosRestantes }),
+        ip_origen:   req.ip,
+      });
+      return res.status(403).json({
+        error: `Cuenta bloqueada temporalmente. Intente nuevamente en ${minutosRestantes} minuto${minutosRestantes === 1 ? '' : 's'}.`,
+        codigo: 'CUENTA_BLOQUEADA',
+        bloqueado_hasta: new Date(paciente.bloqueado_hasta).toISOString(),
+      });
     }
 
-    if (paciente.bloqueado_hasta && new Date() < new Date(paciente.bloqueado_hasta)) {
-      await conn.query('ROLLBACK');
-      const faltanMs = new Date(paciente.bloqueado_hasta) - new Date();
-      const faltanMin = Math.ceil(faltanMs / 60000);
-      return res.status(403).json({ error: `Demasiados intentos fallidos. Cuenta bloqueada ${faltanMin} minutos.` });
-    }
+    // Verificar contraseña
+    const passwordOk = await bcrypt.compare(password, paciente.password_hash);
 
-    const isValid = await bcrypt.compare(password, paciente.password_hash);
-
-    if (!isValid) {
-      const nuevosIntentos = paciente.intentos_fallidos + 1;
-      let bloqueoHasta = null;
+    if (!passwordOk) {
+      const nuevosIntentos = (paciente.intentos_fallidos ?? 0) + 1;
 
       if (nuevosIntentos >= MAX_INTENTOS) {
-        bloqueoHasta = new Date(Date.now() + BLOQUEO_MINUTOS * 60000);
+        const bloqueoHasta = new Date(Date.now() + BLOQUEO_MIN * 60 * 1000);
+        await pool.query(
+          `UPDATE PACIENTE SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE paciente_id = ?`,
+          [nuevosIntentos, bloqueoHasta, paciente.paciente_id]
+        );
+        await logAudit({
+          paciente_id: paciente.paciente_id,
+          accion:      'LOGIN_PACIENTE_BLOQUEADO_TEMP',
+          entidad:     'PACIENTE',
+          entidad_id:  paciente.paciente_id,
+          detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+          ip_origen:   req.ip,
+        });
+        return res.status(403).json({
+          error: `Cuenta bloqueada temporalmente. Intente nuevamente en ${BLOQUEO_MIN} minutos.`,
+          codigo: 'CUENTA_BLOQUEADA',
+          bloqueado_hasta: bloqueoHasta.toISOString(),
+        });
       }
 
-      await conn.query(
-        'UPDATE PACIENTE SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE paciente_id = ?',
-        [nuevosIntentos, bloqueoHasta, paciente.paciente_id]
+      await pool.query(
+        `UPDATE PACIENTE SET intentos_fallidos = ? WHERE paciente_id = ?`,
+        [nuevosIntentos, paciente.paciente_id]
       );
-      await conn.query('COMMIT');
-
-      if (bloqueoHasta) {
-        return res.status(403).json({ error: `Demasiados intentos fallidos. Cuenta bloqueada ${BLOQUEO_MINUTOS} minutos.` });
-      }
-
-      return res.status(401).json({ error: 'Documento o contraseña incorrectos.' });
+      await logAudit({
+        paciente_id: paciente.paciente_id,
+        accion:      'LOGIN_PACIENTE_FALLIDO',
+        entidad:     'PACIENTE',
+        entidad_id:  paciente.paciente_id,
+        detalles:    JSON.stringify({ intento: nuevosIntentos, tipo_documento, numero_documento: docLimpio }),
+        ip_origen:   req.ip,
+      });
+      return res.status(401).json({ error: GENERIC_ERROR });
     }
 
-    // Contraseña correcta
-    await conn.query(
-      'UPDATE PACIENTE SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE paciente_id = ?',
+    // Login exitoso: resetear intentos
+    await pool.query(
+      `UPDATE PACIENTE SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE paciente_id = ?`,
       [paciente.paciente_id]
     );
-    await conn.query('COMMIT');
+
+    const payload = {
+      id:       paciente.paciente_id,
+      nombre:   paciente.nombre,
+      apellido: paciente.apellido,
+      tipo:     'PACIENTE',
+    };
+
+    const token = generateToken(payload);
 
     await logAudit({
       paciente_id: paciente.paciente_id,
-      accion: 'LOGIN_PACIENTE',
-      ip_origen: req.ip
+      accion:      'LOGIN_PACIENTE_EXITOSO',
+      entidad:     'PACIENTE',
+      entidad_id:  paciente.paciente_id,
+      detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+      ip_origen:   req.ip,
     });
 
-    const token = generateToken({ id: paciente.paciente_id, rol: 'PACIENTE' });
+    return res.json({ token, user: payload });
 
-    res.json({
-      token,
-      user: {
-        id: paciente.paciente_id,
-        nombre: paciente.nombre,
-        apellido: paciente.apellido,
-        rol: 'PACIENTE'
-      }
+  } catch (err) {
+    console.error('[authPatient.login]', err.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      ...(isDev && { detail: err.message }),
     });
-
-  } catch (error) {
-    if (conn) await conn.query('ROLLBACK');
-    console.error('[authPatient.login]', error.message);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  } finally {
-    if (conn) conn.release();
   }
 };
 
-const register = async (req, res) => {
-  const { nombre, apellido, tipo_documento, numero_documento, sexo, telefono, email_cuenta, password, fecha_nacimiento } = req.body;
-
-  if (!nombre || !apellido || !tipo_documento || !numero_documento || !email_cuenta || !password || !fecha_nacimiento) {
-    return res.status(400).json({ error: 'Complete todos los campos obligatorios' });
-  }
-
-  let conn;
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/logout  — Solo auditoría; la invalidación es client-side
+// ─────────────────────────────────────────────────────────────────────────────
+const logout = async (req, res) => {
   try {
-    conn = await pool.getConnection();
-    
-    // Verificamos si existe por documento
-    const [[existenteDoc]] = await conn.query(
-      'SELECT paciente_id, estado_cuenta FROM PACIENTE WHERE tipo_documento = ? AND numero_documento = ?',
-      [tipo_documento, numero_documento]
+    const paciente_id = req.user?.id ?? null;
+    await logAudit({
+      paciente_id,
+      accion:    'LOGOUT_PACIENTE',
+      entidad:   'PACIENTE',
+      entidad_id: paciente_id,
+      ip_origen: req.ip,
+    });
+    return res.json({ message: 'Sesión cerrada' });
+  } catch (err) {
+    console.error('[authPatient.logout]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/preview  — Datos anonimizados para reconocimiento
+// ─────────────────────────────────────────────────────────────────────────────
+const preview = async (req, res) => {
+  const { tipo_documento, numero_documento } = req.body;
+
+  if (!tipo_documento || !numero_documento?.trim())
+    return res.status(400).json({ error: 'Tipo y número de documento requeridos' });
+
+  if (!TIPOS_DOCUMENTO.includes(tipo_documento))
+    return res.status(400).json({ error: 'Tipo de documento no válido' });
+
+  const docLimpio = String(numero_documento).trim();
+
+  try {
+    // Verificar si ya tiene cuenta activa
+    const existente = await findByDocument(tipo_documento, docLimpio);
+    if (existente?.estado_cuenta === 'ACTIVO')
+      return res.status(409).json({
+        error: 'Este documento ya tiene una cuenta activa. Inicia sesión.',
+        codigo: 'CUENTA_ACTIVA',
+      });
+
+    const paciente = await findByDocumentPreview(tipo_documento, docLimpio);
+    if (!paciente)
+      return res.status(404).json({ error: 'No se encontró un registro vinculable con ese documento' });
+
+    // Verificar mayoría de edad del paciente en BD
+    const dobBD = paciente.fecha_nacimiento instanceof Date
+      ? paciente.fecha_nacimiento.toISOString().split('T')[0]
+      : String(paciente.fecha_nacimiento).split('T')[0];
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const edadPaciente = Math.floor((hoy - new Date(dobBD + 'T00:00:00')) / (1000 * 60 * 60 * 24 * 365.25));
+    if (edadPaciente < 18)
+      return res.status(403).json({
+        error: 'Usted ya es paciente pero no cumple con los requisitos de registro. Revise la política de privacidad.',
+        codigo: 'MENOR_DE_EDAD',
+      });
+
+    const iniciales = `${paciente.nombre.charAt(0)}.${paciente.apellido.charAt(0)}.`;
+    const docLen = docLimpio.length;
+    const documento_parcial = '*'.repeat(Math.max(docLen - 4, 0)) + docLimpio.slice(-4);
+
+    return res.json({ iniciales, tipo_documento: paciente.tipo_documento, documento_parcial });
+  } catch (err) {
+    console.error('[authPatient.preview]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/patient/vincular  — Vincula cuenta web con historial existente
+// ─────────────────────────────────────────────────────────────────────────────
+const vincular = async (req, res) => {
+  const {
+    tipo_documento, numero_documento, fecha_nacimiento,
+    email, password, confirmar_password, acepta_politica,
+  } = req.body;
+
+  if (!tipo_documento || !numero_documento?.trim() || !fecha_nacimiento ||
+      !email?.trim() || !password || !confirmar_password)
+    return res.status(400).json({ error: 'Todos los campos son requeridos' });
+
+  if (!acepta_politica)
+    return res.status(400).json({ error: 'Debes aceptar la Política de Privacidad' });
+
+  if (!TIPOS_DOCUMENTO.includes(tipo_documento))
+    return res.status(400).json({ error: 'Tipo de documento no válido' });
+
+  const docLimpio = String(numero_documento).trim();
+  if (!validarDocumento(tipo_documento, docLimpio))
+    return res.status(400).json({ error: MSG_DOCUMENTO[tipo_documento] });
+
+  const emailLower = String(email).trim().toLowerCase();
+  if (!RE_EMAIL.test(emailLower))
+    return res.status(400).json({ error: 'El correo electrónico no tiene un formato válido' });
+
+  if (!RE_PASSWORD.test(password))
+    return res.status(400).json({
+      error: 'La contraseña debe tener mínimo 8 caracteres, al menos una mayúscula, un número y un carácter especial',
+    });
+
+  if (password !== confirmar_password)
+    return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+
+  try {
+    // Validar mayoría de edad antes de comparar con BD
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const dobIngresada = new Date(fecha_nacimiento + 'T00:00:00');
+    if (isNaN(dobIngresada.getTime()) || dobIngresada >= hoy)
+      return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
+    const edad = Math.floor((hoy - dobIngresada) / (1000 * 60 * 60 * 24 * 365.25));
+    if (edad < 18)
+      return res.status(400).json({ error: 'Debes ser mayor de 18 años para vincular tu cuenta' });
+    if (edad > 120)
+      return res.status(400).json({ error: 'La fecha de nacimiento no es válida' });
+
+    const existente = await findByDocument(tipo_documento, docLimpio);
+    if (existente?.estado_cuenta === 'ACTIVO')
+      return res.status(409).json({
+        error: 'Este documento ya tiene una cuenta activa. Inicia sesión.',
+        codigo: 'CUENTA_ACTIVA',
+      });
+
+    const paciente = await findByDocumentPreview(tipo_documento, docLimpio);
+    if (!paciente)
+      return res.status(404).json({ error: 'No se encontró un registro vinculable con ese documento' });
+
+    // Comparar fecha de nacimiento como string YYYY-MM-DD para evitar problemas de zona horaria
+    const dobBD = paciente.fecha_nacimiento instanceof Date
+      ? paciente.fecha_nacimiento.toISOString().split('T')[0]
+      : String(paciente.fecha_nacimiento).split('T')[0];
+
+    if (dobBD !== fecha_nacimiento)  // fecha_nacimiento ya validada arriba
+      return res.status(400).json({
+        error: 'Los datos no coinciden. Si tienes problemas, comunícate con el consultorio.',
+        codigo: 'FECHA_NO_COINCIDE',
+      });
+
+    const emailExiste = await findByEmailCuenta(emailLower);
+    if (emailExiste)
+      return res.status(409).json({ error: 'El correo electrónico ya se encuentra registrado.', codigo: 'EMAIL_DUPLICADO' });
+
+    const password_hash = await bcrypt.hash(password, 12);
+    await linkWebAccount(paciente.paciente_id, { email_cuenta: emailLower, password_hash });
+
+    sendWelcomePatientEmail(emailLower, paciente.nombre).catch((err) =>
+      console.error('[authPatient.vincular] Correo de bienvenida falló:', err.message)
     );
 
-    if (existenteDoc) {
-      if (existenteDoc.estado_cuenta === 'ACTIVO') {
-        return res.status(409).json({ error: 'Este documento ya tiene una cuenta activa. Inicia sesión.' });
-      } else {
-        return res.status(409).json({ error: 'Este documento está registrado... vincúlala con tu registro existente.' });
-      }
-    }
+    await logAudit({
+      paciente_id: paciente.paciente_id,
+      accion:      'VINCULACION_CUENTA_WEB',
+      entidad:     'PACIENTE',
+      entidad_id:  paciente.paciente_id,
+      detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+      ip_origen:   req.ip,
+    });
 
-    // Verificamos correo
-    const [[existenteEmail]] = await conn.query(
-      'SELECT paciente_id FROM PACIENTE WHERE email_cuenta = ?',
-      [email_cuenta]
-    );
-
-    if (existenteEmail) {
+    return res.json({ message: 'Cuenta vinculada exitosamente. Ya puedes iniciar sesión.' });
+  } catch (err) {
+    console.error('[authPatient.vincular]', err.message);
+    if (err.code === 'ER_DUP_ENTRY')
       return res.status(409).json({ error: 'El correo electrónico ya se encuentra registrado.' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const [result] = await conn.query(
-      `INSERT INTO PACIENTE 
-       (nombre, apellido, tipo_documento, numero_documento, sexo, telefono, email_cuenta, password_hash, fecha_nacimiento, estado_cuenta, fecha_creacion_cuenta) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO', NOW())`,
-      [nombre, apellido, tipo_documento, numero_documento, sexo, telefono, email_cuenta, passwordHash, fecha_nacimiento]
-    );
-
-    await logAudit({
-      paciente_id: result.insertId,
-      accion: 'REGISTRO_WEB_PACIENTE',
-      ip_origen: req.ip
-    });
-
-    res.status(201).json({ message: 'Cuenta creada exitosamente.' });
-  } catch (error) {
-    console.error('[authPatient.register]', error.message);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  } finally {
-    if (conn) conn.release();
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
   }
 };
 
-const linkAccount = async (req, res) => {
-  const { tipo_documento, numero_documento, fecha_nacimiento, email_cuenta, password } = req.body;
-
-  if (!tipo_documento || !numero_documento || !fecha_nacimiento || !email_cuenta || !password) {
-    return res.status(400).json({ error: 'Complete todos los campos' });
-  }
-
-  let conn;
-  try {
-    conn = await pool.getConnection();
-
-    const [[paciente]] = await conn.query(
-      'SELECT paciente_id, fecha_nacimiento, estado_cuenta FROM PACIENTE WHERE tipo_documento = ? AND numero_documento = ?',
-      [tipo_documento, numero_documento]
-    );
-
-    if (!paciente) {
-      return res.status(404).json({ error: 'No se encontró registro para este documento' });
-    }
-
-    if (paciente.estado_cuenta === 'ACTIVO') {
-      return res.status(409).json({ error: 'Esta cuenta ya está vinculada y activa' });
-    }
-
-    // Comparar fecha de nacimiento (Solo año, mes, dia para no lidiar con T00:00:00Z de JS)
-    const dbDate = new Date(paciente.fecha_nacimiento).toISOString().split('T')[0];
-    const inputDate = new Date(fecha_nacimiento).toISOString().split('T')[0];
-
-    if (dbDate !== inputDate) {
-      return res.status(403).json({ error: 'Los datos no coinciden. Si tienes problemas, comunícate con el consultorio.' });
-    }
-
-    const [[existenteEmail]] = await conn.query(
-      'SELECT paciente_id FROM PACIENTE WHERE email_cuenta = ? AND paciente_id != ?',
-      [email_cuenta, paciente.paciente_id]
-    );
-
-    if (existenteEmail) {
-      return res.status(409).json({ error: 'El correo electrónico ya se encuentra registrado en otra cuenta.' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    await conn.query(
-      `UPDATE PACIENTE 
-       SET email_cuenta = ?, password_hash = ?, estado_cuenta = 'ACTIVO', fecha_creacion_cuenta = NOW() 
-       WHERE paciente_id = ?`,
-      [email_cuenta, passwordHash, paciente.paciente_id]
-    );
-
-    await logAudit({
-      paciente_id: paciente.paciente_id,
-      accion: 'VINCULACION_WEB_PACIENTE',
-      ip_origen: req.ip
-    });
-
-    res.json({ message: 'Cuenta vinculada y activada exitosamente.' });
-  } catch (error) {
-    console.error('[authPatient.link]', error.message);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  } finally {
-    if (conn) conn.release();
-  }
-};
-
-module.exports = { login, register, linkAccount };
+module.exports = { register, login, logout, preview, vincular };

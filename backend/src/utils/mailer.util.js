@@ -329,4 +329,89 @@ const sendComprobanteEmail = async (comp) => {
   });
 };
 
-module.exports = { sendActivationEmail, sendComprobanteEmail };
+// ─────────────────────────────────────────────────────────────────────────────
+// Correo de bienvenida al paciente tras su auto-registro en el portal web.
+// ─────────────────────────────────────────────────────────────────────────────
+const sendWelcomePatientEmail = async (to, nombre) => {
+  const portalUrl = process.env.PORTAL_URL || process.env.FRONTEND_URL || '';
+  const loginUrl  = `${portalUrl}/login`;
+
+  await transporter.sendMail({
+    from:    process.env.MAIL_FROM,
+    to,
+    subject: '¡Bienvenido al Consultorio Padre Pio!',
+    html: `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table width="520" cellpadding="0" cellspacing="0"
+               style="background:#ffffff;border-radius:12px;overflow:hidden;
+                      box-shadow:0 2px 8px rgba(0,0,0,.08);">
+
+          <!-- Header azul -->
+          <tr>
+            <td style="background:#0059B3;padding:28px 32px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.5px;">
+                Consultorio Padre Pio
+              </h1>
+              <p style="margin:4px 0 0;color:#b3d4ff;font-size:12px;letter-spacing:1px;text-transform:uppercase;">
+                Portal del Paciente
+              </p>
+            </td>
+          </tr>
+
+          <!-- Cuerpo -->
+          <tr>
+            <td style="padding:36px 32px 28px;">
+              <p style="margin:0 0 12px;font-size:16px;color:#1e293b;">
+                Hola, <strong>${nombre}</strong> 👋
+              </p>
+              <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+                Tu cuenta en el portal del paciente ha sido creada exitosamente.
+                Ya puedes iniciar sesión para reservar citas y consultar tu historial.
+              </p>
+
+              <!-- Botón -->
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+                <tr>
+                  <td style="background:#0059B3;border-radius:8px;">
+                    <a href="${loginUrl}"
+                       style="display:inline-block;padding:14px 32px;
+                              color:#ffffff;font-size:15px;font-weight:700;
+                              text-decoration:none;letter-spacing:.3px;">
+                      Iniciar sesión
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                Si no creaste esta cuenta, puedes ignorar este correo con total seguridad.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f8fafc;border-top:1px solid #e2e8f0;
+                       padding:16px 32px;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#94a3b8;">
+                © ${new Date().getFullYear()} Consultorio Padre Pio · Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+};
+
+module.exports = { sendActivationEmail, sendComprobanteEmail, sendWelcomePatientEmail };

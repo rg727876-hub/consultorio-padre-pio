@@ -27,8 +27,10 @@ const comprobanteRoutes  = require('./routes/comprobante.routes');
 const agendaRoutes       = require('./routes/agenda.routes');
 const auditRoutes        = require('./routes/audit.routes');
 const consultaRoutes     = require('./routes/consulta.routes');
-const historialRoutes    = require('./routes/historial.routes');
-const especialidadRoutes = require('./routes/especialidad.routes');
+const historialRoutes       = require('./routes/historial.routes');
+const especialidadRoutes    = require('./routes/especialidad.routes');
+const patientProfileRoutes  = require('./routes/patientProfile.routes');
+const familiarRoutes        = require('./routes/familiar.routes');
 
 const app = express();
 
@@ -84,6 +86,8 @@ app.use('/api/audit',        auditRoutes);
 app.use('/api/consultas',    consultaRoutes);
 app.use('/api/historial',    historialRoutes);
 app.use('/api/especialidades', especialidadRoutes);
+app.use('/api/patient',       patientProfileRoutes);
+app.use('/api/familiar',      familiarRoutes);
 
 // Manejo de errores
 app.use(errorHandler);
