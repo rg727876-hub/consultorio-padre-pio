@@ -2,7 +2,7 @@ const bcrypt       = require('bcryptjs');
 const pool         = require('../config/db');
 const { logAudit } = require('../utils/audit.util');
 
-const MAX_INTENTOS  = 5;
+const MAX_INTENTOS  = 3;
 const BLOQUEO_MIN   = 15;
 
 // ── GET /api/auth/activate/:token ────────────────────────────────
@@ -93,21 +93,25 @@ const verifyDni = async (req, res) => {
       const nuevos = intentosActuales + 1;
 
       if (nuevos >= MAX_INTENTOS) {
-        const bloqueadoHasta = new Date(Date.now() + BLOQUEO_MIN * 60 * 1000);
+        // Invalida el token de forma definitiva (expirándolo)
         await pool.execute(
-          'UPDATE USUARIO SET intentos_fallidos = 0, bloqueado_hasta = ? WHERE usuario_id = ?',
-          [bloqueadoHasta, t.usuario_id]
+          'UPDATE TOKEN_ACTIVACION SET fecha_expira = NOW() WHERE token_id = ?',
+          [t.token_id]
+        );
+        // Reseteamos los intentos para cuando le envíen un nuevo enlace
+        await pool.execute(
+          'UPDATE USUARIO SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE usuario_id = ?',
+          [t.usuario_id]
         );
         await logAudit({
           usuario_id: t.usuario_id,
-          accion:     'ACTIVACION_BLOQUEADO_TEMP',
+          accion:     'ACTIVACION_BLOQUEADO_DEFINITIVO',
           entidad:    'USUARIO',
           entidad_id: t.usuario_id,
-          detalles:   `Bloqueado ${BLOQUEO_MIN} min por ${MAX_INTENTOS} intentos fallidos`,
+          detalles:   `Token invalidado definitivamente por ${MAX_INTENTOS} intentos fallidos`,
         });
-        return res.status(429).json({
-          error:           `Demasiados intentos. Intenta de nuevo en ${BLOQUEO_MIN} minutos.`,
-          bloqueado_hasta: bloqueadoHasta.toISOString(),
+        return res.status(403).json({
+          error: 'Demasiados intentos fallidos. Solicita al administrador un nuevo enlace de activación.',
         });
       }
 

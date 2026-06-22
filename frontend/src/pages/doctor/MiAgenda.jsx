@@ -6,6 +6,7 @@ import {
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
+import { useAuth } from '../../hooks/useAuth';
 import { ESTADOS, estadoInfo, fmtFecha } from '../recepcion/citaEstados';
 
 const VISTAS = [
@@ -20,6 +21,7 @@ const ESTADOS_FILTRO = ['CONFIRMADA', 'ATENDIDA', 'NO_ASISTIO', 'CANCELADA'];
 
 export default function MiAgenda() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [citas,   setCitas]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +109,16 @@ export default function MiAgenda() {
     }
   };
 
+  const iniciarTurno = async () => {
+    try {
+      // Simular notificación al sistema / recepcion
+      await api.post('/doctors/inicio-turno');
+      toast.success('Recepcionista notificada. Buen turno!');
+    } catch (err) {
+      toast.error('Error al notificar inicio de turno.');
+    }
+  };
+
   const hayFiltros = (estado.length > 0 && !(estado.length === 1 && estado[0] === 'CONFIRMADA')) || fechaInicio || fechaFin;
 
   return (
@@ -115,9 +127,17 @@ export default function MiAgenda() {
         <div className="max-w-6xl mx-auto space-y-4">
 
           {/* Encabezado */}
-          <div className="mb-1">
-            <h1 className="text-xl font-bold text-[#0059B3]">Mi agenda</h1>
-            <p className="text-sm text-slate-500">Organiza tu jornada y revisa el flujo de pacientes</p>
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <h1 className="text-xl font-bold text-[#0059B3]">Mi agenda</h1>
+              <p className="text-sm text-slate-500">Organiza tu jornada y revisa el flujo de pacientes</p>
+            </div>
+            <button
+              onClick={iniciarTurno}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm"
+            >
+              Inicio de turno
+            </button>
           </div>
 
           {/* Tabs de vista */}

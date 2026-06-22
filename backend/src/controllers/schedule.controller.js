@@ -55,7 +55,7 @@ const create = async (req, res) => {
       [doctorIdNum, dia_semana, hora_fin, hora_inicio]
     );
     if (cnt > 0)
-      return res.status(409).json({ error: 'Este horario se superpone con uno ya existente para ese día' });
+      return res.status(409).json({ error: 'El horario ingresado se superpone con un bloque existente.' });
 
     const [result] = await pool.query(
       `INSERT INTO HORARIO (doctor_id, dia_semana, hora_inicio, hora_fin)
@@ -133,7 +133,7 @@ const update = async (req, res) => {
       [horario.doctor_id, dia_semana, id, hora_fin, hora_inicio]
     );
     if (overlapCnt > 0)
-      return res.status(409).json({ error: 'Este horario se superpone con uno ya existente para ese día' });
+      return res.status(409).json({ error: 'El horario ingresado se superpone con un bloque existente.' });
 
     await pool.query(
       `UPDATE HORARIO
