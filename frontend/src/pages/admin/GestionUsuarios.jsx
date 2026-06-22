@@ -28,10 +28,10 @@ export default function GestionUsuarios() {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        // Traer TODOS los usuarios (sin filtro de rol en URL)
-        const { data } = await api.get('/users');
+        // Traer TODOS los usuarios
+        const { data } = await api.get('/users', { params: { estado: 'TODOS' } });
         // Filtrar en el cliente: excluir doctores
-        const personal = data.filter(u => u.nombre_rol !== 'DOCTOR');
+        const personal = (data.data ?? []).filter(u => u.rol !== 'DOCTOR');
         setUsers(personal);
       } catch (err) {
         console.error('fetchUsers error', err);
@@ -60,7 +60,7 @@ export default function GestionUsuarios() {
         u.apellido?.toLowerCase().includes(term);
       
       // Filtro de Rol
-      const matchesRole = roleFilter === 'TODOS' || u.nombre_rol === roleFilter;
+      const matchesRole = roleFilter === 'TODOS' || u.rol === roleFilter;
       
       // Filtro de Estado
       const matchesStatus = statusFilter === 'TODOS' || u.estado === statusFilter;
@@ -234,7 +234,7 @@ export default function GestionUsuarios() {
                       <td className="px-6 py-4 text-slate-500">{u.email}</td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
-                          {u.nombre_rol || '—'}
+                          {u.rol || '—'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
