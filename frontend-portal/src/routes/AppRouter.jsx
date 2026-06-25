@@ -4,6 +4,7 @@ import RegisterPage    from '../pages/auth/RegisterPage';
 import LoginPage       from '../pages/auth/LoginPage';
 import VinculacionPage from '../pages/auth/VinculacionPage';
 import ProfilePage     from '../pages/profile/ProfilePage';
+import LandingPage     from '../pages/landing/LandingPage';
 
 function ProtectedRoute({ children }) {
   const { user } = usePatientAuth();
@@ -17,6 +18,12 @@ function PublicRoute({ children }) {
   return children;
 }
 
+function HomeRoute() {
+  const { user } = usePatientAuth();
+  if (user) return <Navigate to="/perfil" replace />;
+  return <LandingPage />;
+}
+
 export default function AppRouter() {
   return (
     <PatientAuthProvider>
@@ -25,8 +32,8 @@ export default function AppRouter() {
           <Route path="/login"     element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register"  element={<PublicRoute><RegisterPage /></PublicRoute>} />
           <Route path="/vincular"  element={<PublicRoute><VinculacionPage /></PublicRoute>} />
-          <Route path="/perfil"   element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/"         element={<Navigate to="/perfil" replace />} />
+          <Route path="/perfil"    element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/"          element={<HomeRoute />} />
           <Route path="*"         element={
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
               <div className="bg-white rounded-2xl shadow-md p-8 text-center max-w-md">
