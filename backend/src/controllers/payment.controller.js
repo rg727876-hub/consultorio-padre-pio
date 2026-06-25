@@ -134,7 +134,7 @@ const registerPayment = async (req, res) => {
     );
     if (existingPago) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({ error: 'Esta cita ya tiene un pago registrado' });
+      return res.status(409).json({ error: 'La cita seleccionada ya fue cancelada previamente.' });
     }
 
     // Insertar pago
