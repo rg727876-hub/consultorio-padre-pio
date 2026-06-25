@@ -1,6 +1,7 @@
 const {
   findByDoc, findTitularDoc, createPacienteFamiliar,
   findRelacion, createRelacion, marcarComoFamiliar, getFamiliares,
+  getFamiliarDetalle, desvincularRelacion, updateFamiliarInfo,
 } = require('../models/familiar.model');
 const { logAudit } = require('../utils/audit.util');
 
@@ -50,15 +51,133 @@ const listar = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/familiar/:id  — Detalle de un familiar (valida relación ACTIVA)
+// Registra en auditoría el acceso.
+// ─────────────────────────────────────────────────────────────────────────────
+const getDetalle = async (req, res) => {
+  const titular_id  = req.paciente.id;
+  const familiar_id = parseInt(req.params.id, 10);
+
+  if (!familiar_id || isNaN(familiar_id))
+    return res.status(400).json({ error: 'ID de familiar inválido' });
+
+  try {
+    const familiar = await getFamiliarDetalle(titular_id, familiar_id);
+    if (!familiar)
+      return res.status(404).json({ error: 'Familiar no encontrado o no vinculado a tu cuenta' });
+
+    await logAudit({
+      paciente_id: titular_id,
+      accion:      'ACCESO_PERFIL_FAMILIAR',
+      entidad:     'PACIENTE',
+      entidad_id:  familiar_id,
+      detalles:    JSON.stringify({ familiar_id, titular_id }),
+      ip_origen:   req.ip,
+    });
+
+    return res.json(familiar);
+  } catch (err) {
+    console.error('[familiar.getDetalle]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/familiar/:id  — Actualiza info de contacto de un familiar
+// Valida que el familiar tenga relación ACTIVA con el titular antes de editar.
+// ─────────────────────────────────────────────────────────────────────────────
+const actualizar = async (req, res) => {
+  const titular_id  = req.paciente.id;
+  const familiar_id = parseInt(req.params.id, 10);
+
+  if (!familiar_id || isNaN(familiar_id))
+    return res.status(400).json({ error: 'ID de familiar inválido' });
+
+  const { telefono, direccion, ocupacion, contacto_emergencia } = req.body;
+
+  // Validaciones
+  if (telefono) {
+    const tel = String(telefono).replace(/\D/g, '');
+    if (!RE_TELEFONO.test(tel))
+      return res.status(400).json({ error: 'El teléfono debe tener exactamente 9 dígitos numéricos' });
+  }
+
+  if (contacto_emergencia) {
+    const telEm = String(contacto_emergencia).replace(/\D/g, '');
+    if (!RE_TELEFONO.test(telEm))
+      return res.status(400).json({ error: 'El teléfono de emergencia debe tener exactamente 9 dígitos numéricos' });
+  }
+
+  try {
+    // Verificar relación activa antes de permitir edición
+    const familiar = await getFamiliarDetalle(titular_id, familiar_id);
+    if (!familiar)
+      return res.status(404).json({ error: 'Familiar no encontrado o no vinculado a tu cuenta' });
+
+    await updateFamiliarInfo(familiar_id, {
+      telefono:             telefono             ? String(telefono).replace(/\D/g, '')  : null,
+      direccion:            direccion            ? String(direccion).trim()              : null,
+      ocupacion:            ocupacion            ? String(ocupacion).trim()              : null,
+      contacto_emergencia:  contacto_emergencia  ? String(contacto_emergencia).replace(/\D/g, '') : null,
+    });
+
+    await logAudit({
+      paciente_id: titular_id,
+      accion:      'ACTUALIZACION_PERFIL_FAMILIAR',
+      entidad:     'PACIENTE',
+      entidad_id:  familiar_id,
+      detalles:    JSON.stringify({ familiar_id, campos: ['telefono','direccion','ocupacion','contacto_emergencia'] }),
+      ip_origen:   req.ip,
+    });
+
+    const actualizado = await getFamiliarDetalle(titular_id, familiar_id);
+    return res.json(actualizado);
+  } catch (err) {
+    console.error('[familiar.actualizar]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/familiar/:id/desvincular  — Desvincula al familiar del titular
+// Pone estado = 'INACTIVO' y registra fecha_desvinculacion.
+// Si el paciente no tiene otros titulares activos, permanece como FAMILIAR (huérfano).
+// ─────────────────────────────────────────────────────────────────────────────
+const desvincular = async (req, res) => {
+  const titular_id  = req.paciente.id;
+  const familiar_id = parseInt(req.params.id, 10);
+
+  if (!familiar_id || isNaN(familiar_id))
+    return res.status(400).json({ error: 'ID de familiar inválido' });
+
+  try {
+    // Verificar relación activa
+    const familiar = await getFamiliarDetalle(titular_id, familiar_id);
+    if (!familiar)
+      return res.status(404).json({ error: 'Familiar no encontrado o no vinculado a tu cuenta' });
+
+    const afectados = await desvincularRelacion(titular_id, familiar_id);
+    if (afectados === 0)
+      return res.status(409).json({ error: 'La relación ya estaba inactiva' });
+
+    await logAudit({
+      paciente_id: titular_id,
+      accion:      'DESVINCULACION_FAMILIAR',
+      entidad:     'PACIENTE_FAMILIAR',
+      entidad_id:  familiar_id,
+      detalles:    JSON.stringify({ familiar_id, titular_id, nombre: familiar.nombre, apellido: familiar.apellido }),
+      ip_origen:   req.ip,
+    });
+
+    return res.json({ message: 'Familiar desvinculado correctamente' });
+  } catch (err) {
+    console.error('[familiar.desvincular]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/familiar/registrar  — Registra o vincula un familiar
-//
-// Paso 1 (confirmar ausente o false):
-//   Valida todos los campos, busca en BD, maneja subcasos.
-//   Si B1 (SIN_CUENTA): devuelve 200 { requiere_confirmacion: true, candidato }
-//   para que el frontend muestre el modal de confirmación.
-//
-// Paso 2 (confirmar = true):
-//   Solo necesita parentesco + documento; vincula directamente (B1 confirmado).
 // ─────────────────────────────────────────────────────────────────────────────
 const registrar = async (req, res) => {
   const {
@@ -69,7 +188,6 @@ const registrar = async (req, res) => {
 
   const titular_id = req.paciente.id;
 
-  // ── Siempre obligatorios ──────────────────────────────────────────────────
   if (!parentesco || !tipo_documento || !numero_documento?.trim())
     return res.status(400).json({ error: 'Parentesco, tipo y número de documento son obligatorios' });
 
@@ -83,7 +201,6 @@ const registrar = async (req, res) => {
   if (!validarDocumento(tipo_documento, docLimpio))
     return res.status(400).json({ error: msgDocumento(tipo_documento) });
 
-  // ── Validaciones solo en el primer paso (cuando se crean datos nuevos) ────
   if (!confirmar) {
     if (!nombre?.trim() || !apellido?.trim() || !fecha_nacimiento || !sexo)
       return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' });
@@ -104,7 +221,6 @@ const registrar = async (req, res) => {
   }
 
   try {
-    // ── El familiar no puede tener el mismo documento que el titular ──────
     const titularDoc = await findTitularDoc(titular_id);
     if (
       titularDoc?.tipo_documento === tipo_documento &&
@@ -113,7 +229,6 @@ const registrar = async (req, res) => {
 
     const existente = await findByDoc(tipo_documento, docLimpio);
 
-    // ── CASO A: paciente no existe → crear nuevo con estado FAMILIAR ──────
     if (!existente) {
       const familiar_id = await createPacienteFamiliar({
         nombre:               String(nombre).trim().toUpperCase(),
@@ -136,7 +251,6 @@ const registrar = async (req, res) => {
       return res.status(201).json({ message: 'Familiar registrado correctamente' });
     }
 
-    // ── B3: relación activa ya existe con este titular ────────────────────
     const relExistente = await findRelacion(titular_id, existente.paciente_id);
     if (relExistente?.estado === 'ACTIVO')
       return res.status(409).json({
@@ -144,14 +258,12 @@ const registrar = async (req, res) => {
         codigo: 'YA_VINCULADO',
       });
 
-    // ── B2: paciente tiene cuenta web activa propia ───────────────────────
     if (existente.estado_cuenta === 'ACTIVO')
       return res.status(409).json({
         error: 'Este DNI ya tiene una cuenta web propia y no puede ser vinculado como familiar.',
         codigo: 'TIENE_CUENTA_ACTIVA',
       });
 
-    // ── B1: registrado presencialmente sin cuenta web ─────────────────────
     if (existente.estado_cuenta === 'SIN_CUENTA') {
       if (!confirmar) {
         return res.json({
@@ -163,7 +275,6 @@ const registrar = async (req, res) => {
           },
         });
       }
-      // Paso 2: confirmado por el titular
       await marcarComoFamiliar(existente.paciente_id);
       await createRelacion(titular_id, existente.paciente_id, parentesco);
       await logAudit({
@@ -177,7 +288,6 @@ const registrar = async (req, res) => {
       return res.json({ message: 'Familiar vinculado a tu cuenta correctamente' });
     }
 
-    // ── B4: ya es FAMILIAR de otro titular → permitir vinculación múltiple ─
     if (existente.estado_cuenta === 'FAMILIAR') {
       await createRelacion(titular_id, existente.paciente_id, parentesco);
       await logAudit({
@@ -202,4 +312,4 @@ const registrar = async (req, res) => {
   }
 };
 
-module.exports = { listar, registrar };
+module.exports = { listar, registrar, getDetalle, actualizar, desvincular };
