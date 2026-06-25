@@ -30,6 +30,7 @@ const consultaRoutes     = require('./routes/consulta.routes');
 const historialRoutes       = require('./routes/historial.routes');
 const especialidadRoutes    = require('./routes/especialidad.routes');
 const patientProfileRoutes  = require('./routes/patientProfile.routes');
+const familiarRoutes        = require('./routes/familiar.routes');
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use('/api/consultas',    consultaRoutes);
 app.use('/api/historial',    historialRoutes);
 app.use('/api/especialidades', especialidadRoutes);
 app.use('/api/patient',       patientProfileRoutes);
+app.use('/api/familiar',      familiarRoutes);
 
 // Manejo de errores
 app.use(errorHandler);

@@ -108,6 +108,16 @@ export default function RegistrarAtencion() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validación CP-42: Todos los campos en blanco
+    const isAllBlank = Object.values(form).every(v => !v || !String(v).trim());
+    if (isAllBlank) {
+      setErrors(['Registre al menos un campo de la atención antes de guardar.']);
+      toast.error('Registre al menos un campo de la atención antes de guardar.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const faltantes = OBLIGATORIOS
       .filter(([k]) => !form[k] || !form[k].trim())
       .map(([, label]) => label);
@@ -185,12 +195,20 @@ export default function RegistrarAtencion() {
                 {/* Alerta de faltantes (CA5) */}
                 {!bloqueado && errors.length > 0 && (
                   <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-                    <p className="flex items-center gap-2 font-semibold">
-                      <AlertTriangle size={16} /> Faltan campos obligatorios:
-                    </p>
-                    <ul className="mt-1.5 list-disc list-inside space-y-0.5">
-                      {errors.map((f) => <li key={f}>{f}</li>)}
-                    </ul>
+                    {errors.length === 1 && errors[0].includes('Registre al menos un campo') ? (
+                      <p className="flex items-center gap-2 font-semibold">
+                        <AlertTriangle size={16} /> {errors[0]}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="flex items-center gap-2 font-semibold">
+                          <AlertTriangle size={16} /> Faltan campos obligatorios:
+                        </p>
+                        <ul className="mt-1.5 list-disc list-inside space-y-0.5">
+                          {errors.map((f) => <li key={f}>{f}</li>)}
+                        </ul>
+                      </>
+                    )}
                   </div>
                 )}
 

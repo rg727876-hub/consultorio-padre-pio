@@ -81,7 +81,7 @@ const create = async (req, res) => {
     console.error('[service.create]', err.message);
 
     if (err.code === 'ER_DUP_ENTRY')
-      return res.status(409).json({ error: 'Ya existe un servicio con ese nombre' });
+      return res.status(409).json({ error: 'El nombre del servicio ya se encuentra registrado.' });
 
     if (err.code === 'ER_CHECK_CONSTRAINT_VIOLATED')
       return res.status(400).json({ error: 'La duración debe ser mayor a 0 y el tiempo de espera mayor o igual a 0' });
@@ -176,7 +176,7 @@ const update = async (req, res) => {
     console.error('[service.update]', err.message);
 
     if (err.code === 'ER_DUP_ENTRY')
-      return res.status(409).json({ error: 'Ya existe un servicio con ese nombre' });
+      return res.status(409).json({ error: 'El nombre del servicio ya se encuentra registrado.' });
 
     return res.status(500).json({
       error: 'Error interno del servidor',
