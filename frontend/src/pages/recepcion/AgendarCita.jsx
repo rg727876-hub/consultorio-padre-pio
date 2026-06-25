@@ -56,6 +56,18 @@ export default function AgendarCita() {
       .catch(() => toast.error('No se pudieron cargar los servicios'));
   }, []);
 
+  // ── Temporizador de Reserva (10 minutos) ─────────────────────
+  useEffect(() => {
+    if (!slot) return;
+
+    const timer = setTimeout(() => {
+      setSlot(null); // Libera el horario y regresa a la vista del calendario
+      toast.error('Tiempo de reserva expirado, seleccione otro horario.');
+    }, 10 * 60 * 1000);
+
+    return () => clearTimeout(timer);
+  }, [slot]);
+
   // ── Buscar paciente ──────────────────────────────────────────
   const handleSearch = async () => {
     if (busqueda.trim().length < 2) return;
