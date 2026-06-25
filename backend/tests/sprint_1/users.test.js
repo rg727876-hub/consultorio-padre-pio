@@ -124,40 +124,44 @@ describe('INT-HU003: Registrar nuevos usuarios', () => {
 
   describe('CP-05: Seguridad (Activación)', () => {
     // CP-05: Registrar nuevos usuarios - Seguridad (Activación)
-    it('Dado un nuevo usuario en el enlace de activación. Cuando falla al ingresar su DNI verificador 3 veces consecutivas. Entonces el sistema invalida el token de forma definitiva y muestra la alerta: "Demasiados intentos fallidos. Solicita al administrador un nuevo enlace de activación."', async () => {
+    it('Dado un nuevo usuario en el enlace de activación. Cuando falla al ingresar su DNI verificador 3 veces consecutivas. Entonces el sistema muestra el mensaje: "Demasiados intentos fallidos. Espere 15 minutos" y aplica un bloqueo temporal, preservando el token.', async () => {
       // Endpoint: POST /api/auth/activate/verify-dni
       
       const mockTokenUser = {
         token_id: 1,
         usuario_id: 5,
-        fecha_expira: new Date(Date.now() + 10000), // Válido
+        fecha_expira: new Date(Date.now() + 86400000), // Válido por 24 horas
         usado: false,
         dni_registrado: '12345678',
-        intentos_fallidos: 2, // El siguiente será el tercero
+        intentos_fallidos: 2, // El siguiente será el tercero y causará el bloqueo
         bloqueado_hasta: null
       };
 
       pool.query.mockResolvedValueOnce([[mockTokenUser]]);
-      pool.execute.mockResolvedValueOnce([]); // UPDATE TOKEN_ACTIVACION fecha_expira = NOW()
-      pool.execute.mockResolvedValueOnce([]); // UPDATE USUARIO intentos_fallidos = 0
-      pool.query.mockResolvedValueOnce([]); // AUDITORIA (si la hay) o solo execute
+      pool.execute.mockResolvedValueOnce([]); // UPDATE a intentos_fallidos y bloqueado_hasta
 
       const response = await request(app)
         .post('/api/auth/activate/verify-dni')
         .send({
           token: 'some_random_token',
-          DNI: '00000000' // DNI incorrecto
+          DNI: '00000000' // DNI incorrecto para forzar fallo
         });
 
-      expect(response.status).toBe(403);
-      expect(response.body.error).toContain('Demasiados intentos fallidos. Solicita al administrador un nuevo enlace de activación.');
+      // El status code recomendado para demasiados intentos/bloqueo es 429 (Too Many Requests) o 403 (Forbidden)
+      expect([403, 429]).toContain(response.status); 
+      expect(response.body.error).toContain('Demasiados intentos fallidos. Espere 15 minutos');
 
       const executeCalls = pool.execute.mock.calls;
-      expect(executeCalls[0][0]).toContain('UPDATE TOKEN_ACTIVACION');
-      expect(executeCalls[0][0]).toContain('fecha_expira = NOW()');
       
-      expect(executeCalls[1][0]).toContain('UPDATE USUARIO');
-      expect(executeCalls[1][0]).toContain('intentos_fallidos = 0');
+      // Asegurar que se haya realizado alguna query de actualización
+      expect(executeCalls.length).toBeGreaterThan(0);
+      
+      // Validar que se aplica un bloqueo temporal (seteando bloqueado_hasta)
+      const queryActualizacion = executeCalls[0][0];
+      expect(queryActualizacion).toContain('bloqueado_hasta');
+      
+      // Validar expresamente que NO se altera la fecha de expiración del token (se preserva validez)
+      expect(queryActualizacion).not.toContain('fecha_expira =');
     });
   });
 

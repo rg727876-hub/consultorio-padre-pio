@@ -65,7 +65,7 @@ describe('Consultas y Vistas de Citas (HU013, HU014, HU018)', () => {
     });
 
     // CP-16: Filtros combinados
-    it('Dado un recepcionista visualizando citas. Cuando selecciona filtros combinados (ej. Estado=Confirmada + Rango de Fechas). Entonces el sistema aplica todos los filtros en conjunto y actualiza la paginación según los resultados.', async () => {
+    it('CP-16: Dado un recepcionista visualizando citas. Cuando selecciona filtros combinados (ej. Estado=Confirmada + Rango de Fechas). Entonces el sistema aplica todos los filtros en conjunto y actualiza la paginación según los resultados.', async () => {
       mockConnection.query.mockResolvedValueOnce([[{ total: 5 }]]); 
       mockConnection.query.mockResolvedValueOnce([[{ total_global: 10 }]]); 
       mockConnection.query.mockResolvedValueOnce([[{ cita_id: 2, estado: 'CONFIRMADA' }]]); 
@@ -85,7 +85,7 @@ describe('Consultas y Vistas de Citas (HU013, HU014, HU018)', () => {
 
   describe('INT-HU014: Visualizar información completa de cita', () => {
     // CP-17: Restricción Clínica
-    it('CP-17: Dado un personal administrativo (recepcionista/cajero). Cuando abre el detalle completo de una cita. Entonces el sistema muestra toda la información administrativa y financiera, pero NO devuelve datos de antecedentes ni diagnóstico médico.', async () => {
+    it('CP-17: Dado un recepcionista visualizando una cita "Atendida". Cuando abre la vista de detalle integral. Entonces el sistema le permite ver solo metadatos financieros y operativos, restringiendo estrictamente la información clínica.', async () => {
       
       // 1. Cita y paciente
       mockConnection.query.mockResolvedValueOnce([[{ cita_id: 10, paciente_nombre: 'Ana' }]]);
@@ -107,9 +107,9 @@ describe('Consultas y Vistas de Citas (HU013, HU014, HU018)', () => {
     });
   });
 
-  describe('INT-HU018: Visualizar agenda de doctor con diferentes vistas', () => {
+  describe('INT-HU018: Agenda médica', () => {
     // CP-18: Privacidad Estricta
-    it('CP-18: Dado un médico ingresando a su módulo de agenda. Cuando el sistema solicita las citas programadas. Entonces el backend verifica el rol y solo devuelve las citas asignadas a su doctor_id, impidiendo ver agendas de otros colegas.', async () => {
+    it('CP-18: Dado un médico autenticado en su agenda. Cuando intenta buscar o visualizar citas. Entonces el sistema bloquea por completo el acceso a agendas de colegas, mostrando exclusivamente sus propios pacientes.', async () => {
       
       mockConnection.query.mockResolvedValueOnce([[{ cita_id: 99, doctor_id: 5 }]]); // Data
       mockConnection.query.mockResolvedValueOnce([]); // Auditoría

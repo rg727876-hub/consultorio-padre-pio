@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import ListaUsuarios from '../pages/admin/ListaUsuarios';
-import api from '../api/axios';
+import ListaUsuarios from '../../pages/admin/ListaUsuarios';
+import api from '../../api/axios';
 
 // Mockeamos el módulo axios y useAuth
-vi.mock('../api/axios');
-vi.mock('../hooks/useAuth', () => ({
+vi.mock('../../api/axios');
+vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, rol: 'ADMINISTRADOR', nombre: 'Admin' }, logout: vi.fn() })
 }));
 

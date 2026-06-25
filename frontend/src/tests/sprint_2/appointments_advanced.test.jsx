@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import ModalCancelarCita from '../components/appointments/ModalCancelarCita';
+import ModalCancelarCita from '../../components/appointments/ModalCancelarCita';
 
 describe('INT-HU015: Cancelar Cita - Modal de Advertencia', () => {
   it('CP-36: Dado un recepcionista en la ventana emergente de cancelación. Cuando selecciona "Volver" ante la pregunta Estás seguro de cancelar esta cita?" Entonces el sistema cierra la advertencia inmediatamente sin aplicar ningún cambio a la agenda.', async () => {

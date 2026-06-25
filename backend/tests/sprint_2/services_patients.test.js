@@ -90,7 +90,7 @@ describe('Gestión de Servicios y Pacientes (INT-HU009, INT-HU011)', () => {
 
   describe('INT-HU011: Gestión de pacientes', () => {
     // CP-34: Privacidad Roles
-    it('Dado un usuario con rol "Recepcionista". Cuando abre el perfil de un paciente. Entonces el sistema limita su vista solo a datos personales e historial de citas, sin devolver información clínica.', async () => {
+    it('CP-34: Dado un usuario con rol "Recepcionista". Cuando abre el perfil de un paciente. Entonces el sistema limita su vista solo a datos personales e historial de citas, sin devolver información clínica.', async () => {
       // Mock SELECT Paciente
       mockConnection.query.mockResolvedValueOnce([[{ paciente_id: 1, nombre: 'Ana' }]]);
       // Mock SELECT Citas

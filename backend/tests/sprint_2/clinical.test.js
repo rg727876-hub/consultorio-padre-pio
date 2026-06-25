@@ -123,15 +123,19 @@ describe('Módulo Clínico y Atención (INT-HU019, INT-HU020)', () => {
   });
 
   describe('INT-HU020: Historial Clínico', () => {
-    // CP-44: Privacidad Médica Estricta
-    it('CP-44: Dado un usuario interactuando con el sistema. Cuando su rol es diferente a "Doctor" o "Administrador e intenta abrir el historial clinico completo. Entonces el sistema valida los permisos y bloquea el acceso a la visualización médica por control de privacidad', async () => {
-      // Nota: Si el enrutador implementa middlewares de roles, la petición ni siquiera llega al controlador
-      const response = await request(app)
+    // CP-44: Seguridad (Accesos y Privilegios)
+    it('CP-44: Dado un usuario interactuando con el sistema. Cuando su rol es diferente a "Doctor" (incluyendo explícitamente a los usuarios con el rol de "Administrador") e intenta abrir el historial clínico completo. Entonces el sistema valida los permisos y bloquea el acceso a la visualización médica por control de privacidad, arrojando un código HTTP 403 (Prohibido). Se garantiza que los administradores no tengan acceso a datos sanitarios que carecen de pertinencia administrativa.', async () => {
+      // Intento como Recepcionista
+      const resRecep = await request(app)
         .get('/api/historial/paciente/1')
         .set('Authorization', recepcionistaToken);
+      expect(resRecep.status).toBe(403);
 
-      // Verificamos que sea Forbidden (403) devuelto por el middleware 'authorizeRoles'
-      expect(response.status).toBe(403);
+      // Intento explícito como Administrador
+      const resAdmin = await request(app)
+        .get('/api/historial/paciente/1')
+        .set('Authorization', adminToken);
+      expect(resAdmin.status).toBe(403);
     });
 
     it('Dado un doctor. Cuando visualiza el historial clínico detallado. Entonces el sistema le permite acceso y audita la visualización.', async () => {

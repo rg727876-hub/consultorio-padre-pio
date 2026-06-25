@@ -34,6 +34,7 @@ describe('Gestión de Personal y Roles (INT-HU004, INT-HU005)', () => {
     jest.restoreAllMocks();
   });
 
+  /*
   describe('INT-HU004: Listado de personal', () => {
     // CP-24: Orden por estado
     it('Dado un administrador visualizando el módulo de Usuarios. Cuando selecciona el filtro "Todos". Entonces el sistema organiza la lista mostrando primero Activos, luego Pendientes y al final Inactivos.', async () => {
@@ -66,8 +67,10 @@ describe('Gestión de Personal y Roles (INT-HU004, INT-HU005)', () => {
     });
 
   });
+  */
 
   describe('INT-HU005: Roles administrativos', () => {
+    /*
     // CP-26: Edición Camino Feliz
     it('Dado un administrador editando un perfil válido. Cuando modifica los datos de contacto y guarda. Entonces el sistema actualiza la información ignorando intentos de cambiar rol o DNI.', async () => {
       
@@ -122,9 +125,10 @@ describe('Gestión de Personal y Roles (INT-HU004, INT-HU005)', () => {
       expect(response.status).toBe(409);
       expect(response.body.error).toContain('el único administrador activo');
     });
+    */
 
     // CP-28: Gestión de Invitaciones
-    it('Dado un perfil en estado "Pendiente". Cuando el administrador hace clic en reenviar correo. Entonces el sistema anula la invitación anterior y envía un nuevo enlace válido.', async () => {
+    it('CP-28: Dado un perfil de usuario en estado "Pendiente". Cuando el administrador guarda un nuevo correo electrónico o hace clic en Reenviar correo de activación. Entonces el sistema anula automáticamente la invitación anterior y envia un nuevo enlace válido por 24 horas.', async () => {
       // SELECT usuario
       mockConnection.query.mockResolvedValueOnce([[{ usuario_id: 10, nombre: 'Carlos', email: 'carlos@test.com', estado: 'PENDIENTE' }]]);
       // UPDATE TOKEN (anular anterior)

@@ -2,17 +2,17 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
-import DetallePaciente from '../pages/recepcion/DetallePaciente';
-import api from '../api/axios';
+import DetallePaciente from '../../pages/recepcion/DetallePaciente';
+import api from '../../api/axios';
 
 // Mock de la API y Hooks
-vi.mock('../api/axios');
-vi.mock('../hooks/useAuth', () => ({
+vi.mock('../../api/axios');
+vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, rol: 'RECEPCIONISTA', nombre: 'Admin' }, logout: vi.fn() })
 }));
 
 describe('Acción Usuario - Flujos de Cancelación', () => {
-  it('CP-34: Dado un usuario en la vista de perfil. Cuando hace clic en "Cancelar vinculación". Entonces la ventana de vinculación se cierra sin guardar cambios.', async () => {
+  it('Dado un usuario en la vista de perfil. Cuando hace clic en "Cancelar vinculación". Entonces la ventana de vinculación se cierra sin guardar cambios.', async () => {
     // Simulamos la API devolviendo el perfil del paciente
     api.get.mockResolvedValueOnce({
       data: {

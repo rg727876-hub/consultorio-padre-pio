@@ -15,7 +15,7 @@ describe('INT-HU012: Crear Cita - Tareas Automáticas', () => {
     jest.clearAllMocks();
   });
 
-  it('CP-14: Dado una cita confirmada bajo la modalidad "Pagar después. Cuando transcurre 1 hora sin registrarse el pago en caja. Entonces el sistema caduca automáticamente la cita y el horario regresa a estar libre.', async () => {
+  it('CP-14: Dado una cita en estado "Reservada" bajo la modalidad "Pagar después". Cuando transcurren 20 minutos sin registrarse el pago en caja. Entonces el sistema cambia su estado automáticamente a "Expirada" y el horario regresa a estar libre.', async () => {
     // Simulamos que la query de actualización devuelve affectedRows > 0
     pool.execute.mockResolvedValue([{ affectedRows: 1 }]);
 

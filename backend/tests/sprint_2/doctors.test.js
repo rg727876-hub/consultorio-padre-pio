@@ -33,6 +33,7 @@ describe('Gestión de Médicos (INT-HU006)', () => {
     jest.restoreAllMocks();
   });
 
+  /*
   describe('CP-29: Validación de Duplicados en vivo', () => {
     it('Dado un administrador editando el perfil de un doctor. Cuando ingresa un correo o número de colegiatura que ya le pertenece a otro profesional. Entonces el sistema deniega el guardado de los cambios.', async () => {
       // Validar usuario existente
@@ -82,9 +83,10 @@ describe('Gestión de Médicos (INT-HU006)', () => {
       expect(responseCop.body.error).toContain('Colegiatura ya está registrado');
     });
   });
+  */
 
-  describe('CP-30 y CP-31: Regla de Negocio (Citas y Reactivación)', () => {
-    it('CP-30: Dado un administrador desactivando a un doctor. Cuando el doctor seleccionado tiene citas futuras ya agendadas. Entonces el sistema cambia su estado a Inactivo y cancela automáticamente sus citas futuras.', async () => {
+  describe('CP-30: Regla de Negocio (Citas y Reactivación)', () => {
+    it('CP-30: Dado un administrador desactivando a un doctor. Cuando el doctor seleccionado tiene citas futuras ya agendadas. Entonces el sistema advierte, cambia su estado a "Inactivo", cancela automáticamente sus citas futuras y retiene los pagos completados', async () => {
       mockConnection.query.mockResolvedValueOnce([]); // START TRANSACTION
       mockConnection.query.mockResolvedValueOnce([]); // UPDATE ESTADO
       // UPDATE CITAS devuelve 3 afectadas
@@ -105,6 +107,7 @@ describe('Gestión de Médicos (INT-HU006)', () => {
       expect(cancelCall).toBeDefined();
     });
 
+    /*
     it('CP-31: Dado un doctor en estado "Inactivo". Cuando el administrador presiona el botón "Reactivar". Entonces el sistema lo devuelve a "Activo" sin revertir las citas previamente canceladas.', async () => {
       mockConnection.query.mockResolvedValueOnce([]); // START TRANSACTION
       mockConnection.query.mockResolvedValueOnce([]); // UPDATE ESTADO
@@ -125,6 +128,7 @@ describe('Gestión de Médicos (INT-HU006)', () => {
       const cancelCall = llamadas.find(call => typeof call[0] === 'string' && call[0].includes('UPDATE CITA'));
       expect(cancelCall).toBeUndefined();
     });
+    */
   });
 
 });

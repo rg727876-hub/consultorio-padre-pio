@@ -58,7 +58,7 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
       expect(response.body.user.nombre).toBe('Maria');
     });
 
-    it('Bloqueo de cuenta tras 5 intentos fallidos', async () => {
+    it('CP-56: Dado un paciente intentando acceder a su cuenta, cuando acumula exactamente 5 intentos fallidos consecutivos. Entonces el sistema bloquea temporalmente la cuenta por 15 minutos y muestra la alerta con el tiempo restante.', async () => {
       const mockPatient = {
         paciente_id: 2,
         estado_cuenta: 'ACTIVO',
@@ -82,10 +82,10 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
         });
 
       expect(response.status).toBe(403);
-      expect(response.body.error).toContain('Demasiados intentos fallidos');
+      expect(response.body.error).toContain('Cuenta bloqueada temporalmente. Intente nuevamente en 15 minutos.');
     });
 
-    it('Validación - Datos en blanco', async () => {
+    it('CP-54: Dado un paciente en el formulario de acceso web, cuando intenta ingresar dejando algún dato en blanco. Entonces el sistema detiene el proceso y muestra la alerta: "Complete todos los campos."', async () => {
       const response = await request(app)
         .post('/api/auth/patient/login')
         .send({
@@ -95,10 +95,10 @@ describe('Portal del Paciente - Autenticación y Vinculación', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('credenciales');
+      expect(response.body.error).toBe('Complete todos los campos.');
     });
 
-    it('Antifraude - Mensaje genérico', async () => {
+    it('CP-55: Dado un usuario en el login, cuando ingresa credenciales erróneas o no existe en el sistema. Entonces el sistema bloquea el ingreso y muestra el mensaje genérico: "Documento o contraseña incorrectos." para evitar dar pistas.', async () => {
       // Usuario no existe
       pool.query.mockResolvedValueOnce([[]]); 
 

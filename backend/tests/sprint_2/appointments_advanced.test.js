@@ -135,11 +135,13 @@ describe('Gestión Avanzada de Citas (INT-HU015, INT-HU016, INT-HU017)', () => {
   });
 
   describe('INT-HU017: Horario del doctor (Sincronización)', () => {
-    // CP-41: Sincronización (Agenda en vivo)
-    it('CP-41: Dado un recepcionista visualizando la agenda diaria. Cuando un paciente cancela o reserva una cita desde el portal web en ese mismo instante. Entonces el sistema actualiza la interfaz de la agenda de forma automática y en tiempo real sin requerir refrescar la página.', async () => {
+    // CP-41: Sincronización y Actualización de Estado (Polling / Manual)
+    it('CP-41: Dado un recepcionista visualizando la agenda diaria. Cuando un paciente cancela o reserva una cita desde el portal web en ese mismo instante. Entonces el sistema refleja los cambios mediante actualización manual o sondeo asíncrono periódico (polling) vía HTTP, descartando WebSockets.', async () => {
       mockConnection.query.mockResolvedValueOnce([[{ cita_id: 1, estado: 'CONFIRMADA' }]]); // DATA
       mockConnection.query.mockResolvedValueOnce([]); // AUDITORIA
 
+      // Simulación de la solicitud HTTP GET (Axios) que realiza el Frontend
+      // ya sea de forma manual (refresh) o vía polling periódico.
       const response = await request(app)
         .get('/api/appointments/agenda?vista=hoy')
         .set('Authorization', doctorToken);

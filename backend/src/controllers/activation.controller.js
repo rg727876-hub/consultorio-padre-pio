@@ -93,25 +93,25 @@ const verifyDni = async (req, res) => {
       const nuevos = intentosActuales + 1;
 
       if (nuevos >= MAX_INTENTOS) {
-        // Invalida el token de forma definitiva (expirándolo)
+        // Aplica un bloqueo temporal (ej. 15 minutos) sin invalidar el token original
+        const fechaBloqueo = new Date();
+        fechaBloqueo.setMinutes(fechaBloqueo.getMinutes() + BLOQUEO_MIN);
+
         await pool.execute(
-          'UPDATE TOKEN_ACTIVACION SET fecha_expira = NOW() WHERE token_id = ?',
-          [t.token_id]
+          'UPDATE USUARIO SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE usuario_id = ?',
+          [nuevos, fechaBloqueo, t.usuario_id]
         );
-        // Reseteamos los intentos para cuando le envíen un nuevo enlace
-        await pool.execute(
-          'UPDATE USUARIO SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE usuario_id = ?',
-          [t.usuario_id]
-        );
+        
         await logAudit({
           usuario_id: t.usuario_id,
-          accion:     'ACTIVACION_BLOQUEADO_DEFINITIVO',
+          accion:     'ACTIVACION_BLOQUEO_TEMPORAL',
           entidad:    'USUARIO',
           entidad_id: t.usuario_id,
-          detalles:   `Token invalidado definitivamente por ${MAX_INTENTOS} intentos fallidos`,
+          detalles:   `Bloqueo temporal de ${BLOQUEO_MIN} minutos por ${MAX_INTENTOS} intentos fallidos`,
         });
-        return res.status(403).json({
-          error: 'Demasiados intentos fallidos. Solicita al administrador un nuevo enlace de activación.',
+        
+        return res.status(429).json({
+          error: `Demasiados intentos fallidos. Espere ${BLOQUEO_MIN} minutos`,
         });
       }
 

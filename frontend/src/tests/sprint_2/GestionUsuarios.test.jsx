@@ -10,12 +10,12 @@ vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, rol: 'ADMINISTRADOR', nombre: 'Admin' }, logout: vi.fn() })
 }));
 
-describe('INT-HU024: Filtros UI y Ordenamiento', () => {
+describe('INT-HU004: Listado de personal (UI y Filtros)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('CP-24: Dado un administrador en la lista de usuarios. Cuando el sistema carga la tabla y el filtro está en "Todos los estados". Entonces el sistema ordena jerárquicamente a los usuarios: primero "ACTIVOS", luego "PENDIENTES" y al final "INACTIVOS".', async () => {
+  it('CP-24: Dado un administrador visualizando el módulo de Usuarios. Cuando selecciona el filtro por estado "Todos". Entonces el sistema organiza la lista mostrando primero los Activos, luego los Pendientes con indicador, y al final los Inactivos con diseño opaco.', async () => {
     
     // Devolvemos usuarios desordenados
     const mockUsers = [
