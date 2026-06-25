@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getProfile, updateProfile } from '../../services/patientProfile.service';
 import { usePatientAuth } from '../../context/PatientAuthContext';
+import FamiliaresTab from '../familiares/FamiliaresTab';
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 const calcEdad = (fechaNac) => {
@@ -342,9 +343,12 @@ export default function ProfilePage() {
 
         {/* ── FAMILIARES ── */}
         {activeTab === 'familiares' && (
-          <div className="bg-white rounded-xl shadow-sm p-10 text-center text-muted text-sm">
-            La gestión de familiares estará disponible próximamente (HU010)
-          </div>
+          <FamiliaresTab
+            onSuccess={(msg) => {
+              setSuccessMsg(msg);
+              setTimeout(() => setSuccessMsg(null), 4000);
+            }}
+          />
         )}
 
         {/* ── RESERVAR UNA CITA ── */}
