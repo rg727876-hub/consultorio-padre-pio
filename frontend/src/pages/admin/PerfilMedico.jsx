@@ -41,8 +41,19 @@ export default function PerfilMedico() {
   const fetchUserProfile = async () => {
     try {
       const { data } = await api.get(`/users/${id}`);
+      // Normalizar nroColegiatura: puede venir como número INT desde MySQL
+      const copStr = data.nroColegiatura != null ? String(data.nroColegiatura) : '';
+      // Normalizar especialidadesIds: puede venir como string separado por comas o array
+      let espIds = [];
+      if (Array.isArray(data.especialidadesIds)) {
+        espIds = data.especialidadesIds;
+      } else if (typeof data.especialidadesIds === 'string' && data.especialidadesIds) {
+        espIds = data.especialidadesIds.split(',').map(Number).filter(Boolean);
+      }
       setDoctor({
         ...data,
+        nroColegiatura: copStr,
+        especialidadesIds: espIds,
         servicios: data.servicios || [],
         horarios: data.horarios || [],
         citasFuturas: data.citasFuturas || 0,
@@ -54,8 +65,8 @@ export default function PerfilMedico() {
         email: data.email || '',
         telefono: data.telefono || '',
         direccion: data.direccion || '',
-        especialidadesIds: data.especialidadesIds || [],
-        nroColegiatura: data.nroColegiatura || '',
+        especialidadesIds: espIds,
+        nroColegiatura: copStr,
         serviciosIds: data.servicios?.map(s => s.servicio_id) || []
       });
       return true;
@@ -69,7 +80,11 @@ export default function PerfilMedico() {
     try {
       setLoading(true);
       const { data } = await api.get(`/doctors/${id}/profile`);
-      setDoctor(data);
+      // Normalizar nroColegiatura: MySQL devuelve INT como número JS
+      const copStr = data.nroColegiatura != null ? String(data.nroColegiatura) : '';
+      const espIds = Array.isArray(data.especialidadesIds) ? data.especialidadesIds : [];
+      const normalizedData = { ...data, nroColegiatura: copStr, especialidadesIds: espIds };
+      setDoctor(normalizedData);
       setAudit(data.auditoria || []);
       setForm({
         nombre: data.nombre || '',
@@ -77,14 +92,15 @@ export default function PerfilMedico() {
         email: data.email || '',
         telefono: data.telefono || '',
         direccion: data.direccion || '',
-        especialidadesIds: data.especialidadesIds || [],
-        nroColegiatura: data.nroColegiatura || '',
+        especialidadesIds: espIds,
+        nroColegiatura: copStr,
         serviciosIds: data.servicios?.map(s => s.servicio_id) || []
       });
     } catch (err) {
+      console.error('[PerfilMedico.fetchProfile] Error:', err.response?.data || err.message);
       const loaded = await fetchUserProfile();
       if (loaded) {
-        console.warn('[PerfilMedico.fetchProfile] doctor profile failed, fallback loaded user profile', err.response?.data || err.message);
+        console.warn('[PerfilMedico.fetchProfile] fallback al perfil de usuario');
         return;
       }
 
@@ -599,12 +615,16 @@ export default function PerfilMedico() {
 }
 
 function DetailItem({ icon, label, value }) {
+  // Asegurar que el valor se convierte a string para evitar que números 0 o null no se rendericen
+  const displayValue = value != null && value !== '' ? String(value) : null;
   return (
     <div>
       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
         <span className="text-slate-400">{icon}</span> {label}
       </p>
-      <p className="text-sm font-medium text-slate-800">{value}</p>
+      <p className="text-sm font-medium text-slate-800">
+        {displayValue ?? <span className="text-slate-400 italic">No registrado</span>}
+      </p>
     </div>
   );
 }
