@@ -62,23 +62,66 @@ const marcarComoFamiliar = async (paciente_id) => {
   );
 };
 
-// Lista familiares activos del titular
+// Lista familiares activos del titular — ordenados por vinculación más reciente primero
 const getFamiliares = async (titular_id) => {
   const [rows] = await pool.query(
     `SELECT p.paciente_id, p.nombre, p.apellido,
             p.tipo_documento, p.numero_documento,
             p.fecha_nacimiento, p.sexo,
-            pf.relacion_id, pf.parentesco
+            pf.relacion_id, pf.parentesco, pf.fecha_vinculacion
      FROM   PACIENTE_FAMILIAR pf
      JOIN   PACIENTE p ON p.paciente_id = pf.familiar_id
      WHERE  pf.titular_id = ? AND pf.estado = 'ACTIVO'
-     ORDER  BY p.nombre, p.apellido`,
+     ORDER  BY pf.fecha_vinculacion DESC`,
     [titular_id]
   );
   return rows;
 };
 
+// Devuelve el perfil completo de un familiar validando relación ACTIVA con el titular
+const getFamiliarDetalle = async (titular_id, familiar_id) => {
+  const [[row]] = await pool.query(
+    `SELECT p.paciente_id, p.nombre, p.apellido,
+            p.tipo_documento, p.numero_documento, p.fecha_nacimiento,
+            p.sexo, p.telefono, p.direccion, p.ocupacion, p.contacto_emergencia,
+            pf.relacion_id, pf.parentesco, pf.fecha_vinculacion
+     FROM   PACIENTE_FAMILIAR pf
+     JOIN   PACIENTE p ON p.paciente_id = pf.familiar_id
+     WHERE  pf.titular_id = ? AND pf.familiar_id = ? AND pf.estado = 'ACTIVO'`,
+    [titular_id, familiar_id]
+  );
+  return row ?? null;
+};
+
+// Desvincula un familiar: marca la relación como INACTIVO y registra fecha
+const desvincularRelacion = async (titular_id, familiar_id) => {
+  const [result] = await pool.query(
+    `UPDATE PACIENTE_FAMILIAR
+     SET estado = 'INACTIVO', fecha_desvinculacion = NOW()
+     WHERE  titular_id = ? AND familiar_id = ? AND estado = 'ACTIVO'`,
+    [titular_id, familiar_id]
+  );
+  return result.affectedRows;
+};
+
+// Actualiza info de contacto de un familiar (teléfono, dirección, ocupación, emergencia)
+const updateFamiliarInfo = async (familiar_id, data) => {
+  await pool.query(
+    `UPDATE PACIENTE
+     SET telefono = ?, direccion = ?, ocupacion = ?, contacto_emergencia = ?
+     WHERE paciente_id = ?`,
+    [
+      data.telefono           ?? null,
+      data.direccion          ?? null,
+      data.ocupacion          ?? null,
+      data.contacto_emergencia ?? null,
+      familiar_id,
+    ]
+  );
+};
+
 module.exports = {
   findByDoc, findTitularDoc, createPacienteFamiliar,
-  findRelacion, createRelacion, marcarComoFamiliar, getFamiliares,
+  findRelacion, createRelacion, marcarComoFamiliar,
+  getFamiliares, getFamiliarDetalle, desvincularRelacion, updateFamiliarInfo,
 };
