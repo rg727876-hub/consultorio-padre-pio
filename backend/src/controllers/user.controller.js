@@ -250,7 +250,7 @@ const getById = async (req, res) => {
     const [[user]] = await pool.query(
       `SELECT u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono,
               u.direccion, u.estado, u.fecha_registro,
-              d.nroColegiatura,
+              CAST(d.nroColegiatura AS CHAR) AS nroColegiatura,
               ${SUB_ROL} AS rol,
               ${SUB_ESP} AS especialidad
        FROM   USUARIO u
