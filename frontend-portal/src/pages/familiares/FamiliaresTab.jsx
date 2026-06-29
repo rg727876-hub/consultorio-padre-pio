@@ -580,7 +580,7 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
     setLoading(true); setListError(null);
     try {
       const { data } = await getFamiliares();
-      setFamiliares(data.familiares ?? []);
+      setFamiliares(Array.isArray(data?.familiares) ? data.familiares : []);
     } catch {
       setListError('No se pudo cargar la lista de familiares.');
     } finally {
