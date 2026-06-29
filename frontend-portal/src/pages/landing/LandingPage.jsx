@@ -94,12 +94,12 @@ export default function LandingPage() {
 
   useEffect(() => {
     getServiciosPublicos()
-      .then(({ data }) => setServicios(data))
+      .then(({ data }) => setServicios(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoadingSvc(false));
 
     getDoctoresPublicos()
-      .then(({ data }) => setDoctores(data))
+      .then(({ data }) => setDoctores(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoadingDoc(false));
   }, []);
