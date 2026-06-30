@@ -60,7 +60,6 @@ const MODULOS = {
       icon: BarChart2,
       color: 'bg-purple-50 text-purple-600',
       ruta: '/admin/reportes',
-      proximamente: true,
     },
   ],
   RECEPCIONISTA: [
