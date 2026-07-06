@@ -190,7 +190,10 @@ export default function DashboardReportes() {
         kpis:     resumen.kpis,
         pagos,
         perdidas,
-        pacientes: pacientesDetalle,
+        pacientes:            pacientesDetalle,
+        topDoctores,
+        topPacientes,
+        metodosDistribucion,
       };
       if (tipo === 'pdf')   await exportarPDF(payload);
       if (tipo === 'excel') await exportarExcel(payload);
