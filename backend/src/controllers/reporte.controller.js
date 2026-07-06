@@ -18,6 +18,14 @@ const { logAudit } = require('../utils/audit.util');
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const UMBRAL_FIDELIZACION = 30; // % por debajo del cual se dispara la alerta
 
+// Perú es UTC-5 (sin DST). Todas las columnas DATETIME están en UTC en BD,
+// así que las convertimos a Perú antes de comparar/agrupar por fecha.
+// De lo contrario un pago hecho a las 21:00 hora Perú (02:00 UTC del día
+// siguiente) aparecería en el día equivocado en filtros y gráficas.
+const TZ_PERU  = "'-05:00'";
+const TZ_UTC   = "'+00:00'";
+const A_PERU   = (col) => `CONVERT_TZ(${col}, ${TZ_UTC}, ${TZ_PERU})`;
+
 const getResumen = async (req, res) => {
   const { fecha_inicio, fecha_fin } = req.query;
 
@@ -36,7 +44,7 @@ const getResumen = async (req, res) => {
       `SELECT COALESCE(SUM(monto_total), 0) AS total
          FROM PAGO
         WHERE estado = 'COMPLETADO'
-          AND DATE(fecha_pago) BETWEEN ? AND ?`,
+          AND DATE(${A_PERU('fecha_pago')}) BETWEEN ? AND ?`,
       [fecha_inicio, fecha_fin],
     );
 
@@ -136,7 +144,7 @@ const getPagos = async (req, res) => {
          INNER JOIN PACIENTE pac ON pac.paciente_id = c.paciente_id
          INNER JOIN SERVICIO s   ON s.servicio_id   = c.servicio_id
         WHERE pg.estado = 'COMPLETADO'
-          AND DATE(pg.fecha_pago) BETWEEN ? AND ?
+          AND DATE(${A_PERU('pg.fecha_pago')}) BETWEEN ? AND ?
         ORDER BY pg.fecha_pago DESC`,
       [fecha_inicio, fecha_fin],
     );
@@ -260,10 +268,10 @@ const getNuevosPacientes = async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      `SELECT DATE_FORMAT(fecha_registro, ?) AS periodo,
+      `SELECT DATE_FORMAT(${A_PERU('fecha_registro')}, ?) AS periodo,
               COUNT(*) AS total
          FROM PACIENTE
-        WHERE DATE(fecha_registro) BETWEEN ? AND ?
+        WHERE DATE(${A_PERU('fecha_registro')}) BETWEEN ? AND ?
         GROUP BY periodo
         ORDER BY periodo ASC`,
       [formato, fecha_inicio, fecha_fin],
@@ -329,11 +337,11 @@ const getIngresosMensuales = async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      `SELECT DATE_FORMAT(fecha_pago, ?) AS periodo,
+      `SELECT DATE_FORMAT(${A_PERU('fecha_pago')}, ?) AS periodo,
               COALESCE(SUM(monto_total), 0) AS total
          FROM PAGO
         WHERE estado = 'COMPLETADO'
-          AND DATE(fecha_pago) BETWEEN ? AND ?
+          AND DATE(${A_PERU('fecha_pago')}) BETWEEN ? AND ?
         GROUP BY periodo
         ORDER BY periodo ASC`,
       [formato, fecha_inicio, fecha_fin],
@@ -372,7 +380,7 @@ const getPacientesDetalle = async (req, res) => {
           p.sexo,
           p.estado_cuenta
          FROM PACIENTE p
-        WHERE DATE(p.fecha_registro) BETWEEN ? AND ?
+        WHERE DATE(${A_PERU('p.fecha_registro')}) BETWEEN ? AND ?
         ORDER BY p.fecha_registro DESC`,
       [fecha_inicio, fecha_fin],
     );
