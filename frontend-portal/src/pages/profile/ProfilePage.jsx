@@ -8,6 +8,7 @@ import {
 import { getProfile, updateProfile } from '../../services/patientProfile.service';
 import { usePatientAuth } from '../../context/PatientAuthContext';
 import FamiliaresTab from '../familiares/FamiliaresTab';
+import HistorialClinico from '../../components/HistorialClinico';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const INFO = {
@@ -54,7 +55,7 @@ const isDirty = (f, o) =>
   f.contacto_emergencia.replace(/\D/g, '') !== o.contacto_emergencia;
 
 // ── Acordeón ──────────────────────────────────────────────────────────────────
-function Accordion({ id, label, hu, open, onToggle }) {
+function Accordion({ id, label, hu, open, onToggle, children }) {
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm">
       <button
@@ -68,8 +69,10 @@ function Accordion({ id, label, hu, open, onToggle }) {
           : <ChevronDown size={16} className="text-slate-400" />}
       </button>
       {open && (
-        <div className="px-5 py-8 bg-slate-50 border-t border-slate-100 text-center">
-          <p className="text-sm text-slate-400 italic">Disponible próximamente ({hu})</p>
+        <div className="px-5 py-5 bg-slate-50 border-t border-slate-100">
+          {children ?? (
+            <p className="text-sm text-slate-400 italic text-center py-3">Disponible próximamente ({hu})</p>
+          )}
         </div>
       )}
     </div>
@@ -504,7 +507,11 @@ export default function ProfilePage() {
                         {...acc}
                         open={openAccordions.has(acc.id)}
                         onToggle={toggleAccordion}
-                      />
+                      >
+                        {acc.id === 'historial' && openAccordions.has('historial') && (
+                          <HistorialClinico pacienteId={profile.paciente_id} />
+                        )}
+                      </Accordion>
                     ))}
                   </div>
                 </div>

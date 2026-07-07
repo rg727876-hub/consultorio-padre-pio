@@ -8,6 +8,7 @@ import {
   getFamiliares, registrarFamiliar,
   getFamiliarDetalle, updateFamiliar, desvincularFamiliar,
 } from '../../services/patientFamily.service';
+import HistorialClinico from '../../components/HistorialClinico';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const PARENTESCOS = [
@@ -128,8 +129,8 @@ const sel = (err) =>
 const readonlyCls =
   'w-full border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-400 cursor-not-allowed';
 
-// ── Acordeón (placeholder HU004 / HU005) ────────────────────────────────────
-function Accordion({ id, label, hu, open, onToggle }) {
+// ── Acordeón (placeholder HU004 / historial HU005) ──────────────────────────
+function Accordion({ id, label, hu, open, onToggle, children }) {
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm">
       <button
@@ -143,8 +144,10 @@ function Accordion({ id, label, hu, open, onToggle }) {
           : <ChevronDown size={16} className="text-slate-400" />}
       </button>
       {open && (
-        <div className="px-5 py-8 bg-slate-50 border-t border-slate-100 text-center">
-          <p className="text-sm text-slate-400 italic">Disponible próximamente ({hu})</p>
+        <div className="px-5 py-5 bg-slate-50 border-t border-slate-100">
+          {children ?? (
+            <p className="text-sm text-slate-400 italic text-center py-3">Disponible próximamente ({hu})</p>
+          )}
         </div>
       )}
     </div>
@@ -362,7 +365,11 @@ function FamiliarDetalle({ familiar: initialData, onBack, onDesvinculado, onSucc
                     {...acc}
                     open={openAccordions.has(acc.id)}
                     onToggle={toggleAccordion}
-                  />
+                  >
+                    {acc.id === 'historial' && openAccordions.has('historial') && (
+                      <HistorialClinico pacienteId={familiar.paciente_id} />
+                    )}
+                  </Accordion>
                 ))}
               </div>
             </div>
