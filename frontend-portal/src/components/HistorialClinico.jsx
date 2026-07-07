@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Loader2, AlertCircle, ChevronRight, X, Printer, Stethoscope,
+  Loader2, AlertCircle, ChevronRight, X, Download, Stethoscope,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { getHistorial, registrarDescargaPDF } from '../services/patientHistorial.service';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -55,17 +56,110 @@ const fmtFechaHora = (f) => {
   });
 };
 
+// Convierte la imagen del odontograma a data URL para poder incrustarla en el PDF.
+// Si falla (CORS, red, etc.) se resuelve con null y el PDF se genera sin la imagen.
+const odontogramaADataUrl = (url) => new Promise((resolve) => {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      resolve({ dataUrl: canvas.toDataURL('image/png'), width: img.naturalWidth, height: img.naturalHeight });
+    } catch {
+      resolve(null);
+    }
+  };
+  img.onerror = () => resolve(null);
+  img.src = url;
+});
+
+// Genera el PDF real del detalle de una atención (CA-14) y dispara la descarga.
+const generarPdfAtencion = async (paciente, atencion) => {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const marginX = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const maxWidth = pageWidth - marginX * 2;
+  let y = 50;
+
+  const salto = (alto = 14) => {
+    if (y + alto > pageHeight - 40) { doc.addPage(); y = 50; }
+  };
+
+  const escribir = (texto, { size = 10, bold = false, color = '#1e293b', gapAfter = 12 } = {}) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    doc.setTextColor(color);
+    doc.splitTextToSize(String(texto), maxWidth).forEach((linea) => {
+      salto(size * 1.3);
+      doc.text(linea, marginX, y);
+      y += size * 1.3;
+    });
+    y += gapAfter;
+  };
+
+  escribir('Consultorio Padre Pío — Historial Clínico', { size: 15, bold: true, gapAfter: 2 });
+  escribir(paciente?.nombre_completo ?? 'Paciente', { size: 12, bold: true, gapAfter: paciente?.edad != null ? 0 : 10 });
+  if (paciente?.edad != null) escribir(`${paciente.edad} años`, { size: 9, color: '#64748b', gapAfter: 10 });
+
+  escribir('Detalle de la atención', { size: 12, bold: true, gapAfter: 6 });
+  escribir(`Fecha: ${fmtFechaHora(atencion.fecha_atencion) ?? 'No registrada'}`, { gapAfter: 2 });
+  escribir(`Doctor: ${atencion.doctor_nombre ?? 'No registrado'}`, { gapAfter: 2 });
+  escribir(`Servicio: ${atencion.servicio_nombre ?? 'No registrado'}`, { gapAfter: 10 });
+
+  const vitales = CAMPOS_VITALES.filter((c) => tieneContenido(atencion[c.key]));
+  if (vitales.length) {
+    escribir('Signos vitales', { size: 11, bold: true, gapAfter: 4 });
+    vitales.forEach((c) => escribir(`${c.label}: ${atencion[c.key]}`, { size: 9.5, gapAfter: 2 }));
+    y += 6;
+  }
+
+  CAMPOS_DETALLE.filter((c) => tieneContenido(atencion[c.key])).forEach((c) => {
+    escribir(c.label, { size: 9.5, bold: true, gapAfter: 1 });
+    escribir(atencion[c.key], { size: 9.5, color: '#334155', gapAfter: 8 });
+  });
+
+  if (atencion.odontograma_url) {
+    const img = await odontogramaADataUrl(atencion.odontograma_url);
+    escribir('Odontograma', { size: 11, bold: true, gapAfter: img ? 6 : 2 });
+    if (img) {
+      const anchoMax = maxWidth;
+      const alto = Math.min(280, (img.height / img.width) * anchoMax);
+      salto(alto + 10);
+      doc.addImage(img.dataUrl, 'PNG', marginX, y, anchoMax, alto);
+      y += alto + 10;
+    } else {
+      escribir('(La imagen no pudo incluirse en el PDF; disponible en el portal)', { size: 8.5, color: '#94a3b8', gapAfter: 6 });
+    }
+  }
+
+  doc.setFontSize(8);
+  doc.setTextColor('#94a3b8');
+  doc.text(
+    `Generado el ${new Date().toLocaleString('es-PE')} — Documento de referencia, no reemplaza indicación médica.`,
+    marginX, pageHeight - 30
+  );
+
+  const nombreArchivo = `historial-${(paciente?.nombre_completo ?? 'paciente').trim().replace(/\s+/g, '_')}-${
+    atencion.fecha_atencion ? String(atencion.fecha_atencion).slice(0, 10) : 'atencion'
+  }.pdf`;
+  doc.save(nombreArchivo);
+};
+
 // ── Ventana flotante: detalle de una atención ────────────────────────────────
-function AtencionDetalle({ atencion, pacienteId, onClose }) {
-  const [imprimiendo, setImprimiendo] = useState(false);
+function AtencionDetalle({ paciente, atencion, pacienteId, onClose }) {
+  const [descargando, setDescargando] = useState(false);
   const disponibles = CAMPOS_DETALLE.filter((c) => tieneContenido(atencion[c.key]));
   const vitalesDisponibles = CAMPOS_VITALES.filter((c) => tieneContenido(atencion[c.key]));
 
-  const handleImprimir = async () => {
-    setImprimiendo(true);
-    try { await registrarDescargaPDF(pacienteId); } catch { /* no bloquear la impresión */ }
-    setImprimiendo(false);
-    window.print();
+  const handleDescargar = async () => {
+    setDescargando(true);
+    try { await registrarDescargaPDF(pacienteId); } catch { /* no bloquear la descarga */ }
+    try { await generarPdfAtencion(paciente, atencion); }
+    finally { setDescargando(false); }
   };
 
   return (
@@ -143,12 +237,12 @@ function AtencionDetalle({ atencion, pacienteId, onClose }) {
 
         <div className="px-5 py-4 border-t border-slate-100 shrink-0">
           <button
-            onClick={handleImprimir}
-            disabled={imprimiendo}
+            onClick={handleDescargar}
+            disabled={descargando}
             className="w-full flex items-center justify-center gap-2 bg-primary text-white
                        font-bold text-sm py-2.5 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            <Printer size={15} /> {imprimiendo ? 'Preparando…' : 'Imprimir / Descargar PDF'}
+            <Download size={15} /> {descargando ? 'Generando PDF…' : 'Descargar PDF'}
           </button>
         </div>
       </div>
@@ -274,6 +368,7 @@ export default function HistorialClinico({ pacienteId }) {
 
       {seleccionada && (
         <AtencionDetalle
+          paciente={data.paciente}
           atencion={seleccionada}
           pacienteId={pacienteId}
           onClose={() => setSeleccionada(null)}
