@@ -104,6 +104,17 @@ const desvincularRelacion = async (titular_id, familiar_id) => {
   return result.affectedRows;
 };
 
+// Verifica si existe relación ACTIVA titular-familiar (para autorizar acceso a datos del familiar)
+const esFamiliarActivo = async (titular_id, familiar_id) => {
+  const [[row]] = await pool.query(
+    `SELECT 1 FROM PACIENTE_FAMILIAR
+     WHERE  titular_id = ? AND familiar_id = ? AND estado = 'ACTIVO'
+     LIMIT  1`,
+    [titular_id, familiar_id]
+  );
+  return !!row;
+};
+
 // Actualiza info de contacto de un familiar (teléfono, dirección, ocupación, emergencia)
 const updateFamiliarInfo = async (familiar_id, data) => {
   await pool.query(
@@ -124,4 +135,5 @@ module.exports = {
   findByDoc, findTitularDoc, createPacienteFamiliar,
   findRelacion, createRelacion, marcarComoFamiliar,
   getFamiliares, getFamiliarDetalle, desvincularRelacion, updateFamiliarInfo,
+  esFamiliarActivo,
 };
