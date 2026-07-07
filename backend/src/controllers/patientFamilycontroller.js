@@ -29,6 +29,22 @@ const msgDocumento = (tipo) => {
   return 'Tipo de documento no válido';
 };
 
+// El ENUM PACIENTE_FAMILIAR.parentesco distingue género (HIJO/HIJA, HERMANO/HERMANA,
+// ABUELO/ABUELA), pero la UI ofrece una sola opción combinada ("Hijo/a") para no
+// duplicar el selector de género que ya se pide en el mismo formulario. Se resuelve
+// aquí el valor exacto antes de guardar. Para sexo='OTRO' (sin forma neutra en el
+// ENUM) se usa la forma masculina como fallback.
+const PARENTESCO_GENERO = {
+  'HIJO/A':    { MASCULINO: 'HIJO',    FEMENINO: 'HIJA'    },
+  'HERMANO/A': { MASCULINO: 'HERMANO', FEMENINO: 'HERMANA' },
+  'ABUELO/A':  { MASCULINO: 'ABUELO',  FEMENINO: 'ABUELA'  },
+};
+const resolverParentesco = (parentesco, sexo) => {
+  const mapa = PARENTESCO_GENERO[parentesco];
+  if (!mapa) return parentesco;
+  return mapa[sexo] ?? mapa.MASCULINO;
+};
+
 const calcEdad = (fechaNac) => {
   const raw = fechaNac instanceof Date
     ? fechaNac.toISOString().split('T')[0]
@@ -239,13 +255,14 @@ const registrar = async (req, res) => {
         sexo,
         contacto_emergencia:  contacto_emergencia ? String(contacto_emergencia).replace(/\D/g, '') : null,
       });
-      await createRelacion(titular_id, familiar_id, parentesco);
+      const parentescoResuelto = resolverParentesco(parentesco, sexo);
+      await createRelacion(titular_id, familiar_id, parentescoResuelto);
       await logAudit({
         paciente_id: titular_id,
         accion:      'REGISTRO_FAMILIAR',
         entidad:     'PACIENTE_FAMILIAR',
         entidad_id:  familiar_id,
-        detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio, parentesco, operacion: 'REGISTRO_NUEVO' }),
+        detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio, parentesco: parentescoResuelto, operacion: 'REGISTRO_NUEVO' }),
         ip_origen:   req.ip,
       });
       return res.status(201).json({ message: 'Familiar registrado correctamente' });
@@ -276,26 +293,28 @@ const registrar = async (req, res) => {
         });
       }
       await marcarComoFamiliar(existente.paciente_id);
-      await createRelacion(titular_id, existente.paciente_id, parentesco);
+      const parentescoResuelto = resolverParentesco(parentesco, existente.sexo);
+      await createRelacion(titular_id, existente.paciente_id, parentescoResuelto);
       await logAudit({
         paciente_id: titular_id,
         accion:      'VINCULACION_FAMILIAR',
         entidad:     'PACIENTE_FAMILIAR',
         entidad_id:  existente.paciente_id,
-        detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio, parentesco, operacion: 'VINCULACION_SIN_CUENTA' }),
+        detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio, parentesco: parentescoResuelto, operacion: 'VINCULACION_SIN_CUENTA' }),
         ip_origen:   req.ip,
       });
       return res.json({ message: 'Familiar vinculado a tu cuenta correctamente' });
     }
 
     if (existente.estado_cuenta === 'FAMILIAR') {
-      await createRelacion(titular_id, existente.paciente_id, parentesco);
+      const parentescoResuelto = resolverParentesco(parentesco, existente.sexo);
+      await createRelacion(titular_id, existente.paciente_id, parentescoResuelto);
       await logAudit({
         paciente_id: titular_id,
         accion:      'VINCULACION_FAMILIAR',
         entidad:     'PACIENTE_FAMILIAR',
         entidad_id:  existente.paciente_id,
-        detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio, parentesco, operacion: 'VINCULACION_FAMILIAR_EXISTENTE' }),
+        detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio, parentesco: parentescoResuelto, operacion: 'VINCULACION_FAMILIAR_EXISTENTE' }),
         ip_origen:   req.ip,
       });
       return res.json({ message: 'Familiar vinculado a tu cuenta correctamente' });

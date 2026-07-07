@@ -3,7 +3,7 @@ const pool = require('../config/db');
 // Busca paciente por documento con todos los campos necesarios para los subcasos
 const findByDoc = async (tipo_documento, numero_documento) => {
   const [[row]] = await pool.query(
-    `SELECT paciente_id, nombre, apellido, fecha_nacimiento, estado_cuenta
+    `SELECT paciente_id, nombre, apellido, fecha_nacimiento, sexo, estado_cuenta
      FROM   PACIENTE
      WHERE  tipo_documento = ? AND numero_documento = ?`,
     [tipo_documento, numero_documento]
