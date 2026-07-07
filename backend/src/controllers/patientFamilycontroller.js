@@ -218,7 +218,7 @@ const registrar = async (req, res) => {
     return res.status(400).json({ error: msgDocumento(tipo_documento) });
 
   if (!confirmar) {
-    if (!nombre?.trim() || !apellido?.trim() || !fecha_nacimiento || !sexo)
+    if (!nombre?.trim() || !apellido?.trim() || !fecha_nacimiento || !sexo || !contacto_emergencia?.trim())
       return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' });
 
     if (!SEXOS.includes(sexo))
@@ -229,11 +229,11 @@ const registrar = async (req, res) => {
     if (isNaN(dob.getTime()) || dob >= hoy)
       return res.status(400).json({ error: 'La fecha de nacimiento debe ser anterior al día de hoy' });
 
-    if (contacto_emergencia) {
-      const telLimpio = String(contacto_emergencia).replace(/\D/g, '');
-      if (!RE_TELEFONO.test(telLimpio))
-        return res.status(400).json({ error: 'El contacto de emergencia debe tener exactamente 9 dígitos' });
-    }
+    // Todo paciente debe tener al menos un medio de contacto propio (además del
+    // titular vinculado, que puede desvincularse más adelante y dejarlo huérfano).
+    const telLimpio = String(contacto_emergencia).replace(/\D/g, '');
+    if (!RE_TELEFONO.test(telLimpio))
+      return res.status(400).json({ error: 'El contacto de emergencia debe tener exactamente 9 dígitos' });
   }
 
   try {

@@ -84,7 +84,8 @@ const validateForm = (f) => {
       e.fecha_nacimiento = 'Debe ser anterior a hoy';
   }
   if (!f.sexo)                          e.sexo             = 'Requerido';
-  if (f.contacto_emergencia && !RE_TEL.test(f.contacto_emergencia.replace(/\D/g, '')))
+  if (!f.contacto_emergencia.trim())    e.contacto_emergencia = 'Requerido';
+  else if (!RE_TEL.test(f.contacto_emergencia.replace(/\D/g, '')))
                                         e.contacto_emergencia = 'Debe tener 9 dígitos';
   return e;
 };
@@ -673,7 +674,7 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
         apellido:             form.apellido.trim(),
         fecha_nacimiento:     form.fecha_nacimiento,
         sexo:                 form.sexo,
-        contacto_emergencia:  form.contacto_emergencia.trim() || undefined,
+        contacto_emergencia:  form.contacto_emergencia.trim(),
       });
       if (data.requiere_confirmacion) { setCandidato(data.candidato); return; }
       await fetchFamiliares();
@@ -945,13 +946,13 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
                     </Field>
                   </div>
 
-                  <Field label="Contacto de emergencia (opcional)" error={touched.contacto_emergencia && errors.contacto_emergencia}>
+                  <Field label="Contacto de emergencia" error={touched.contacto_emergencia && errors.contacto_emergencia} required>
                     <input type="tel" name="contacto_emergencia" value={form.contacto_emergencia}
                       onChange={handleChange} onBlur={handleBlur}
                       maxLength={9} placeholder="987654321"
                       className={inp(touched.contacto_emergencia && errors.contacto_emergencia)} />
                     <p className="text-[11px] text-slate-400 -mt-0.5">
-                      No requerido para familiares menores de edad.
+                      Un número por el que el consultorio pueda contactar a este familiar.
                     </p>
                   </Field>
 
