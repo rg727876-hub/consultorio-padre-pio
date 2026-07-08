@@ -115,6 +115,29 @@ const esFamiliarActivo = async (titular_id, familiar_id) => {
   return !!row;
 };
 
+// Titulares con relación ACTIVA hacia este paciente (para notificarlos al activar su cuenta propia, WEB-HU009)
+const getTitularesActivos = async (familiar_id) => {
+  const [rows] = await pool.query(
+    `SELECT p.paciente_id, p.nombre, p.apellido, p.email_cuenta
+     FROM   PACIENTE_FAMILIAR pf
+     JOIN   PACIENTE p ON p.paciente_id = pf.titular_id
+     WHERE  pf.familiar_id = ? AND pf.estado = 'ACTIVO'`,
+    [familiar_id]
+  );
+  return rows;
+};
+
+// Desvincula TODAS las relaciones activas donde el paciente es el familiar
+// (activación de cuenta propia, WEB-HU009: deja de estar bajo control de sus titulares)
+const desvincularTodasComoFamiliar = async (familiar_id) => {
+  await pool.query(
+    `UPDATE PACIENTE_FAMILIAR
+     SET estado = 'INACTIVO', fecha_desvinculacion = NOW()
+     WHERE  familiar_id = ? AND estado = 'ACTIVO'`,
+    [familiar_id]
+  );
+};
+
 // Actualiza info de contacto de un familiar (teléfono, dirección, ocupación, emergencia)
 const updateFamiliarInfo = async (familiar_id, data) => {
   await pool.query(
@@ -135,5 +158,5 @@ module.exports = {
   findByDoc, findTitularDoc, createPacienteFamiliar,
   findRelacion, createRelacion, marcarComoFamiliar,
   getFamiliares, getFamiliarDetalle, desvincularRelacion, updateFamiliarInfo,
-  esFamiliarActivo,
+  esFamiliarActivo, getTitularesActivos, desvincularTodasComoFamiliar,
 };

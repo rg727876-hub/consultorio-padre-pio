@@ -414,4 +414,77 @@ const sendWelcomePatientEmail = async (to, nombre) => {
   });
 };
 
-module.exports = { sendActivationEmail, sendComprobanteEmail, sendWelcomePatientEmail };
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifica a un titular que un familiar suyo activó su propia cuenta web
+// (WEB-HU009). Se envía una vez por cada titular afectado.
+// ─────────────────────────────────────────────────────────────────────────────
+const sendFamiliarActivadoEmail = async (to, titularNombre, familiarNombre) => {
+  await transporter.sendMail({
+    from:    process.env.MAIL_FROM,
+    to,
+    subject: `${familiarNombre} activó su cuenta web propia — Consultorio Padre Pio`,
+    html: `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table width="520" cellpadding="0" cellspacing="0"
+               style="background:#ffffff;border-radius:12px;overflow:hidden;
+                      box-shadow:0 2px 8px rgba(0,0,0,.08);">
+
+          <!-- Header azul -->
+          <tr>
+            <td style="background:#0059B3;padding:28px 32px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.5px;">
+                Consultorio Padre Pio
+              </h1>
+              <p style="margin:4px 0 0;color:#b3d4ff;font-size:12px;letter-spacing:1px;text-transform:uppercase;">
+                Portal del Paciente
+              </p>
+            </td>
+          </tr>
+
+          <!-- Cuerpo -->
+          <tr>
+            <td style="padding:36px 32px 28px;">
+              <p style="margin:0 0 12px;font-size:16px;color:#1e293b;">
+                Hola, <strong>${titularNombre}</strong>
+              </p>
+              <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+                <strong>${familiarNombre}</strong> ha activado su cuenta web propia.
+                La vinculación familiar se ha desactivado automáticamente.
+                Ya no podrás gestionar sus citas ni acceder a su información.
+              </p>
+
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                Si crees que esto es un error, comunícate con el consultorio.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f8fafc;border-top:1px solid #e2e8f0;
+                       padding:16px 32px;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#94a3b8;">
+                © ${new Date().getFullYear()} Consultorio Padre Pio · Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+};
+
+module.exports = {
+  sendActivationEmail, sendComprobanteEmail, sendWelcomePatientEmail,
+  sendFamiliarActivadoEmail,
+};
