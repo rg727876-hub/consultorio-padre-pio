@@ -9,6 +9,7 @@ import { getProfile, updateProfile } from '../../services/patientProfile.service
 import { usePatientAuth } from '../../context/PatientAuthContext';
 import FamiliaresTab from '../familiares/FamiliaresTab';
 import HistorialClinico from '../../components/HistorialClinico';
+import BookingWizard from '../booking/BookingWizard';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const INFO = {
@@ -114,6 +115,7 @@ export default function ProfilePage() {
   const [openAccordions, setOpenAccordions] = useState(new Set());
   const [menuOpen, setMenuOpen]             = useState(false);
   const [selectedFamiliar, setSelectedFamiliar] = useState(null);
+  const [autoOpenRegisterFamiliar, setAutoOpenRegisterFamiliar] = useState(false);
 
   const [showEdit, setShowEdit]               = useState(false);
   const [editForm, setEditForm]               = useState(null);
@@ -526,6 +528,8 @@ export default function ProfilePage() {
             <FamiliaresTab
               selectedFamiliar={selectedFamiliar}
               onSelectFamiliar={setSelectedFamiliar}
+              autoOpenRegister={autoOpenRegisterFamiliar}
+              onAutoOpenHandled={() => setAutoOpenRegisterFamiliar(false)}
               onSuccess={(msg) => {
                 setSuccessMsg(msg);
                 setTimeout(() => setSuccessMsg(null), 4000);
@@ -537,20 +541,13 @@ export default function ProfilePage() {
         {/* ── RESERVAR UNA CITA ── */}
         {activeTab === 'citas' && (
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Calendar size={24} className="text-primary" />
-              </div>
-              <h2 className="font-display font-bold text-slate-800 text-xl mb-2">Reservar una cita</h2>
-              <p className="text-slate-400 text-sm max-w-xs mx-auto leading-relaxed">
-                Pronto podrás agendar tu cita directamente desde aquí. Estamos trabajando en ello.
-              </p>
-              <div className="mt-6 inline-flex items-center gap-2 bg-slate-50 border border-slate-200
-                              text-slate-500 text-sm font-semibold px-4 py-2 rounded-xl">
-                <Phone size={14} className="text-primary" />
-                Mientras tanto, llámanos al {INFO.telefono}
-              </div>
-            </div>
+            <BookingWizard
+              titular={profile}
+              onRegistrarFamiliar={() => {
+                setAutoOpenRegisterFamiliar(true);
+                setActiveTab('familiares');
+              }}
+            />
           </div>
         )}
 

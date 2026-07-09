@@ -562,7 +562,7 @@ function FamiliarDetalle({ familiar: initialData, onBack, onDesvinculado, onSucc
 // ── ════════════════════════════════════════════════════════════════════════ ──
 // COMPONENTE PRINCIPAL
 // ── ════════════════════════════════════════════════════════════════════════ ──
-export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFamiliar }) {
+export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFamiliar, autoOpenRegister, onAutoOpenHandled }) {
   const [familiares, setFamiliares]       = useState([]);
   const [loading, setLoading]             = useState(true);
   const [listError, setListError]         = useState(null);
@@ -639,6 +639,15 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
     if (submitting || confirming) return;
     setShowModal(false); setCandidato(null);
   };
+
+  // Permite abrir el modal de registro desde fuera (ej. wizard de reserva de cita, WEB-HU003)
+  useEffect(() => {
+    if (autoOpenRegister) {
+      openModal();
+      if (onAutoOpenHandled) onAutoOpenHandled();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenRegister]);
 
   const handleChange = (e) => {
     const { name } = e.target;
