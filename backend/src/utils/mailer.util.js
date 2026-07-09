@@ -1,5 +1,6 @@
 const fs   = require('fs');
 const path = require('path');
+const axios = require('axios');
 const transporter = require('../config/mailer');
 
 // Logo de la clínica embebido como data URI (se lee una sola vez al iniciar).
@@ -484,7 +485,163 @@ const sendFamiliarActivadoEmail = async (to, titularNombre, familiarNombre) => {
   });
 };
 
+// WEB-HU003: confirmación de reserva y pago online. Adjunta el PDF real del
+// comprobante (descargado de Nubefact) cuando está disponible; en modo DEMO
+// o si la descarga falla, cae al mismo patrón de botón "Ver comprobante" que
+// usa sendComprobanteEmail.
+const sendAppointmentConfirmationEmail = async (cita) => {
+  const fechaFmt = new Date(`${cita.fecha}T00:00:00`).toLocaleDateString('es-PE', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+  const precio = `S/ ${Number(cita.precio_aplicado).toFixed(2)}`;
+
+  let pdfAttachment = null;
+  if (cita.nubefact_pdf_url) {
+    try {
+      const { data } = await axios.get(cita.nubefact_pdf_url, {
+        responseType: 'arraybuffer', timeout: 15_000,
+      });
+      pdfAttachment = {
+        filename:    `Comprobante_${cita.codigo_cita}.pdf`,
+        content:     Buffer.from(data),
+        contentType: 'application/pdf',
+      };
+    } catch (e) {
+      console.warn('[mailer] No se pudo descargar el PDF del comprobante:', e.message);
+    }
+  }
+
+  const pdfLink = cita.nubefact_pdf_url
+    ? `<p style="margin:0 0 12px;font-size:14px;text-align:center;">
+         <a href="${cita.nubefact_pdf_url}"
+            style="background:#0059B3;color:#fff;padding:12px 28px;border-radius:8px;
+                   text-decoration:none;font-weight:700;display:inline-block;">
+           Ver comprobante
+         </a>
+       </p>`
+    : '';
+
+  await transporter.sendMail({
+    from:    process.env.MAIL_FROM,
+    to:      cita.paciente_email,
+    subject: `Cita confirmada ${cita.codigo_cita} — Consultorio Padre Pio`,
+    attachments: [
+      ...(pdfAttachment ? [pdfAttachment] : []),
+      {
+        filename: 'logo.png',
+        path:     path.join(__dirname, '../assets/Logo-Consultorio-Padre-Pio.png'),
+        cid:      'logoClinica',
+      },
+    ],
+    html: `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table width="520" cellpadding="0" cellspacing="0"
+               style="background:#ffffff;border-radius:12px;overflow:hidden;
+                      box-shadow:0 2px 8px rgba(0,0,0,.08);">
+          <tr>
+            <td style="background:#0059B3;padding:24px 32px 28px;text-align:center;">
+              <img src="cid:logoClinica" alt="Consultorio Padre Pío" width="72" height="72"
+                   style="display:block;margin:0 auto 12px;width:72px;height:72px;
+                          background:#ffffff;border-radius:50%;padding:6px;object-fit:contain;">
+              <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">
+                Consultorio Padre Pio
+              </h1>
+              <p style="margin:4px 0 0;color:#b3d4ff;font-size:12px;text-transform:uppercase;letter-spacing:1px;">
+                Cita confirmada
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <p style="margin:0 0 16px;font-size:16px;color:#1e293b;">
+                Hola, <strong>${cita.paciente_nombre}</strong>
+              </p>
+              <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+                Tu cita fue reservada y pagada con éxito. Aquí el resumen:
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0"
+                     style="background:#f8fafc;border:1px solid #e2e8f0;
+                            border-radius:8px;margin-bottom:24px;">
+                <tr><td style="padding:16px 20px;">
+                  <table width="100%">
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Código de cita</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${cita.codigo_cita}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Paciente</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${cita.paciente_nombre}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Servicio</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${cita.servicio_nombre}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Médico</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${cita.doctor_nombre}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Sede</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${cita.sede}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Fecha y hora</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${fechaFmt} · ${cita.hora_inicio}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#64748b;padding:4px 0;">Precio total</td>
+                      <td style="font-size:13px;font-weight:700;color:#1e293b;text-align:right;padding:4px 0;">
+                        ${precio}
+                      </td>
+                    </tr>
+                  </table>
+                </td></tr>
+              </table>
+
+              ${pdfLink}
+
+              <p style="margin:16px 0 0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                Preséntate 10 minutos antes de tu hora reservada.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f8fafc;border-top:1px solid #e2e8f0;
+                       padding:16px 32px;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#94a3b8;">
+                © ${new Date().getFullYear()} Consultorio Padre Pio · Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+};
+
 module.exports = {
   sendActivationEmail, sendComprobanteEmail, sendWelcomePatientEmail,
-  sendFamiliarActivadoEmail,
+  sendFamiliarActivadoEmail, sendAppointmentConfirmationEmail,
 };
