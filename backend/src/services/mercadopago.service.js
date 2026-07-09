@@ -1,9 +1,33 @@
-const { MercadoPagoConfig, Payment, PaymentRefund } = require('mercadopago');
+const { MercadoPagoConfig, Payment, PaymentRefund, PaymentMethod } = require('mercadopago');
 
 // Solo producción — sin modo test/sandbox.
 const ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN_PROD;
 
 const client = ACCESS_TOKEN ? new MercadoPagoConfig({ accessToken: ACCESS_TOKEN }) : null;
+
+// Logos de marcas (Visa/Mastercard/Amex) y de Yape, servidos por MercadoPago.
+// Requiere el access token (credencial privada) — por eso se pide desde acá
+// y no desde el navegador con la public key.
+let cachedMethods = null;
+const MARCAS_TARJETA = ['visa', 'master', 'amex', 'diners'];
+
+const getPaymentMethodIcons = async () => {
+  if (!client) throw new Error('MercadoPago no está configurado (falta access token)');
+  if (!cachedMethods) {
+    const paymentMethod = new PaymentMethod(client);
+    cachedMethods = await paymentMethod.get();
+  }
+  // Dedupe por id: MercadoPago devuelve variantes (ej. "Visa" y "Visa Prepaid")
+  // con el mismo id — nos quedamos con la primera (marca genérica).
+  const vistos = new Set();
+  const brands = cachedMethods
+    .filter((m) => MARCAS_TARJETA.includes(m.id) && m.status === 'active')
+    .filter((m) => (vistos.has(m.id) ? false : vistos.add(m.id)))
+    .sort((a, b) => MARCAS_TARJETA.indexOf(a.id) - MARCAS_TARJETA.indexOf(b.id))
+    .map((m) => ({ id: m.id, name: m.name, thumbnail: m.thumbnail }));
+  const yape = cachedMethods.find((m) => m.id === 'yape' && m.status === 'active');
+  return { brands, yape: yape ? { id: yape.id, name: yape.name, thumbnail: yape.thumbnail } : null };
+};
 
 // Mensajes en español por status_detail de rechazo de MercadoPago.
 // https://www.mercadopago.com.pe/developers/es/docs/checkout-api/response-handling/collection-results
@@ -58,4 +82,4 @@ const refundPayment = async (paymentId) => {
   return refund.create({ payment_id: paymentId });
 };
 
-module.exports = { createPayment, mapRejectionMessage, refundPayment };
+module.exports = { createPayment, mapRejectionMessage, refundPayment, getPaymentMethodIcons };

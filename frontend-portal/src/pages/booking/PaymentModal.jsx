@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 
 // Ventana flotante para completar el pago — header azul con logo de la
 // clínica para tarjeta, morado (color de marca de Yape) para Yape.
-export default function PaymentModal({ metodo, onClose, children }) {
+export default function PaymentModal({ metodo, yapeIcon, onClose, children }) {
   const isYape = metodo === 'yape';
 
   return (
@@ -21,7 +21,14 @@ export default function PaymentModal({ metodo, onClose, children }) {
             />
             <div>
               <p className="text-white font-bold text-sm leading-tight">Consultorio Padre Pio</p>
-              {isYape && <p className="text-white/80 text-[11px] leading-tight">Pago con Yape</p>}
+              {isYape && (
+                <p className="text-white/80 text-[11px] leading-tight flex items-center gap-1">
+                  Pago con
+                  {yapeIcon
+                    ? <img src={yapeIcon.thumbnail} alt="Yape" className="h-3.5 w-auto inline-block" />
+                    : 'Yape'}
+                </p>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="text-white/80 hover:text-white transition-colors p-1">

@@ -9,6 +9,7 @@ import StepPago     from './StepPago';
 import StepExito    from './StepExito';
 import PaymentModal from './PaymentModal';
 import { liberarHold } from '../../services/portalAppointments.service';
+import { getPaymentMethodIcons } from '../../services/public.service';
 
 const STEPS = ['PACIENTE', 'SERVICIO', 'DOCTOR', 'HORARIO', 'RESUMEN'];
 const STEP_LABELS = {
@@ -51,7 +52,7 @@ function StepIndicator({ stepIndex }) {
 
 // Botones de medio de pago (columna derecha del paso 5) — al elegir uno se
 // abre la ventana flotante con el formulario correspondiente.
-function MetodoPagoPicker({ onSelect }) {
+function MetodoPagoPicker({ onSelect, yapeIcon }) {
   return (
     <div className="space-y-3">
       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Elige cómo pagar</p>
@@ -76,8 +77,10 @@ function MetodoPagoPicker({ onSelect }) {
         className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-slate-200 bg-white
                    hover:border-[#6d2eb3] hover:bg-[#6d2eb3]/5 transition-colors text-left"
       >
-        <div className="w-10 h-10 rounded-lg bg-[#6d2eb3]/10 flex items-center justify-center shrink-0">
-          <Smartphone size={18} className="text-[#6d2eb3]" />
+        <div className="w-10 h-10 rounded-lg bg-[#6d2eb3]/10 flex items-center justify-center shrink-0 overflow-hidden">
+          {yapeIcon
+            ? <img src={yapeIcon.thumbnail} alt={yapeIcon.name} className="w-7 h-7 object-contain" />
+            : <Smartphone size={18} className="text-[#6d2eb3]" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-800">Yape</p>
@@ -100,9 +103,17 @@ export default function BookingWizard({ titular, onRegistrarFamiliar }) {
   const [resultado, setResultado] = useState(null);
   const [remaining, setRemaining] = useState(null);
   const [expiredMsg, setExpiredMsg] = useState(null);
+  const [yapeIcon, setYapeIcon] = useState(null);
   const holdRef = useRef(null);
 
   useEffect(() => { holdRef.current = data.hold; }, [data.hold]);
+
+  // Logo real de Yape (servido por MercadoPago) para el botón y el modal.
+  useEffect(() => {
+    getPaymentMethodIcons()
+      .then(({ data: icons }) => setYapeIcon(icons.yape))
+      .catch(() => setYapeIcon(null));
+  }, []);
 
   // ── Cuenta regresiva del bloqueo (5 min), arrancada desde el paso 4 al
   //    elegir un horario (ver StepHorario.onHoldCreated) ──────────────────
@@ -254,12 +265,12 @@ export default function BookingWizard({ titular, onRegistrarFamiliar }) {
       {step === 'RESUMEN' && mostrarMetodos && (
         <div className="grid sm:grid-cols-2 gap-6 items-start">
           <StepResumen paciente={data.paciente} servicio={data.servicio} doctor={data.doctor} slot={data.slot} />
-          <MetodoPagoPicker onSelect={setMetodoModal} />
+          <MetodoPagoPicker onSelect={setMetodoModal} yapeIcon={yapeIcon} />
         </div>
       )}
 
       {metodoModal && (
-        <PaymentModal metodo={metodoModal} onClose={() => setMetodoModal(null)}>
+        <PaymentModal metodo={metodoModal} yapeIcon={yapeIcon} onClose={() => setMetodoModal(null)}>
           <StepPago
             metodo={metodoModal}
             holdId={data.hold.hold_id}

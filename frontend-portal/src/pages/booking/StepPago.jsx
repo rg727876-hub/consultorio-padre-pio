@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { confirmarPago } from '../../services/portalAppointments.service';
+import { getPaymentMethodIcons } from '../../services/public.service';
 
 const MP_PUBLIC_KEY = import.meta.env.VITE_MP_PUBLIC_KEY;
 
@@ -24,7 +25,8 @@ export default function StepPago({ metodo, holdId, amount, defaultEmail, onSucce
   const [phoneNumber, setPhoneNumber]       = useState('');
   const [otp, setOtp]                       = useState('');
   const [email, setEmail]                   = useState(defaultEmail ?? '');
-  const [cardBrand, setCardBrand]           = useState(null); // { id, name, thumbnail }
+  const [cardBrand, setCardBrand]           = useState(null); // { id, name, thumbnail } — detectada al escribir
+  const [acceptedBrands, setAcceptedBrands] = useState([]);   // marcas aceptadas por la cuenta (fila fija)
 
   const [submitting, setSubmitting] = useState(false);
   const [payError, setPayError]     = useState(null);
@@ -41,6 +43,13 @@ export default function StepPago({ metodo, holdId, amount, defaultEmail, onSucce
     setSdkReady(true);
 
     if (metodo !== 'tarjeta') return;
+
+    // Fila fija con las marcas de tarjeta aceptadas por la cuenta (Visa,
+    // Mastercard, etc.) — logos servidos por MercadoPago. Se piden al backend
+    // porque requieren el access token (no la public key del navegador).
+    getPaymentMethodIcons()
+      .then(({ data }) => setAcceptedBrands(data.brands ?? []))
+      .catch(() => setAcceptedBrands([]));
 
     const cardNumberField = mp.fields
       .create('cardNumber', { placeholder: '0000 0000 0000 0000', style: fieldStyle })
@@ -124,7 +133,16 @@ export default function StepPago({ metodo, holdId, amount, defaultEmail, onSucce
         {metodo === 'tarjeta' ? (
           <>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número de tarjeta</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número de tarjeta</label>
+                {acceptedBrands.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    {acceptedBrands.map((b) => (
+                      <img key={b.id} src={b.thumbnail} alt={b.name} title={b.name} className="h-4 w-auto" />
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="relative">
                 <div id="mp-card-number" className="w-full border border-slate-300 rounded-lg px-3 py-2.5 pr-12 h-10 bg-white" />
                 {cardBrand?.thumbnail && (
