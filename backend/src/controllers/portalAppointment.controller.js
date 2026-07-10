@@ -484,8 +484,332 @@ const confirmPayment = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────────
+// Utilidades compartidas por listar/anular/reprogramar (WEB-HU004)
+// ─────────────────────────────────────────────────────────────────
+
+// El titular puede operar sobre su propia cita o la de un familiar vinculado ACTIVO.
+const puedeOperar = async (titularId, pacienteId) => {
+  if (titularId === pacienteId) return true;
+  return familiarModel.esFamiliarActivo(titularId, pacienteId);
+};
+
+const HORAS_ANTICIPACION_ANULAR = 24;
+
+const esAnulable = (fecha, horaInicio) => {
+  const fechaStr = fecha instanceof Date ? fecha.toISOString().slice(0, 10) : String(fecha).slice(0, 10);
+  const citaMs = new Date(`${fechaStr}T${horaInicio}:00`).getTime();
+  return citaMs - Date.now() >= HORAS_ANTICIPACION_ANULAR * 60 * 60 * 1000;
+};
+
+// GET /api/portal/appointments?paciente_id=&tipo=proximas|pagos
+const getMisCitas = async (req, res) => {
+  const titularId  = req.paciente.id;
+  const pacienteId = Number(req.query.paciente_id);
+  const tipo       = req.query.tipo === 'pagos' ? 'pagos' : 'proximas';
+
+  if (!pacienteId || !Number.isInteger(pacienteId))
+    return res.status(400).json({ error: 'paciente_id inválido' });
+
+  try {
+    if (!(await puedeOperar(titularId, pacienteId)))
+      return res.status(403).json({ error: 'No autorizado para ver las citas de este paciente' });
+
+    // "Mis pagos": toda cita con un pago COMPLETADO (sin importar su estado actual),
+    // más reciente primero — permite ver si asistió, canceló, etc. y su comprobante.
+    if (tipo === 'pagos') {
+      const [rows] = await pool.query(
+        `SELECT c.cita_id, c.codigo_cita,
+                DATE_FORMAT(c.fecha, '%Y-%m-%d') AS fecha,
+                c.estado,
+                s.nombre AS servicio_nombre,
+                p.monto_total AS monto_pagado,
+                (SELECT nubefact_pdf_url FROM COMPROBANTE
+                  WHERE pago_id = p.pago_id ORDER BY comprobante_id DESC LIMIT 1) AS comprobante_url
+         FROM   CITA     c
+         JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+         JOIN   PAGO     p ON p.cita_id     = c.cita_id
+         WHERE  c.paciente_id = ? AND p.estado = 'COMPLETADO'
+         ORDER  BY c.fecha DESC, c.hora_inicio DESC`,
+        [pacienteId]
+      );
+      return res.json({ citas: rows });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT c.cita_id, c.codigo_cita,
+              DATE_FORMAT(c.fecha, '%Y-%m-%d') AS fecha,
+              TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
+              TIME_FORMAT(c.hora_fin,   '%H:%i') AS hora_fin,
+              c.estado, c.precio_aplicado,
+              s.nombre AS servicio_nombre,
+              CONCAT('Dr. ', u.apellido, ', ', u.nombre) AS doctor_nombre
+       FROM   CITA     c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       JOIN   USUARIO  u ON u.usuario_id  = c.doctor_id
+       WHERE  c.paciente_id = ? AND c.estado = 'CONFIRMADA'
+       ORDER  BY c.fecha ASC, c.hora_inicio ASC`,
+      [pacienteId]
+    );
+
+    const citas = rows.map((c) => ({ ...c, anulable: esAnulable(c.fecha, c.hora_inicio) }));
+
+    return res.json({ citas });
+  } catch (err) {
+    console.error('[portalAppointment.getMisCitas]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// GET /api/portal/appointments/:id
+const getCitaDetalle = async (req, res) => {
+  const titularId = req.paciente.id;
+  const citaId    = Number(req.params.id);
+  if (!citaId || !Number.isInteger(citaId))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+
+  try {
+    const [[cita]] = await pool.query(
+      `SELECT c.cita_id, c.codigo_cita, c.paciente_id,
+              DATE_FORMAT(c.fecha, '%Y-%m-%d') AS fecha,
+              TIME_FORMAT(c.hora_inicio,'%H:%i') AS hora_inicio,
+              TIME_FORMAT(c.hora_fin,   '%H:%i') AS hora_fin,
+              c.estado, c.precio_aplicado, c.motivo_cancelacion, c.fecha_cancelacion,
+              c.doctor_id, c.servicio_id,
+              s.nombre AS servicio_nombre,
+              CONCAT('Dr. ', u.apellido, ', ', u.nombre) AS doctor_nombre,
+              CONCAT(pat.nombre,' ',pat.apellido) AS paciente_nombre
+       FROM   CITA     c
+       JOIN   SERVICIO s   ON s.servicio_id = c.servicio_id
+       JOIN   USUARIO  u   ON u.usuario_id  = c.doctor_id
+       JOIN   PACIENTE pat ON pat.paciente_id = c.paciente_id
+       WHERE  c.cita_id = ?`,
+      [citaId]
+    );
+    if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
+
+    if (!(await puedeOperar(titularId, cita.paciente_id)))
+      return res.status(403).json({ error: 'No autorizado para ver esta cita' });
+
+    const [[pago]] = await pool.query(
+      `SELECT pago_id, metodo_pago, estado, monto_total, fecha_pago
+       FROM   PAGO WHERE cita_id = ? ORDER BY pago_id DESC LIMIT 1`,
+      [citaId]
+    );
+
+    let comprobante = null;
+    if (pago) {
+      const [[comp]] = await pool.query(
+        `SELECT tipo_comprobante, serie, numero, nubefact_pdf_url
+         FROM   COMPROBANTE WHERE pago_id = ? ORDER BY comprobante_id DESC LIMIT 1`,
+        [pago.pago_id]
+      );
+      comprobante = comp ?? null;
+    }
+
+    return res.json({
+      ...cita,
+      anulable: cita.estado === 'CONFIRMADA' && esAnulable(cita.fecha, cita.hora_inicio),
+      pago:        pago ?? null,
+      comprobante,
+    });
+  } catch (err) {
+    console.error('[portalAppointment.getCitaDetalle]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// PATCH /api/portal/appointments/:id/cancel
+const cancelarCita = async (req, res) => {
+  const titularId = req.paciente.id;
+  const citaId    = Number(req.params.id);
+  if (!citaId || !Number.isInteger(citaId))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query('START TRANSACTION');
+
+    const [[cita]] = await conn.query(
+      `SELECT cita_id, paciente_id, codigo_cita, estado,
+              DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
+              TIME_FORMAT(hora_inicio,'%H:%i') AS hora_inicio
+       FROM   CITA WHERE cita_id = ? FOR UPDATE`,
+      [citaId]
+    );
+
+    if (!cita) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+
+    if (!(await puedeOperar(titularId, cita.paciente_id))) {
+      await conn.query('ROLLBACK');
+      return res.status(403).json({ error: 'No autorizado para anular esta cita' });
+    }
+
+    if (cita.estado !== 'CONFIRMADA') {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({ error: `No se puede anular una cita en estado '${cita.estado}'.` });
+    }
+
+    if (!esAnulable(cita.fecha, cita.hora_inicio)) {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({
+        error: 'No es posible anular citas con menos de 24 horas de anticipación. Comunícate con el consultorio.',
+      });
+    }
+
+    await conn.query(
+      `UPDATE CITA
+       SET    estado = 'CANCELADA', motivo_cancelacion = 'PACIENTE_VOLUNTARIO', fecha_cancelacion = NOW()
+       WHERE  cita_id = ?`,
+      [citaId]
+    );
+
+    await conn.query(
+      `INSERT INTO AUDITORIA
+         (usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen)
+       VALUES (NULL, ?, 'ANULACION_CITA_PORTAL', 'CITA', ?, ?, ?)`,
+      [
+        cita.paciente_id, citaId,
+        JSON.stringify({ titular_id: titularId, paciente_id: cita.paciente_id, codigo_cita: cita.codigo_cita, estado_previo: cita.estado }),
+        req.ip ?? null,
+      ]
+    );
+
+    await conn.query('COMMIT');
+
+    return res.json({ message: 'Cita anulada correctamente', cita_id: citaId, codigo_cita: cita.codigo_cita, estado: 'CANCELADA' });
+  } catch (err) {
+    if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    console.error('[portalAppointment.cancelarCita]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+// PATCH /api/portal/appointments/:id/reschedule
+const reprogramarCita = async (req, res) => {
+  const titularId = req.paciente.id;
+  const citaId    = Number(req.params.id);
+  const { nueva_fecha, nueva_hora_inicio } = req.body;
+
+  if (!citaId || !Number.isInteger(citaId))
+    return res.status(400).json({ error: 'ID de cita inválido' });
+  if (!nueva_fecha || !nueva_hora_inicio)
+    return res.status(400).json({ error: 'nueva_fecha y nueva_hora_inicio son requeridos' });
+
+  const hoy = new Date().toLocaleDateString('en-CA');
+  if (nueva_fecha < hoy)
+    return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query('START TRANSACTION');
+
+    const [[cita]] = await conn.query(
+      `SELECT cita_id, paciente_id, codigo_cita, estado, doctor_id, servicio_id,
+              DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
+              TIME_FORMAT(hora_inicio,'%H:%i') AS hora_inicio,
+              TIME_FORMAT(hora_fin,   '%H:%i') AS hora_fin
+       FROM   CITA WHERE cita_id = ? FOR UPDATE`,
+      [citaId]
+    );
+
+    if (!cita) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+
+    if (!(await puedeOperar(titularId, cita.paciente_id))) {
+      await conn.query('ROLLBACK');
+      return res.status(403).json({ error: 'No autorizado para reprogramar esta cita' });
+    }
+
+    if (cita.estado !== 'CONFIRMADA') {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({ error: `No se puede reprogramar una cita en estado '${cita.estado}'.` });
+    }
+
+    const [[servicio]] = await conn.query(
+      `SELECT duracion, buffer FROM SERVICIO WHERE servicio_id = ?`,
+      [cita.servicio_id]
+    );
+    if (!servicio) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ error: 'El servicio de esta cita ya no está disponible.' });
+    }
+
+    const nueva_hora_fin = minsToTime(timeToMins(nueva_hora_inicio) + servicio.duracion);
+
+    const [otras] = await conn.query(
+      `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+              TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+              s.buffer AS buffer
+       FROM   CITA     c
+       JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+       WHERE  c.doctor_id = ? AND c.fecha = ? AND c.cita_id <> ?
+         AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
+      [cita.doctor_id, nueva_fecha, citaId]
+    );
+    const rIni    = timeToMins(nueva_hora_inicio);
+    const rFinBuf = timeToMins(nueva_hora_fin) + servicio.buffer;
+    const solapa = otras.some(
+      b => rIni < (timeToMins(b.hf) + (b.buffer || 0)) && rFinBuf > timeToMins(b.hi)
+    );
+    if (solapa) {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({ error: 'El horario solicitado se cruza con otra cita o su tiempo de limpieza (buffer).' });
+    }
+
+    await conn.query(
+      `UPDATE CITA
+       SET    fecha = ?, hora_inicio = ?, hora_fin = ?, veces_reprogramada = veces_reprogramada + 1
+       WHERE  cita_id = ?`,
+      [nueva_fecha, nueva_hora_inicio, nueva_hora_fin, citaId]
+    );
+
+    await conn.query(
+      `INSERT INTO AUDITORIA
+         (usuario_id, paciente_id, accion, entidad, entidad_id, detalles, ip_origen)
+       VALUES (NULL, ?, 'REPROGRAMACION_CITA_PORTAL', 'CITA', ?, ?, ?)`,
+      [
+        cita.paciente_id, citaId,
+        JSON.stringify({
+          titular_id: titularId, paciente_id: cita.paciente_id, codigo_cita: cita.codigo_cita,
+          fecha_anterior: cita.fecha, hora_inicio_antes: cita.hora_inicio, hora_fin_antes: cita.hora_fin,
+          nueva_fecha, nueva_hora_inicio, nueva_hora_fin,
+        }),
+        req.ip ?? null,
+      ]
+    );
+
+    await conn.query('COMMIT');
+
+    return res.json({
+      message: 'Cita reprogramada correctamente',
+      cita_id: citaId,
+      codigo_cita: cita.codigo_cita,
+      fecha: nueva_fecha,
+      hora_inicio: nueva_hora_inicio,
+      hora_fin: nueva_hora_fin,
+    });
+  } catch (err) {
+    if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    console.error('[portalAppointment.reprogramarCita]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
 module.exports = {
   getDoctorsByService, getAvailability,
   createHold: createHoldHandler, releaseHold: releaseHoldHandler,
   confirmPayment,
+  getMisCitas, getCitaDetalle, cancelarCita, reprogramarCita,
 };
