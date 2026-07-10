@@ -6,7 +6,7 @@ import {
   ArrowLeft, BarChart2, Wallet, Stethoscope,
   Repeat, AlertTriangle, FileText, Sheet, ArrowUpDown,
   Users, PieChart as PieIcon, LineChart as LineIcon,
-  LayoutDashboard, CreditCard, CalendarCheck, X, Lock, Loader2,
+  LayoutDashboard, CreditCard, CalendarCheck, X, Loader2,
 } from 'lucide-react';
 import {
   ResponsiveContainer,

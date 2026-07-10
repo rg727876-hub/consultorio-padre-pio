@@ -472,7 +472,6 @@ export async function exportarExcel({
     { width: 6 }, { width: 34 }, { width: 16 },
   ];
 
-  const topServicios = [...(pagos.length ? [] : [])]; // solo estructura, se calcula abajo
   const serviciosMap = {};
   pagos.forEach((p) => { serviciosMap[p.servicio] = (serviciosMap[p.servicio] || 0) + 1; });
   perdidas.forEach((p) => { serviciosMap[p.servicio] = (serviciosMap[p.servicio] || 0) + 1; });
