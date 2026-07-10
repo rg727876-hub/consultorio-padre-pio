@@ -283,6 +283,22 @@ export default function RegisterPage() {
                 </button>
               </p>
             )}
+            {serverError.codigo === 'DOC_FAMILIAR' && (
+              <p className="mt-1">
+                <button
+                  type="button"
+                  onClick={() => navigate('/vincular', {
+                    state: {
+                      tipo_documento:   form.tipo_documento,
+                      numero_documento: form.numero_documento.trim(),
+                    },
+                  })}
+                  className="underline font-semibold"
+                >
+                  Activar mi cuenta propia →
+                </button>
+              </p>
+            )}
           </div>
         )}
 

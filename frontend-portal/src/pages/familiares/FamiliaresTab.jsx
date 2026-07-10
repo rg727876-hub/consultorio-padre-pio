@@ -8,6 +8,8 @@ import {
   getFamiliares, registrarFamiliar,
   getFamiliarDetalle, updateFamiliar, desvincularFamiliar,
 } from '../../services/patientFamily.service';
+import HistorialClinico from '../../components/HistorialClinico';
+import { ProximasCitas, MisPagos } from '../../components/MisCitas';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const PARENTESCOS = [
@@ -83,7 +85,8 @@ const validateForm = (f) => {
       e.fecha_nacimiento = 'Debe ser anterior a hoy';
   }
   if (!f.sexo)                          e.sexo             = 'Requerido';
-  if (f.contacto_emergencia && !RE_TEL.test(f.contacto_emergencia.replace(/\D/g, '')))
+  if (!f.contacto_emergencia.trim())    e.contacto_emergencia = 'Requerido';
+  else if (!RE_TEL.test(f.contacto_emergencia.replace(/\D/g, '')))
                                         e.contacto_emergencia = 'Debe tener 9 dígitos';
   return e;
 };
@@ -128,8 +131,8 @@ const sel = (err) =>
 const readonlyCls =
   'w-full border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-400 cursor-not-allowed';
 
-// ── Acordeón (placeholder HU004 / HU005) ────────────────────────────────────
-function Accordion({ id, label, hu, open, onToggle }) {
+// ── Acordeón (placeholder HU004 / historial HU005) ──────────────────────────
+function Accordion({ id, label, hu, open, onToggle, children }) {
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm">
       <button
@@ -143,8 +146,10 @@ function Accordion({ id, label, hu, open, onToggle }) {
           : <ChevronDown size={16} className="text-slate-400" />}
       </button>
       {open && (
-        <div className="px-5 py-8 bg-slate-50 border-t border-slate-100 text-center">
-          <p className="text-sm text-slate-400 italic">Disponible próximamente ({hu})</p>
+        <div className="px-5 py-5 bg-slate-50 border-t border-slate-100">
+          {children ?? (
+            <p className="text-sm text-slate-400 italic text-center py-3">Disponible próximamente ({hu})</p>
+          )}
         </div>
       )}
     </div>
@@ -263,6 +268,7 @@ function FamiliarDetalle({ familiar: initialData, onBack, onDesvinculado, onSucc
 
   const ACCORDIONS = [
     { id: 'proximas',  label: 'Próximas citas',    hu: 'HU004' },
+    { id: 'pagos',     label: 'Mis pagos',         hu: 'HU004' },
     { id: 'historial', label: 'Historias clínicas', hu: 'HU005' },
   ];
 
@@ -362,7 +368,17 @@ function FamiliarDetalle({ familiar: initialData, onBack, onDesvinculado, onSucc
                     {...acc}
                     open={openAccordions.has(acc.id)}
                     onToggle={toggleAccordion}
-                  />
+                  >
+                    {acc.id === 'proximas' && openAccordions.has('proximas') && (
+                      <ProximasCitas pacienteId={familiar.paciente_id} onSuccess={onSuccess} />
+                    )}
+                    {acc.id === 'pagos' && openAccordions.has('pagos') && (
+                      <MisPagos pacienteId={familiar.paciente_id} />
+                    )}
+                    {acc.id === 'historial' && openAccordions.has('historial') && (
+                      <HistorialClinico pacienteId={familiar.paciente_id} />
+                    )}
+                  </Accordion>
                 ))}
               </div>
             </div>
@@ -554,7 +570,7 @@ function FamiliarDetalle({ familiar: initialData, onBack, onDesvinculado, onSucc
 // ── ════════════════════════════════════════════════════════════════════════ ──
 // COMPONENTE PRINCIPAL
 // ── ════════════════════════════════════════════════════════════════════════ ──
-export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFamiliar }) {
+export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFamiliar, autoOpenRegister, onAutoOpenHandled }) {
   const [familiares, setFamiliares]       = useState([]);
   const [loading, setLoading]             = useState(true);
   const [listError, setListError]         = useState(null);
@@ -632,6 +648,15 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
     setShowModal(false); setCandidato(null);
   };
 
+  // Permite abrir el modal de registro desde fuera (ej. wizard de reserva de cita, WEB-HU003)
+  useEffect(() => {
+    if (autoOpenRegister) {
+      openModal();
+      if (onAutoOpenHandled) onAutoOpenHandled();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenRegister]);
+
   const handleChange = (e) => {
     const { name } = e.target;
     let value = e.target.value;
@@ -666,7 +691,7 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
         apellido:             form.apellido.trim(),
         fecha_nacimiento:     form.fecha_nacimiento,
         sexo:                 form.sexo,
-        contacto_emergencia:  form.contacto_emergencia.trim() || undefined,
+        contacto_emergencia:  form.contacto_emergencia.trim(),
       });
       if (data.requiere_confirmacion) { setCandidato(data.candidato); return; }
       await fetchFamiliares();
@@ -938,13 +963,13 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
                     </Field>
                   </div>
 
-                  <Field label="Contacto de emergencia (opcional)" error={touched.contacto_emergencia && errors.contacto_emergencia}>
+                  <Field label="Contacto de emergencia" error={touched.contacto_emergencia && errors.contacto_emergencia} required>
                     <input type="tel" name="contacto_emergencia" value={form.contacto_emergencia}
                       onChange={handleChange} onBlur={handleBlur}
                       maxLength={9} placeholder="987654321"
                       className={inp(touched.contacto_emergencia && errors.contacto_emergencia)} />
                     <p className="text-[11px] text-slate-400 -mt-0.5">
-                      No requerido para familiares menores de edad.
+                      Un número por el que el consultorio pueda contactar a este familiar.
                     </p>
                   </Field>
 

@@ -3,7 +3,7 @@ const pool = require('../config/db');
 // Busca paciente por documento con todos los campos necesarios para los subcasos
 const findByDoc = async (tipo_documento, numero_documento) => {
   const [[row]] = await pool.query(
-    `SELECT paciente_id, nombre, apellido, fecha_nacimiento, estado_cuenta
+    `SELECT paciente_id, nombre, apellido, fecha_nacimiento, sexo, estado_cuenta
      FROM   PACIENTE
      WHERE  tipo_documento = ? AND numero_documento = ?`,
     [tipo_documento, numero_documento]
@@ -104,6 +104,40 @@ const desvincularRelacion = async (titular_id, familiar_id) => {
   return result.affectedRows;
 };
 
+// Verifica si existe relación ACTIVA titular-familiar (para autorizar acceso a datos del familiar)
+const esFamiliarActivo = async (titular_id, familiar_id) => {
+  const [[row]] = await pool.query(
+    `SELECT 1 FROM PACIENTE_FAMILIAR
+     WHERE  titular_id = ? AND familiar_id = ? AND estado = 'ACTIVO'
+     LIMIT  1`,
+    [titular_id, familiar_id]
+  );
+  return !!row;
+};
+
+// Titulares con relación ACTIVA hacia este paciente (para notificarlos al activar su cuenta propia, WEB-HU009)
+const getTitularesActivos = async (familiar_id) => {
+  const [rows] = await pool.query(
+    `SELECT p.paciente_id, p.nombre, p.apellido, p.email_cuenta
+     FROM   PACIENTE_FAMILIAR pf
+     JOIN   PACIENTE p ON p.paciente_id = pf.titular_id
+     WHERE  pf.familiar_id = ? AND pf.estado = 'ACTIVO'`,
+    [familiar_id]
+  );
+  return rows;
+};
+
+// Desvincula TODAS las relaciones activas donde el paciente es el familiar
+// (activación de cuenta propia, WEB-HU009: deja de estar bajo control de sus titulares)
+const desvincularTodasComoFamiliar = async (familiar_id) => {
+  await pool.query(
+    `UPDATE PACIENTE_FAMILIAR
+     SET estado = 'INACTIVO', fecha_desvinculacion = NOW()
+     WHERE  familiar_id = ? AND estado = 'ACTIVO'`,
+    [familiar_id]
+  );
+};
+
 // Actualiza info de contacto de un familiar (teléfono, dirección, ocupación, emergencia)
 const updateFamiliarInfo = async (familiar_id, data) => {
   await pool.query(
@@ -124,4 +158,5 @@ module.exports = {
   findByDoc, findTitularDoc, createPacienteFamiliar,
   findRelacion, createRelacion, marcarComoFamiliar,
   getFamiliares, getFamiliarDetalle, desvincularRelacion, updateFamiliarInfo,
+  esFamiliarActivo, getTitularesActivos, desvincularTodasComoFamiliar,
 };
