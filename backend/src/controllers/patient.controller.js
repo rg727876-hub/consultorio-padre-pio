@@ -112,7 +112,7 @@ const search = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT paciente_id, nombre, apellido,
               tipo_documento, numero_documento,
-              telefono, sexo, fecha_nacimiento
+              telefono, sexo, fecha_nacimiento, foto
        FROM   PACIENTE
        WHERE  estado = 'ACTIVO'
          AND  (numero_documento LIKE ? OR nombre LIKE ? OR apellido LIKE ? OR CONCAT(nombre, ' ', apellido) LIKE ?)
@@ -186,7 +186,7 @@ const list = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT paciente_id, nombre, apellido,
               tipo_documento, numero_documento,
-              telefono, sexo, estado,
+              telefono, sexo, estado, foto,
               DATE_FORMAT(fecha_nacimiento, '%Y-%m-%d') AS fecha_nacimiento,
               fecha_registro
        FROM   PACIENTE
@@ -228,7 +228,7 @@ const getById = async (req, res) => {
     const [[paciente]] = await pool.query(
       `SELECT paciente_id, nombre, apellido,
               tipo_documento, numero_documento,
-              telefono, sexo, estado,
+              telefono, sexo, estado, foto,
               DATE_FORMAT(fecha_nacimiento, '%Y-%m-%d') AS fecha_nacimiento,
               email, direccion, ocupacion, contacto_emergencia,
               fecha_registro
@@ -507,4 +507,39 @@ const reactivate = async (req, res) => {
   }
 };
 
-module.exports = { register, search, list, getById, update, deactivate, reactivate };
+// ─────────────────────────────────────────────────────────────────
+// POST /api/patients/:id/foto   — Subir o actualizar foto del paciente
+// Roles: RECEPCIONISTA, ADMINISTRADOR
+// ─────────────────────────────────────────────────────────────────
+const uploadPhoto = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isInteger(id)) return res.status(400).json({ error: 'ID de paciente inválido' });
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se ha subido ningún archivo válido' });
+  }
+
+  try {
+    const [[patient]] = await pool.query('SELECT paciente_id FROM PACIENTE WHERE paciente_id = ?', [id]);
+    if (!patient) {
+      const fs = require('fs');
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Paciente no encontrado' });
+    }
+
+    const photoUrl = `/uploads/patients/${req.file.filename}`;
+    await pool.query('UPDATE PACIENTE SET foto = ? WHERE paciente_id = ?', [photoUrl, id]);
+
+    await logAudit({
+      usuario_id: req.user?.id, accion: 'ACTUALIZAR_FOTO_PACIENTE', entidad: 'PACIENTE',
+      entidad_id: id, detalles: `Foto de perfil actualizada`, ip_origen: req.ip,
+    });
+
+    return res.json({ message: 'Foto de paciente actualizada correctamente', foto: photoUrl });
+  } catch (err) {
+    console.error('[patient.uploadPhoto]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { register, search, list, getById, update, deactivate, reactivate, uploadPhoto };

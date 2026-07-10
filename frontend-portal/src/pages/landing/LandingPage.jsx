@@ -45,13 +45,22 @@ function ServiceCard({ servicio }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col gap-3
                     hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-      <h3 className="font-bold text-slate-800 text-base">{toTitle(servicio.nombre)}</h3>
+      <div className="flex items-center gap-3">
+        {servicio.imagen && (
+          <img 
+            src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${servicio.imagen}`} 
+            alt={servicio.nombre} 
+            className="w-12 h-12 rounded-xl object-cover bg-slate-50 flex-shrink-0 border border-slate-100 shadow-sm"
+          />
+        )}
+        <h3 className="font-bold text-slate-800 text-base leading-tight">{toTitle(servicio.nombre)}</h3>
+      </div>
       {servicio.descripcion && (
         <p className="text-sm text-slate-500 leading-relaxed flex-1">
           {servicio.descripcion}
         </p>
       )}
-      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-auto">
         <span className="text-xs text-slate-400">{servicio.duracion} min</span>
         <span className="text-sm font-bold text-primary">
           S/ {Number(servicio.costo).toFixed(2)}
@@ -64,11 +73,19 @@ function ServiceCard({ servicio }) {
 function DoctorCard({ doctor }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col
-                    items-center text-center gap-3 hover:shadow-md transition-shadow">
-      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center
-                      text-white text-xl font-black select-none shadow-md">
-        {iniciales(doctor.nombre, doctor.apellido)}
-      </div>
+                    items-center text-center gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+      {doctor.avatar ? (
+        <img 
+          src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`} 
+          alt={doctor.nombre}
+          className="w-20 h-20 rounded-full object-cover shadow-md border-2 border-white flex-shrink-0 bg-slate-50"
+        />
+      ) : (
+        <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center
+                        text-white text-xl font-black select-none shadow-md border-2 border-white flex-shrink-0">
+          {iniciales(doctor.nombre, doctor.apellido)}
+        </div>
+      )}
       <div>
         <p className="font-bold text-slate-800">
           Dr. {toTitle(doctor.nombre)} {toTitle(doctor.apellido)}

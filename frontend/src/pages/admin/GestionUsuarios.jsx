@@ -227,8 +227,21 @@ export default function GestionUsuarios() {
                     <tr key={u.usuario_id} className={`transition-colors ${getRowClass(u.estado)}`}>
                       <td className="px-6 py-4 font-medium text-slate-700">{u.DNI}</td>
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-800">
-                          {u.nombre} {u.apellido}
+                        <div className="flex items-center gap-3">
+                          {u.avatar ? (
+                            <img 
+                              src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${u.avatar}`} 
+                              alt="Avatar" 
+                              className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-[#0059B3]/10 flex items-center justify-center text-[#0059B3] text-xs font-bold flex-shrink-0">
+                              {(u.nombre?.[0] ?? '') + (u.apellido?.[0] ?? '')}
+                            </div>
+                          )}
+                          <div className="font-semibold text-slate-800 leading-tight">
+                            {u.nombre} {u.apellido}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{u.email}</td>

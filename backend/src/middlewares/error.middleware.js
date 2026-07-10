@@ -37,10 +37,15 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
+    // Multer / Formato no soportado
+    if (err.message && err.message.includes('Formato de archivo no soportado')) {
+        return res.status(400).json({ error: err.message, detail: err.message, stack: err.stack });
+    }
+
     const status = err.statusCode || 500;
     const message = err.statusCode ? err.message : 'Error interno del servidor';
 
-    res.status(status).json({ error: message });
+    res.status(status).json({ error: message, detail: err.message, stack: err.stack });
 };
 
 module.exports = { errorHandler };

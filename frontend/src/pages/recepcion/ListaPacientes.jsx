@@ -269,7 +269,20 @@ export default function ListaPacientes() {
 
                             {/* Nombres */}
                             <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-800">
-                              {p.nombre}
+                              <div className="flex items-center gap-3">
+                                {p.foto ? (
+                                  <img 
+                                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${p.foto}`} 
+                                    alt="Foto" 
+                                    className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold flex-shrink-0">
+                                    {(p.nombre?.[0] ?? '') + (p.apellido?.[0] ?? '')}
+                                  </div>
+                                )}
+                                <span>{p.nombre}</span>
+                              </div>
                             </td>
 
                             {/* Apellidos */}

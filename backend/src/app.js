@@ -73,6 +73,15 @@ app.use('/api/auth/staff', authLimiter, authStaffRoutes);     // Staff: email + 
 app.use('/api/auth/patient', authLimiter, authPatientRoutes); // Paciente: doc + password
 app.use('/api/auth/activate', authLimiter, activationRoutes); // Activación de cuentas
 
+// ===== UPLOADS (Archivos estáticos) =====
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+    setHeaders: (res) => {
+        // Permitir carga cross-origin de recursos estáticos para el frontend
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
+}));
+
 // ===== RECURSOS =====
 app.use('/api/users', userRoutes);
 app.use('/api/patients', patientRoutes);

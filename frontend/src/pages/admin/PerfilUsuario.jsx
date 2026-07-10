@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   User, Mail, Phone, MapPin, Calendar, Clock,
-  Edit2, Trash2, RotateCcw, Send, Save, X, ArrowLeft, Loader2, AlertCircle, RefreshCw, Activity, Shield
+  Edit2, Trash2, RotateCcw, Send, Save, X, ArrowLeft, Loader2, AlertCircle, RefreshCw, Activity, Shield, Camera
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
@@ -22,7 +22,8 @@ export default function PerfilUsuario() {
   const [isSaving, setIsSaving] = useState(false);
   const [isStatusChanging, setIsStatusChanging] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false); // Modal para desactivar
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false); // Modal para desactivar
 
   // Form states
   const [form, setForm] = useState({
@@ -152,6 +153,34 @@ export default function PerfilUsuario() {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 5MB');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('avatar', file);
+    setUploadingAvatar(true);
+    try {
+      const { data } = await api.post(`/users/${id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success('Foto de perfil actualizada');
+      setUser(u => ({ ...u, avatar: data.avatar }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al subir la imagen');
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────
   if (loading && !user) {
     return (
@@ -220,8 +249,24 @@ export default function PerfilUsuario() {
         {/* Top actions (CA2) */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-[#0059B3] text-xl font-bold shrink-0">
-              {(user?.nombre?.[0] || '')}{(user?.apellido?.[0] || '')}
+            <div className="relative group w-20 h-20 shrink-0">
+              {user?.avatar ? (
+                <img
+                  src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${user.avatar}`}
+                  alt="Avatar"
+                  className="w-full h-full rounded-full object-cover border-2 border-slate-100"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-[#0059B3] text-2xl font-bold">
+                  {(user?.nombre?.[0] || '')}{(user?.apellido?.[0] || '')}
+                </div>
+              )}
+              <label className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 cursor-pointer transition-opacity text-white ${!isInactive && !uploadingAvatar ? 'group-hover:opacity-100' : 'hidden'}`}
+                     title="Cambiar foto de perfil">
+                {uploadingAvatar ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                <input type="file" accept="image/jpeg, image/png, image/webp" className="hidden"
+                       onChange={handleAvatarUpload} disabled={uploadingAvatar || isInactive} />
+              </label>
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-800">{user.nombre} {user.apellido}</h2>

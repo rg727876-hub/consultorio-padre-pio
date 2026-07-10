@@ -1,11 +1,12 @@
 const { Router } = require('express');
 const { register, login, logout, preview, vincular } = require('../controllers/authPatient.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
+const { upload } = require('../middlewares/upload.middleware');
 
 const router = Router();
 
 // POST /api/auth/patient/register  — Registro de cuenta web (público)
-router.post('/register', register);
+router.post('/register', upload.single('foto'), register);
 
 // POST /api/auth/patient/login     — Login con documento + contraseña (público)
 router.post('/login', login);

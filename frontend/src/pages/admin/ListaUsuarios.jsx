@@ -98,8 +98,8 @@ export default function ListaUsuarios() {
             <button
               onClick={() => navigate('/admin/usuarios/nuevo')}
               className="flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99]
-                         text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm">
-              <UserPlus size={15} /> Nuevo usuario
+                         text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5">
+              <UserPlus size={18} /> Nuevo usuario
             </button>
           </div>
 
@@ -197,8 +197,8 @@ export default function ListaUsuarios() {
                 </p>
                 <button onClick={() => navigate('/admin/usuarios/nuevo')}
                   className="inline-flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99]
-                             text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-sm">
-                  <UserPlus size={15} /> Crear usuario nuevo
+                             text-white text-sm font-semibold px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5">
+                  <UserPlus size={18} /> Crear usuario nuevo
                 </button>
               </div>
             ) : (
@@ -225,8 +225,23 @@ export default function ListaUsuarios() {
                                 : pendiente ? 'bg-amber-50/60 hover:bg-amber-50'
                                 : 'hover:bg-slate-50'}`}>
                             <td className="px-4 py-3 whitespace-nowrap font-mono text-xs text-slate-500">{u.DNI}</td>
-                            <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-800">
-                              {u.nombre} {u.apellido}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                {u.avatar ? (
+                                  <img
+                                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${u.avatar}`}
+                                    alt="Avatar"
+                                    className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-[#0059B3]/10 flex items-center justify-center text-[#0059B3] text-xs font-bold flex-shrink-0">
+                                    {(u.nombre?.[0] ?? '') + (u.apellido?.[0] ?? '')}
+                                  </div>
+                                )}
+                                <span className="font-medium text-slate-800">
+                                  {u.nombre} {u.apellido}
+                                </span>
+                              </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-slate-600">{u.email}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-slate-600">{ROL_LABEL[u.rol] ?? u.rol ?? '—'}</td>

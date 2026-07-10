@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Filter, Plus, Eye, UserX, UserCheck, Clock, Loader2,
+  Search, Filter, Plus, UserPlus, Eye, UserX, UserCheck, Clock, Loader2,
   ChevronLeft, ChevronRight, AlertCircle, FileX
 } from 'lucide-react';
 import api from '../../api/axios';
@@ -136,10 +136,10 @@ export default function GestionDoctores() {
           </div>
           <div className="mt-4 sm:mt-0">
             <button
-              onClick={() => navigate('/admin/usuarios/nuevo')}
-              className="flex items-center gap-2 bg-[#0059B3] hover:bg-[#004494] text-white px-5 py-2.5 rounded-full font-medium transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105"
+              onClick={() => navigate('/admin/usuarios/nuevo?tipo=doctor')}
+              className="flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99] text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
             >
-              <Plus size={18} /> Crear doctor nuevo
+              <UserPlus size={18} /> Crear doctor nuevo
             </button>
           </div>
         </div>
@@ -204,10 +204,10 @@ export default function GestionDoctores() {
                           Intenta ajustar los filtros de búsqueda o registra un nuevo doctor.
                         </p>
                         <button
-                          onClick={() => navigate('/admin/usuarios/nuevo')}
-                          className="flex items-center gap-2 bg-[#0059B3] hover:bg-[#004494] text-white px-5 py-2.5 rounded-full font-medium transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 text-sm"
+                          onClick={() => navigate('/admin/usuarios/nuevo?tipo=doctor')}
+                          className="inline-flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99] text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
                         >
-                          <Plus size={16} /> Crear doctor nuevo
+                          <UserPlus size={18} /> Crear doctor nuevo
                         </button>
                       </div>
                     </td>
@@ -217,8 +217,21 @@ export default function GestionDoctores() {
                     <tr key={u.usuario_id} className={`transition-colors ${getRowClass(u.estado)}`}>
                       <td className="px-6 py-4 font-medium text-slate-700">{u.DNI}</td>
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-800">
-                          {u.nombre} {u.apellido}
+                        <div className="flex items-center gap-3">
+                          {u.avatar ? (
+                            <img
+                              src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${u.avatar}`}
+                              alt="Avatar"
+                              className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-[#0059B3]/10 flex items-center justify-center text-[#0059B3] text-xs font-bold flex-shrink-0">
+                              {(u.nombre?.[0] ?? '') + (u.apellido?.[0] ?? '')}
+                            </div>
+                          )}
+                          <div className="font-semibold text-slate-800 leading-tight">
+                            {u.nombre} {u.apellido}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{u.email}</td>

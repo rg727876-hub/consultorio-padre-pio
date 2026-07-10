@@ -12,7 +12,7 @@ const getActive = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT u.usuario_id AS doctor_id,
-              u.nombre, u.apellido, u.DNI,
+              u.nombre, u.apellido, u.DNI, u.avatar,
               (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
                  FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
                 WHERE de.doctor_id = u.usuario_id) AS especialidad,
@@ -109,56 +109,51 @@ const getDoctorProfile = async (req, res) => {
   try {
     conn = await pool.getConnection();
     
-    // 1. Datos básicos
-    let users;
-    try {
-      [users] = await conn.query(`
-        SELECT 
-          u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
-          u.estado, u.fecha_registro,
-          (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
-             FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
-            WHERE de.doctor_id = u.usuario_id) AS especialidad,
-          (SELECT GROUP_CONCAT(de2.especialidad_id ORDER BY de2.especialidad_id)
-             FROM DOCTOR_ESPECIALIDAD de2
-            WHERE de2.doctor_id = u.usuario_id) AS especialidadesIds,
-          CAST(d.nroColegiatura AS CHAR) AS nroColegiatura
-        FROM USUARIO u
-        LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
-        WHERE u.usuario_id = ?
-      `, [doctorId]);
-    } catch (err) {
-      if (isBadFieldError(err)) {
-        const [fallbackUsers] = await conn.query(`
-          SELECT 
-            u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
-            u.estado, u.fecha_registro,
-            NULL AS especialidad, NULL AS especialidadesIds, NULL AS nroColegiatura
-          FROM USUARIO u
-          LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
-          WHERE u.usuario_id = ?
-        `, [doctorId]);
-        users = fallbackUsers;
-      } else {
-        throw err;
-      }
-    }
+    // 1. Datos básicos del usuario
+    const [users] = await conn.query(`
+      SELECT 
+        u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono, u.direccion,
+        u.estado, u.fecha_registro, u.avatar
+      FROM USUARIO u
+      WHERE u.usuario_id = ?
+    `, [doctorId]);
 
     if (!users.length) return res.status(404).json({ error: 'Doctor no encontrado' });
     const doctor = users[0];
-    
-    // Parse especialidadesIds back to array
-    if (doctor.especialidadesIds) {
-      doctor.especialidadesIds = String(doctor.especialidadesIds).split(',').map(Number).filter(Boolean);
+
+    // 2. Datos de la tabla DOCTOR (COP y especialidades)
+    const [doctorRows] = await conn.query(`
+      SELECT 
+        d.nroColegiatura,
+        (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
+           FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
+          WHERE de.doctor_id = d.doctor_id) AS especialidad,
+        (SELECT GROUP_CONCAT(de2.especialidad_id ORDER BY de2.especialidad_id)
+           FROM DOCTOR_ESPECIALIDAD de2
+          WHERE de2.doctor_id = d.doctor_id) AS especialidadesIds
+      FROM DOCTOR d
+      WHERE d.doctor_id = ?
+    `, [doctorId]);
+
+    if (doctorRows.length > 0) {
+      const dr = doctorRows[0];
+      // Convertir nroColegiatura a string de forma segura
+      doctor.nroColegiatura = (dr.nroColegiatura !== null && dr.nroColegiatura !== undefined)
+        ? String(dr.nroColegiatura)
+        : null;
+      doctor.especialidad = dr.especialidad || null;
+      // Parse especialidadesIds a array de números
+      doctor.especialidadesIds = dr.especialidadesIds
+        ? String(dr.especialidadesIds).split(',').map(Number).filter(Boolean)
+        : [];
     } else {
+      // Doctor no tiene fila en tabla DOCTOR todavía
+      doctor.nroColegiatura = null;
+      doctor.especialidad = null;
       doctor.especialidadesIds = [];
     }
-    // Asegurar que nroColegiatura es string (puede llegar como número desde MySQL)
-    if (doctor.nroColegiatura != null) {
-      doctor.nroColegiatura = String(doctor.nroColegiatura);
-    }
 
-    // 2. Servicios
+    // 3. Servicios
     const [servicios] = await conn.query(`
       SELECT s.servicio_id, s.nombre AS nombre_servicio 
       FROM SERVICIO s
@@ -167,7 +162,7 @@ const getDoctorProfile = async (req, res) => {
     `, [doctorId]);
     doctor.servicios = servicios;
 
-    // 3. Horarios
+    // 4. Horarios
     const [horarios] = await conn.query(`
       SELECT dia_semana, hora_inicio, hora_fin 
       FROM HORARIO 
@@ -176,7 +171,7 @@ const getDoctorProfile = async (req, res) => {
     `, [doctorId]);
     doctor.horarios = horarios;
 
-    // 4. Citas Futuras
+    // 5. Citas Futuras
     const [citas] = await conn.query(`
       SELECT COUNT(*) as cantidad 
       FROM CITA 
@@ -184,7 +179,7 @@ const getDoctorProfile = async (req, res) => {
     `, [doctorId]);
     doctor.citasFuturas = citas[0].cantidad;
 
-    // 5. Auditoría
+    // 6. Auditoría
     const [audit] = await conn.query(`
       SELECT accion, detalles, fecha_evento, 
         (SELECT CONCAT(nombre, ' ', apellido) FROM USUARIO actor WHERE actor.usuario_id = a.usuario_id) as autor
@@ -207,7 +202,12 @@ const getDoctorProfile = async (req, res) => {
 // PUT /api/doctors/:id
 const updateDoctorProfile = async (req, res) => {
   const doctorId = Number(req.params.id);
-  const { nombre, apellido, email, telefono, direccion, nroColegiatura, serviciosIds, especialidadesIds } = req.body;
+  const { nombre, apellido, email, telefono, direccion, serviciosIds, especialidadesIds } = req.body;
+  // nroColegiatura puede venir como string del form; convertir a entero para MySQL (columna INT)
+  const copRaw = req.body.nroColegiatura;
+  const nroColegiatura = (copRaw !== null && copRaw !== undefined && copRaw !== '') 
+    ? parseInt(String(copRaw).replace(/\D/g, ''), 10) 
+    : null;
   let conn;
 
   try {
@@ -217,6 +217,9 @@ const updateDoctorProfile = async (req, res) => {
     const [users] = await conn.query('SELECT estado, email FROM USUARIO WHERE usuario_id = ?', [doctorId]);
     if (!users.length) return res.status(404).json({ error: 'Doctor no encontrado' });
     const user = users[0];
+
+    if (!nroColegiatura || isNaN(nroColegiatura))
+      return res.status(400).json({ error: 'El número de colegiatura (C.O.P.) es requerido y debe ser un número válido' });
 
     // CA6: Validar email único
     const [existingEmail] = await conn.query('SELECT usuario_id FROM USUARIO WHERE email = ? AND usuario_id != ?', [email, doctorId]);

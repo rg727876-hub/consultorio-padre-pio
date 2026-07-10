@@ -1,9 +1,10 @@
 const { Router } = require('express');
 const {
-  register, list, getById, update, deactivate, reactivate, resendActivation, getActivity,
+  register, list, getById, update, deactivate, reactivate, resendActivation, getActivity, uploadAvatar
 } = require('../controllers/user.controller');
 const { verifyToken: authMiddleware } = require('../middlewares/auth.middleware');
 const { checkRole } = require('../middlewares/role.middleware');
+const { upload } = require('../middlewares/upload.middleware');
 
 const router = Router();
 const soloAdmin = checkRole('ADMINISTRADOR');
@@ -29,5 +30,8 @@ router.post('/:id/resend-activation', authMiddleware, soloAdmin, resendActivatio
 // PATCH /api/users/:id/deactivate | /reactivate  — gestión de estado
 router.patch('/:id/deactivate', authMiddleware, soloAdmin, deactivate);
 router.patch('/:id/reactivate', authMiddleware, soloAdmin, reactivate);
+
+// POST /api/users/:id/avatar — subir/actualizar imagen de perfil
+router.post('/:id/avatar', authMiddleware, soloAdmin, upload.single('avatar'), uploadAvatar);
 
 module.exports = router;

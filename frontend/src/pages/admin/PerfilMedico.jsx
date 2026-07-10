@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   User, Mail, Phone, MapPin, Calendar, Clock,
-  Edit2, Trash2, RotateCcw, Send, Save, X, ArrowLeft, Loader2, AlertCircle, Activity, Shield, Stethoscope
+  Edit2, Trash2, RotateCcw, Send, Save, X, ArrowLeft, Loader2, AlertCircle, Activity, Shield, Stethoscope, Camera
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
@@ -25,6 +25,7 @@ export default function PerfilMedico() {
   const [isStatusChanging, setIsStatusChanging] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Form states
   const [form, setForm] = useState({
@@ -80,11 +81,12 @@ export default function PerfilMedico() {
     try {
       setLoading(true);
       const { data } = await api.get(`/doctors/${id}/profile`);
-      // Normalizar nroColegiatura: MySQL devuelve INT como número JS
-      const copStr = data.nroColegiatura != null ? String(data.nroColegiatura) : '';
+      // nroColegiatura llega como string o null desde el backend
+      const copStr = (data.nroColegiatura != null && data.nroColegiatura !== '')
+        ? String(data.nroColegiatura)
+        : null;
       const espIds = Array.isArray(data.especialidadesIds) ? data.especialidadesIds : [];
-      const normalizedData = { ...data, nroColegiatura: copStr, especialidadesIds: espIds };
-      setDoctor(normalizedData);
+      setDoctor({ ...data, nroColegiatura: copStr, especialidadesIds: espIds });
       setAudit(data.auditoria || []);
       setForm({
         nombre: data.nombre || '',
@@ -93,16 +95,13 @@ export default function PerfilMedico() {
         telefono: data.telefono || '',
         direccion: data.direccion || '',
         especialidadesIds: espIds,
-        nroColegiatura: copStr,
+        nroColegiatura: copStr || '',
         serviciosIds: data.servicios?.map(s => s.servicio_id) || []
       });
     } catch (err) {
       console.error('[PerfilMedico.fetchProfile] Error:', err.response?.data || err.message);
       const loaded = await fetchUserProfile();
-      if (loaded) {
-        console.warn('[PerfilMedico.fetchProfile] fallback al perfil de usuario');
-        return;
-      }
+      if (loaded) return;
 
       const serverMessage = err.response?.data?.error;
       const status = err.response?.status;
@@ -115,7 +114,6 @@ export default function PerfilMedico() {
       } else {
         toast.error(err.message || 'Error al cargar el perfil del médico.');
       }
-
       if (!doctor) navigate('/admin/doctores');
     } finally {
       setLoading(false);
@@ -234,6 +232,34 @@ export default function PerfilMedico() {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 5MB');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('avatar', file);
+    setUploadingAvatar(true);
+    try {
+      const { data } = await api.post(`/users/${id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success('Foto de perfil actualizada');
+      setDoctor(d => ({ ...d, avatar: data.avatar }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al subir la imagen');
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────
   if (loading && !doctor) {
     return (
@@ -312,8 +338,24 @@ export default function PerfilMedico() {
         {/* Top actions (CA4) */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-[#0059B3]/10 flex items-center justify-center text-[#0059B3] text-xl font-bold shrink-0">
-              {(doctor?.nombre?.[0] || '')}{(doctor?.apellido?.[0] || '')}
+            <div className="relative group w-20 h-20 shrink-0">
+              {doctor?.avatar ? (
+                <img
+                  src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`}
+                  alt="Avatar"
+                  className="w-full h-full rounded-full object-cover border-2 border-slate-100"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-[#0059B3]/10 flex items-center justify-center text-[#0059B3] text-2xl font-bold">
+                  {(doctor?.nombre?.[0] || '')}{(doctor?.apellido?.[0] || '')}
+                </div>
+              )}
+              <label className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 cursor-pointer transition-opacity text-white ${!isInactive && !uploadingAvatar ? 'group-hover:opacity-100' : 'hidden'}`}
+                     title="Cambiar foto de perfil">
+                {uploadingAvatar ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                <input type="file" accept="image/jpeg, image/png, image/webp" className="hidden"
+                       onChange={handleAvatarUpload} disabled={uploadingAvatar || isInactive} />
+              </label>
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-800">Dr. {doctor.nombre} {doctor.apellido}</h2>
@@ -490,8 +532,8 @@ export default function PerfilMedico() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
                   <DetailItem icon={<Shield size={16} />} label="DNI" value={doctor.DNI} />
-                  <DetailItem icon={<Stethoscope size={16} />} label="Especialidad" value={doctor.especialidad || 'Médico General'} />
-                  <DetailItem icon={<Shield size={16} />} label="C.O.P." value={doctor.nroColegiatura || 'No registrado'} />
+                  <DetailItem icon={<Stethoscope size={16} />} label="Especialidad" value={doctor.especialidad} />
+                  <DetailItem icon={<Shield size={16} />} label="C.O.P." value={doctor.nroColegiatura} />
                   <DetailItem icon={<Mail size={16} />} label="Correo electrónico" value={doctor.email} />
                   <DetailItem icon={<Phone size={16} />} label="Teléfono" value={doctor.telefono} />
                   <DetailItem icon={<MapPin size={16} />} label="Dirección" value={doctor.direccion || 'No registrada'} />

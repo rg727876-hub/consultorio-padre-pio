@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronUp, Pencil, X, Check,
   Loader2, AlertCircle, LogOut, Phone, MapPin, Clock,
-  User, Users, Calendar, Home,
+  User, Users, Calendar, Home, Camera
 } from 'lucide-react';
-import { getProfile, updateProfile } from '../../services/patientProfile.service';
+import { getProfile, updateProfile, uploadPhotoProfile } from '../../services/patientProfile.service';
 import { usePatientAuth } from '../../context/PatientAuthContext';
 import FamiliaresTab from '../familiares/FamiliaresTab';
 
@@ -120,6 +120,8 @@ export default function ProfilePage() {
   const [editSaving, setEditSaving]           = useState(false);
   const [editServerError, setEditServerError] = useState(null);
   const [successMsg, setSuccessMsg]           = useState(null);
+  const [imageFile, setImageFile]             = useState(null);
+  const [imagePreview, setImagePreview]       = useState(null);
 
   const fetchProfile = useCallback(async () => {
     setLoading(true); setPageError(null);
@@ -145,12 +147,23 @@ export default function ProfilePage() {
       contacto_emergencia:  profile.contacto_emergencia ?? '',
     };
     setEditForm(initial); setEditOriginal(initial);
+    setImageFile(null);
+    setImagePreview(profile.foto ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}` : null);
     setEditErrors({}); setEditTouched({}); setEditServerError(null); setShowEdit(true);
   };
 
   const cancelEdit = () => {
     setEditForm(editOriginal); setEditErrors({});
+    setImageFile(null); setImagePreview(null);
     setEditTouched({}); setEditServerError(null); setShowEdit(false);
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
   };
 
   const handleEditChange = (e) => {
@@ -174,17 +187,32 @@ export default function ProfilePage() {
     if (Object.keys(errs).length > 0) return;
     setEditSaving(true); setEditServerError(null);
     try {
-      const { data } = await updateProfile({
-        telefono:            editForm.telefono.replace(/\D/g, ''),
-        direccion:           editForm.direccion.trim(),
-        ocupacion:           editForm.ocupacion.trim() || null,
-        contacto_emergencia: editForm.contacto_emergencia.replace(/\D/g, '') || null,
-      });
-      setProfile(data); setShowEdit(false);
+      let finalProfile = profile;
+      
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append('foto', imageFile);
+        const imgRes = await uploadPhotoProfile(formData);
+        finalProfile = { ...finalProfile, foto: imgRes.data.fotoUrl };
+      }
+
+      if (isDirty(editForm, editOriginal)) {
+        const { data } = await updateProfile({
+          telefono:            editForm.telefono.replace(/\D/g, ''),
+          direccion:           editForm.direccion.trim(),
+          ocupacion:           editForm.ocupacion.trim() || null,
+          contacto_emergencia: editForm.contacto_emergencia.replace(/\D/g, '') || null,
+        });
+        finalProfile = { ...finalProfile, ...data };
+      }
+
+      setProfile(finalProfile); setShowEdit(false);
       setSuccessMsg('Información de perfil actualizada exitosamente.');
       setTimeout(() => setSuccessMsg(null), 4000);
-    } catch {
-      setEditServerError('Ocurrió un error al actualizar los datos. Por favor, intente nuevamente.');
+    } catch (err) {
+      console.error('Update error:', err);
+      const msg = err.response?.data?.error || err.message || 'Ocurrió un error al actualizar los datos. Por favor, intente nuevamente.';
+      setEditServerError(msg);
     } finally {
       setEditSaving(false);
     }
@@ -205,7 +233,7 @@ export default function ProfilePage() {
     </div>
   );
 
-  const canSave = editForm && isDirty(editForm, editOriginal) && isFormValid(editForm);
+  const canSave = (editForm && isDirty(editForm, editOriginal) && isFormValid(editForm)) || imageFile !== null;
   const edad    = calcEdad(profile.fecha_nacimiento);
 
   const NAV_TABS = [
@@ -264,10 +292,18 @@ export default function ProfilePage() {
           {/* Usuario + logout desktop */}
           <div className="hidden md:flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center
-                              text-white text-xs font-black select-none">
-                {iniciales(profile.nombre, profile.apellido)}
-              </div>
+              {profile.foto ? (
+                <img 
+                  src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                  alt="Perfil" 
+                  className="w-7 h-7 rounded-full object-cover border border-slate-200"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center
+                                text-white text-xs font-black select-none">
+                  {iniciales(profile.nombre, profile.apellido)}
+                </div>
+              )}
               <span className="text-sm font-semibold text-slate-700">
                 {toTitle(profile.nombre)}
               </span>
@@ -310,10 +346,18 @@ export default function ProfilePage() {
             ))}
             <div className="pt-3 mt-2 border-t border-slate-100">
               <div className="flex items-center gap-2 mb-3 px-1">
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center
-                                text-white text-sm font-black select-none">
-                  {iniciales(profile.nombre, profile.apellido)}
-                </div>
+                {profile.foto ? (
+                  <img 
+                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                    alt="Perfil" 
+                    className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center
+                                  text-white text-sm font-black select-none">
+                    {iniciales(profile.nombre, profile.apellido)}
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-bold text-slate-800">{toTitle(profile.nombre)} {toTitle(profile.apellido)}</p>
                   <p className="text-xs text-slate-400">{profile.email_cuenta}</p>
@@ -448,11 +492,19 @@ export default function ProfilePage() {
               <div className="px-6 pb-6">
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-12 mb-6 relative z-10">
                   {/* Avatar */}
-                  <div className="w-24 h-24 rounded-2xl bg-primary border-4 border-white
-                                  flex items-center justify-center shadow-lg
-                                  text-white text-2xl font-black select-none">
-                    {iniciales(profile.nombre, profile.apellido)}
-                  </div>
+                  {profile.foto ? (
+                    <img 
+                      src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                      alt="Perfil" 
+                      className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-lg flex-shrink-0 bg-white"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl bg-primary border-4 border-white
+                                    flex items-center justify-center shadow-lg
+                                    text-white text-3xl font-black select-none flex-shrink-0">
+                      {iniciales(profile.nombre, profile.apellido)}
+                    </div>
+                  )}
                   <button
                     onClick={openEdit}
                     className="self-start sm:self-auto inline-flex items-center gap-2 bg-accent text-white
@@ -612,7 +664,7 @@ export default function ProfilePage() {
       {/* ── Modal de edición ── */}
       {showEdit && editForm && (
         <div
-          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center
                      bg-black/50 sm:px-4"
           onClick={(e) => { if (e.target === e.currentTarget) cancelEdit(); }}
         >
@@ -622,7 +674,7 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
               <div>
                 <h2 className="text-base font-bold text-slate-800">Editar mi información</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Los datos de identidad no pueden modificarse</p>
+                <p className="text-xs text-slate-400 mt-0.5">Actualiza tu foto y datos de contacto</p>
               </div>
               <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600 transition-colors p-1">
                 <X size={19} />
@@ -630,6 +682,35 @@ export default function ProfilePage() {
             </div>
 
             <div className="overflow-y-auto px-5 py-5 space-y-5">
+              
+              {/* Foto de Perfil */}
+              <div className="flex justify-center mb-2">
+                <div className="relative group">
+                  <label htmlFor="editFotoUpload" className="cursor-pointer block relative">
+                    {imagePreview ? (
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-24 h-24 rounded-full object-cover border-4 border-slate-100 shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-slate-100 border-4 border-slate-50 flex items-center justify-center text-slate-400 shadow-sm group-hover:bg-slate-200 transition-colors">
+                        <Camera size={32} />
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full shadow-md border-2 border-white">
+                      <Camera size={14} />
+                    </div>
+                  </label>
+                  <input 
+                    type="file" 
+                    id="editFotoUpload" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageChange}
+                  />
+                </div>
+              </div>
 
               {/* Solo lectura */}
               <div>

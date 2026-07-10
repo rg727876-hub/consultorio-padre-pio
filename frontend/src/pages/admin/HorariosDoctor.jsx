@@ -240,10 +240,20 @@ export default function HorariosDoctor() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between
                             gap-4 bg-white rounded-2xl shadow-sm p-5 mb-5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0059B3]
-                                flex items-center justify-center shrink-0">
-                  <UserRound size={20} />
-                </div>
+              <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
+                {doctor.avatar ? (
+                  <img
+                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-blue-50 flex items-center justify-center
+                                  text-[#0059B3] text-sm font-bold">
+                    {(doctor.nombre?.[0] ?? '')}{(doctor.apellido?.[0] ?? '')}
+                  </div>
+                )}
+              </div>
                 <div>
                   <p className="font-semibold text-slate-800">
                     Dr. {doctor.nombre} {doctor.apellido}

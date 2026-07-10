@@ -185,4 +185,38 @@ const update = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getAdmin, create, update };
+// ─────────────────────────────────────────────────────────────────
+// POST /api/services/:id/image — subir/actualizar imagen de servicio
+// ─────────────────────────────────────────────────────────────────
+const uploadImage = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isInteger(id)) return res.status(400).json({ error: 'ID de servicio inválido' });
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se ha subido ningún archivo válido' });
+  }
+
+  try {
+    const [[service]] = await pool.query('SELECT servicio_id FROM SERVICIO WHERE servicio_id = ?', [id]);
+    if (!service) {
+      const fs = require('fs');
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Servicio no encontrado' });
+    }
+
+    const imageUrl = `/uploads/services/${req.file.filename}`;
+    await pool.query('UPDATE SERVICIO SET imagen = ? WHERE servicio_id = ?', [imageUrl, id]);
+
+    await logAudit({
+      usuario_id: req.user?.id, accion: 'ACTUALIZAR_IMAGEN_SERVICIO', entidad: 'SERVICIO',
+      entidad_id: id, detalles: `Imagen actualizada`, ip_origen: req.ip,
+    });
+
+    return res.json({ message: 'Imagen del servicio actualizada correctamente', imagen: imageUrl });
+  } catch (err) {
+    console.error('[service.uploadImage]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getAll, getAdmin, create, update, uploadImage };

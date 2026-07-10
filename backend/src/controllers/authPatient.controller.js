@@ -50,6 +50,7 @@ const register = async (req, res) => {
     confirmar_password,
     acepta_politica,
   } = req.body;
+  const fotoUrl = req.file ? `/uploads/patients/${req.file.filename}` : null;
 
   // ── Campos obligatorios ───────────────────────────────────────────────────
   if (
@@ -160,6 +161,7 @@ const register = async (req, res) => {
       email_cuenta:     emailLower,
       fecha_nacimiento,
       password_hash,
+      foto:             fotoUrl,
     });
 
     // ── Email de bienvenida (fire-and-forget, no bloquea la respuesta) ─────
@@ -296,7 +298,10 @@ const login = async (req, res) => {
       id:       paciente.paciente_id,
       nombre:   paciente.nombre,
       apellido: paciente.apellido,
+      email:    paciente.email_cuenta,
+      foto:     paciente.foto,
       tipo:     'PACIENTE',
+      rol:      'PACIENTE',
     };
 
     const token = generateToken(payload);

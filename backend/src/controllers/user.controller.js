@@ -216,7 +216,7 @@ const list = async (req, res) => {
     );
 
     const [rows] = await pool.query(
-      `SELECT u.usuario_id, u.DNI, u.nombre, u.apellido, u.email, u.estado,
+      `SELECT u.usuario_id, u.DNI, u.nombre, u.apellido, u.email, u.estado, u.avatar,
               ${SUB_ROL} AS rol,
               ${SUB_ESP} AS especialidad
        FROM   USUARIO u
@@ -249,7 +249,7 @@ const getById = async (req, res) => {
   try {
     const [[user]] = await pool.query(
       `SELECT u.usuario_id, u.nombre, u.apellido, u.email, u.DNI, u.telefono,
-              u.direccion, u.estado, u.fecha_registro,
+              u.direccion, u.estado, u.fecha_registro, u.avatar,
               CAST(d.nroColegiatura AS CHAR) AS nroColegiatura,
               ${SUB_ROL} AS rol,
               ${SUB_ESP} AS especialidad
@@ -507,4 +507,39 @@ const getActivity = async (req, res) => {
   }
 };
 
-module.exports = { register, list, getById, update, deactivate, reactivate, resendActivation, getActivity };
+// ─────────────────────────────────────────────────────────────────
+// POST /api/users/:id/avatar — subir/actualizar imagen de perfil
+// ─────────────────────────────────────────────────────────────────
+const uploadAvatar = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isInteger(id)) return res.status(400).json({ error: 'ID de usuario inválido' });
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se ha subido ningún archivo válido' });
+  }
+
+  try {
+    const [[user]] = await pool.query('SELECT usuario_id FROM USUARIO WHERE usuario_id = ?', [id]);
+    if (!user) {
+      // Si el usuario no existe, borrar archivo huérfano
+      const fs = require('fs');
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    await pool.query('UPDATE USUARIO SET avatar = ? WHERE usuario_id = ?', [avatarUrl, id]);
+
+    await logAudit({
+      usuario_id: req.user?.id, accion: 'ACTUALIZAR_AVATAR', entidad: 'USUARIO',
+      entidad_id: id, detalles: `Avatar actualizado`, ip_origen: req.ip,
+    });
+
+    return res.json({ message: 'Foto de perfil actualizada correctamente', avatar: avatarUrl });
+  } catch (err) {
+    console.error('[user.uploadAvatar]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { register, list, getById, update, deactivate, reactivate, resendActivation, getActivity, uploadAvatar };

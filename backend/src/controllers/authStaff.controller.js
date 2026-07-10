@@ -14,7 +14,7 @@ const login = async (req, res) => {
   try {
     // Obtener usuario + su rol (JOIN con ROL_USUARIO y ROL)
     const [rows] = await pool.query(
-      `SELECT u.usuario_id, u.nombre, u.apellido, u.email,
+      `SELECT u.usuario_id, u.nombre, u.apellido, u.email, u.avatar,
               u.password_hash, u.estado,
               u.intentos_fallidos, u.bloqueado_hasta,
               r.nombre_rol AS rol
@@ -88,6 +88,7 @@ const login = async (req, res) => {
       apellido: user.apellido,
       email:    user.email,
       rol:      user.rol,
+      avatar:   user.avatar,
     };
 
     const token = generateToken(payload);
