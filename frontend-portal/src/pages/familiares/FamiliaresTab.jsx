@@ -9,6 +9,7 @@ import {
   getFamiliarDetalle, updateFamiliar, desvincularFamiliar,
 } from '../../services/patientFamily.service';
 import HistorialClinico from '../../components/HistorialClinico';
+import { ProximasCitas, MisPagos } from '../../components/MisCitas';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const PARENTESCOS = [
@@ -267,6 +268,7 @@ function FamiliarDetalle({ familiar: initialData, onBack, onDesvinculado, onSucc
 
   const ACCORDIONS = [
     { id: 'proximas',  label: 'Próximas citas',    hu: 'HU004' },
+    { id: 'pagos',     label: 'Mis pagos',         hu: 'HU004' },
     { id: 'historial', label: 'Historias clínicas', hu: 'HU005' },
   ];
 
@@ -367,6 +369,12 @@ function FamiliarDetalle({ familiar: initialData, onBack, onDesvinculado, onSucc
                     open={openAccordions.has(acc.id)}
                     onToggle={toggleAccordion}
                   >
+                    {acc.id === 'proximas' && openAccordions.has('proximas') && (
+                      <ProximasCitas pacienteId={familiar.paciente_id} onSuccess={onSuccess} />
+                    )}
+                    {acc.id === 'pagos' && openAccordions.has('pagos') && (
+                      <MisPagos pacienteId={familiar.paciente_id} />
+                    )}
                     {acc.id === 'historial' && openAccordions.has('historial') && (
                       <HistorialClinico pacienteId={familiar.paciente_id} />
                     )}

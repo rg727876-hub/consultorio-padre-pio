@@ -14,3 +14,16 @@ export const liberarHold = (holdId) =>
 
 export const confirmarPago = (data) =>
   api.post('/portal/appointments/confirm-payment', data);
+
+// ── Mis citas (WEB-HU004) ────────────────────────────────────────────────────
+export const getMisCitas = (pacienteId, tipo = 'proximas') =>
+  api.get('/portal/appointments', { params: { paciente_id: pacienteId, tipo } });
+
+export const getCitaDetalle = (citaId) =>
+  api.get(`/portal/appointments/${citaId}`);
+
+export const anularCita = (citaId) =>
+  api.patch(`/portal/appointments/${citaId}/cancel`);
+
+export const reprogramarCita = (citaId, data) =>
+  api.patch(`/portal/appointments/${citaId}/reschedule`, data);

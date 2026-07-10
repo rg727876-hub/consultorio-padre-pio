@@ -9,6 +9,7 @@ import { getProfile, updateProfile } from '../../services/patientProfile.service
 import { usePatientAuth } from '../../context/PatientAuthContext';
 import FamiliaresTab from '../familiares/FamiliaresTab';
 import HistorialClinico from '../../components/HistorialClinico';
+import { ProximasCitas, MisPagos } from '../../components/MisCitas';
 import BookingWizard from '../booking/BookingWizard';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -232,6 +233,7 @@ export default function ProfilePage() {
 
   const ACCORDIONS = [
     { id: 'proximas',  label: 'Próximas citas',    hu: 'HU004' },
+    { id: 'pagos',     label: 'Mis pagos',         hu: 'HU004' },
     { id: 'historial', label: 'Historias clínicas', hu: 'HU005' },
   ];
 
@@ -510,6 +512,18 @@ export default function ProfilePage() {
                         open={openAccordions.has(acc.id)}
                         onToggle={toggleAccordion}
                       >
+                        {acc.id === 'proximas' && openAccordions.has('proximas') && (
+                          <ProximasCitas
+                            pacienteId={profile.paciente_id}
+                            onSuccess={(msg) => {
+                              setSuccessMsg(msg);
+                              setTimeout(() => setSuccessMsg(null), 4000);
+                            }}
+                          />
+                        )}
+                        {acc.id === 'pagos' && openAccordions.has('pagos') && (
+                          <MisPagos pacienteId={profile.paciente_id} />
+                        )}
                         {acc.id === 'historial' && openAccordions.has('historial') && (
                           <HistorialClinico pacienteId={profile.paciente_id} />
                         )}
