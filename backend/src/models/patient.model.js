@@ -99,13 +99,15 @@ const updateContactInfo = async (paciente_id, { telefono, direccion, ocupacion, 
   );
 };
 
+// Incluye SIN_CUENTA (WEB-HU001: vincular cuenta a un registro interno) y
+// FAMILIAR (WEB-HU009: familiar vinculado que quiere activar su propia cuenta).
 const findByDocumentPreview = async (tipo_documento, numero_documento) => {
   const [[row]] = await pool.query(
     `SELECT paciente_id, nombre, apellido, tipo_documento, numero_documento,
             fecha_nacimiento, estado_cuenta
      FROM   PACIENTE
      WHERE  tipo_documento = ? AND numero_documento = ?
-       AND  estado_cuenta = 'SIN_CUENTA'`,
+       AND  estado_cuenta IN ('SIN_CUENTA', 'FAMILIAR')`,
     [tipo_documento, numero_documento]
   );
   return row ?? null;

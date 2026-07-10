@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const pool   = require('../config/db');
 const { generateToken } = require('../utils/jwt.util');
+const { logAudit }      = require('../utils/audit.util');
 
 const MAX_INTENTOS   = 5;
 const BLOQUEO_MIN    = 15;
@@ -104,4 +105,53 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login };
+// ─────────────────────────────────────────────────────────────────
+// POST /api/auth/staff/reauthenticate
+// Doble factor para zonas sensibles (Dashboard de reportes).
+// Requiere token JWT válido + contraseña del propio usuario logueado.
+// Registra el intento (éxito o fallo) en AUDITORIA.
+// El lockout por reintentos se maneja en cliente (sessionStorage / localStorage).
+// ─────────────────────────────────────────────────────────────────
+const reauthenticate = async (req, res) => {
+  const { password } = req.body;
+  const usuario_id   = req.user?.id;
+
+  if (!password)
+    return res.status(400).json({ error: 'Contraseña requerida' });
+  if (!usuario_id)
+    return res.status(401).json({ error: 'Sesión inválida' });
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT usuario_id, password_hash, estado
+         FROM USUARIO
+        WHERE usuario_id = ?`,
+      [usuario_id],
+    );
+    if (!rows.length)
+      return res.status(401).json({ error: 'Usuario no encontrado' });
+
+    const user = rows[0];
+    if (user.estado !== 'ACTIVO')
+      return res.status(403).json({ error: 'Cuenta no activa' });
+
+    const passwordOk = await bcrypt.compare(password, user.password_hash);
+
+    await logAudit({
+      usuario_id,
+      accion:    passwordOk ? 'REAUTH_REPORTES_OK' : 'REAUTH_REPORTES_FAIL',
+      entidad:   'REPORTE',
+      ip_origen: req.ip,
+    });
+
+    if (!passwordOk)
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[authStaff.reauthenticate]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { login, reauthenticate };

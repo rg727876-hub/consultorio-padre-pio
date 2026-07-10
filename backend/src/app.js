@@ -30,8 +30,11 @@ const consultaRoutes     = require('./routes/consulta.routes');
 const historialRoutes       = require('./routes/historial.routes');
 const especialidadRoutes    = require('./routes/especialidad.routes');
 const patientProfileRoutes  = require('./routes/patientProfile.routes');
+const reporteRoutes         = require('./routes/reporte.routes');
 const familiarRoutes        = require('./routes/familiar.routes');
 const publicRoutes          = require('./routes/public.routes');
+const patientHistorialRoutes = require('./routes/patientHistorial.routes');
+const portalAppointmentRoutes = require('./routes/portalAppointment.routes');
 
 const app = express();
 
@@ -97,8 +100,11 @@ app.use('/api/consultas',    consultaRoutes);
 app.use('/api/historial',    historialRoutes);
 app.use('/api/especialidades', especialidadRoutes);
 app.use('/api/patient',       patientProfileRoutes);
+app.use('/api/reportes',      reporteRoutes);
 app.use('/api/familiar',      familiarRoutes);
 app.use('/api/public',        publicRoutes);
+app.use('/api/mi-historial',  patientHistorialRoutes);
+app.use('/api/portal/appointments', portalAppointmentRoutes);
 
 // Manejo de errores
 app.use(errorHandler);

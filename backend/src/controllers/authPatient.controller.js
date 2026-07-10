@@ -4,9 +4,10 @@ const {
   findByDocument, findByEmailCuenta, registerWebAccount,
   findByDocumentForLogin, findByDocumentPreview, linkWebAccount,
 } = require('../models/patient.model');
+const { getTitularesActivos, desvincularTodasComoFamiliar } = require('../models/familiar.model');
 const { generateToken } = require('../utils/jwt.util');
 const { logAudit } = require('../utils/audit.util');
-const { sendWelcomePatientEmail } = require('../utils/mailer.util');
+const { sendWelcomePatientEmail, sendFamiliarActivadoEmail } = require('../utils/mailer.util');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -379,17 +380,34 @@ const preview = async (req, res) => {
       : String(paciente.fecha_nacimiento).split('T')[0];
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     const edadPaciente = Math.floor((hoy - new Date(dobBD + 'T00:00:00')) / (1000 * 60 * 60 * 24 * 365.25));
-    if (edadPaciente < 18)
+    const esFamiliar = paciente.estado_cuenta === 'FAMILIAR';
+
+    if (edadPaciente < 18) {
+      if (esFamiliar)
+        return res.status(403).json({
+          error: 'Solo mayores de 18 años pueden activar su propia cuenta web. Mantente vinculado como familiar mientras tanto.',
+          codigo: 'MENOR_DE_EDAD_FAMILIAR',
+        });
       return res.status(403).json({
         error: 'Usted ya es paciente pero no cumple con los requisitos de registro. Revise la política de privacidad.',
         codigo: 'MENOR_DE_EDAD',
       });
+    }
 
     const iniciales = `${paciente.nombre.charAt(0)}.${paciente.apellido.charAt(0)}.`;
     const docLen = docLimpio.length;
     const documento_parcial = '*'.repeat(Math.max(docLen - 4, 0)) + docLimpio.slice(-4);
 
-    return res.json({ iniciales, tipo_documento: paciente.tipo_documento, documento_parcial });
+    return res.json({
+      iniciales, tipo_documento: paciente.tipo_documento, documento_parcial,
+      es_familiar: esFamiliar,
+      // WEB-HU009: pantalla de activación pide nombre completo y edad, a diferencia
+      // del flujo genérico de vinculación (que solo muestra iniciales por privacidad).
+      ...(esFamiliar && {
+        nombre_completo: `${paciente.nombre} ${paciente.apellido}`,
+        edad: edadPaciente,
+      }),
+    });
   } catch (err) {
     console.error('[authPatient.preview]', err.message);
     return res.status(500).json({ error: 'Error interno del servidor', ...(isDev && { detail: err.message }) });
@@ -469,8 +487,22 @@ const vincular = async (req, res) => {
     if (emailExiste)
       return res.status(409).json({ error: 'El correo electrónico ya se encuentra registrado.', codigo: 'EMAIL_DUPLICADO' });
 
+    // Se determina ANTES de linkWebAccount, que sobrescribe estado_cuenta a 'ACTIVO'.
+    const eraFamiliar = paciente.estado_cuenta === 'FAMILIAR';
+    const titulares = eraFamiliar ? await getTitularesActivos(paciente.paciente_id) : [];
+
     const password_hash = await bcrypt.hash(password, 12);
     await linkWebAccount(paciente.paciente_id, { email_cuenta: emailLower, password_hash });
+
+    if (eraFamiliar) {
+      // WEB-HU009: al activar su cuenta propia, se desvincula de TODOS sus titulares.
+      await desvincularTodasComoFamiliar(paciente.paciente_id);
+      titulares.forEach((t) => {
+        sendFamiliarActivadoEmail(t.email_cuenta, t.nombre, paciente.nombre).catch((err) =>
+          console.error('[authPatient.vincular] Notificación a titular falló:', err.message)
+        );
+      });
+    }
 
     sendWelcomePatientEmail(emailLower, paciente.nombre).catch((err) =>
       console.error('[authPatient.vincular] Correo de bienvenida falló:', err.message)
@@ -478,14 +510,21 @@ const vincular = async (req, res) => {
 
     await logAudit({
       paciente_id: paciente.paciente_id,
-      accion:      'VINCULACION_CUENTA_WEB',
+      accion:      eraFamiliar ? 'ACTIVACION_CUENTA_FAMILIAR' : 'VINCULACION_CUENTA_WEB',
       entidad:     'PACIENTE',
       entidad_id:  paciente.paciente_id,
-      detalles:    JSON.stringify({ tipo_documento, numero_documento: docLimpio }),
+      detalles:    JSON.stringify({
+        tipo_documento, numero_documento: docLimpio,
+        titulares_notificados: titulares.map((t) => t.paciente_id),
+      }),
       ip_origen:   req.ip,
     });
 
-    return res.json({ message: 'Cuenta vinculada exitosamente. Ya puedes iniciar sesión.' });
+    return res.json({
+      message: eraFamiliar
+        ? 'Tu cuenta ha sido activada exitosamente. Ya puedes iniciar sesión.'
+        : 'Cuenta vinculada exitosamente. Ya puedes iniciar sesión.',
+    });
   } catch (err) {
     console.error('[authPatient.vincular]', err.message);
     if (err.code === 'ER_DUP_ENTRY')

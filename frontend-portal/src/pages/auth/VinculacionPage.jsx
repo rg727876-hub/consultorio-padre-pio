@@ -41,17 +41,20 @@ const inputCls = (touched, error) =>
      : 'border-slate-300 bg-white focus:border-primary'}`;
 
 // ── Pantalla de éxito ─────────────────────────────────────────────────────────
-function SuccessScreen() {
+function SuccessScreen({ esFamiliar }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="bg-white rounded-2xl shadow-md p-8 max-w-md w-full text-center">
         <div className="flex justify-center mb-4">
           <CheckCircle2 size={56} className="text-green-500" />
         </div>
-        <h2 className="text-xl font-bold text-slate-800 mb-3">¡Cuenta vinculada!</h2>
+        <h2 className="text-xl font-bold text-slate-800 mb-3">
+          {esFamiliar ? '¡Cuenta activada!' : '¡Cuenta vinculada!'}
+        </h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-6">
-          Cuenta vinculada exitosamente. Ya puedes iniciar sesión con tu correo y contraseña.
-          Tu historial clínico y citas previas se conservan intactos.
+          {esFamiliar
+            ? 'Tu cuenta ha sido activada exitosamente. Ya puedes iniciar sesión.'
+            : 'Cuenta vinculada exitosamente. Ya puedes iniciar sesión con tu correo y contraseña. Tu historial clínico y citas previas se conservan intactos.'}
         </p>
         <Link
           to="/login"
@@ -147,7 +150,11 @@ export default function VinculacionPage() {
         const dob = new Date(valor + 'T00:00:00');
         if (dob >= hoy) return 'Debe ser anterior al día de hoy';
         const edad = Math.floor((hoy - dob) / (1000 * 60 * 60 * 24 * 365.25));
-        if (edad < 18) return 'Debes ser mayor de 18 años para vincular tu cuenta';
+        if (edad < 18) {
+          return preview?.es_familiar
+            ? 'Solo mayores de 18 años pueden activar su propia cuenta web'
+            : 'Debes ser mayor de 18 años para vincular tu cuenta';
+        }
         if (edad > 120) return 'Fecha de nacimiento no válida';
         return '';
       }
@@ -221,7 +228,7 @@ export default function VinculacionPage() {
     }
   };
 
-  if (success) return <SuccessScreen />;
+  if (success) return <SuccessScreen esFamiliar={preview?.es_familiar} />;
 
   return (
     <>
@@ -260,14 +267,14 @@ export default function VinculacionPage() {
                   </p>
                 </div>
               )}
-              {docError && docError.codigo === 'MENOR_DE_EDAD' && (
+              {docError && ['MENOR_DE_EDAD', 'MENOR_DE_EDAD_FAMILIAR'].includes(docError.codigo) && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   <p className="flex items-center gap-2">
                     <AlertCircle size={15} className="shrink-0" /> {docError.msg}
                   </p>
                 </div>
               )}
-              {docError && !['CUENTA_ACTIVA', 'MENOR_DE_EDAD'].includes(docError.codigo) && (
+              {docError && !['CUENTA_ACTIVA', 'MENOR_DE_EDAD', 'MENOR_DE_EDAD_FAMILIAR'].includes(docError.codigo) && (
                 <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
                   <AlertCircle size={15} className="shrink-0 mt-0.5" /> {docError.msg}
                 </div>
@@ -320,18 +327,24 @@ export default function VinculacionPage() {
           {preview && (
             <>
               {/* Tarjeta de reconocimiento */}
-              <div className="flex items-center gap-4 p-4 bg-primary/5 border border-primary/20 rounded-xl mb-6">
+              <div className={`flex items-center gap-4 p-4 bg-primary/5 border border-primary/20 rounded-xl ${preview.es_familiar ? 'mb-4' : 'mb-6'}`}>
                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center
                                 text-white font-black text-base select-none shrink-0">
-                  {preview.iniciales}
+                  {preview.es_familiar ? preview.nombre_completo.charAt(0) : preview.iniciales}
                 </div>
                 <div>
                   <p className="text-xs text-muted font-semibold uppercase tracking-wide mb-0.5">
                     Registro encontrado
                   </p>
-                  <p className="text-sm font-bold text-slate-800">
-                    {preview.tipo_documento} {preview.documento_parcial}
-                  </p>
+                  {preview.es_familiar ? (
+                    <p className="text-sm font-bold text-slate-800">
+                      {preview.nombre_completo} · {preview.edad} años
+                    </p>
+                  ) : (
+                    <p className="text-sm font-bold text-slate-800">
+                      {preview.tipo_documento} {preview.documento_parcial}
+                    </p>
+                  )}
                   <p className="text-xs text-slate-500 mt-0.5">
                     ¿No eres tú?{' '}
                     <button
@@ -343,6 +356,14 @@ export default function VinculacionPage() {
                   </p>
                 </div>
               </div>
+
+              {preview.es_familiar && (
+                <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 leading-relaxed">
+                  Este DNI está vinculado como familiar a otra cuenta. ¿Deseas activar tu cuenta web propia?
+                  Al activar, te desvincularás automáticamente de los titulares que te tenían registrado y
+                  tendrás control total sobre tu información.
+                </div>
+              )}
 
               {/* Error del servidor */}
               {serverError && (
@@ -479,8 +500,8 @@ export default function VinculacionPage() {
                                transition-colors flex items-center justify-center gap-2"
                   >
                     {loading
-                      ? <><Loader2 size={16} className="animate-spin" /> Vinculando…</>
-                      : <><LinkIcon size={15} /> Vincular mi cuenta</>}
+                      ? <><Loader2 size={16} className="animate-spin" /> {preview.es_familiar ? 'Activando…' : 'Vinculando…'}</>
+                      : <><LinkIcon size={15} /> {preview.es_familiar ? 'Activar mi cuenta' : 'Vincular mi cuenta'}</>}
                   </button>
                 </div>
 

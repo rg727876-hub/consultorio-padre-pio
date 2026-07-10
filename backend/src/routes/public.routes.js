@@ -1,7 +1,19 @@
 const { Router } = require('express');
 const pool       = require('../config/db');
+const { getPaymentMethodIcons } = require('../services/mercadopago.service');
 
 const router = Router();
+
+// GET /api/public/payment-methods — logos de marcas de tarjeta y Yape (sin auth)
+router.get('/payment-methods', async (req, res) => {
+  try {
+    const icons = await getPaymentMethodIcons();
+    return res.json(icons);
+  } catch (err) {
+    console.error('[public.paymentMethods]', err.message);
+    return res.status(502).json({ error: 'No se pudo cargar los medios de pago' });
+  }
+});
 
 // GET /api/public/servicios — servicios activos (sin auth, para landing page)
 router.get('/servicios', async (req, res) => {

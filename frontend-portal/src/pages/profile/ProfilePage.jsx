@@ -8,6 +8,9 @@ import {
 import { getProfile, updateProfile, uploadPhotoProfile } from '../../services/patientProfile.service';
 import { usePatientAuth } from '../../context/PatientAuthContext';
 import FamiliaresTab from '../familiares/FamiliaresTab';
+import HistorialClinico from '../../components/HistorialClinico';
+import { ProximasCitas, MisPagos } from '../../components/MisCitas';
+import BookingWizard from '../booking/BookingWizard';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const INFO = {
@@ -54,7 +57,7 @@ const isDirty = (f, o) =>
   f.contacto_emergencia.replace(/\D/g, '') !== o.contacto_emergencia;
 
 // ── Acordeón ──────────────────────────────────────────────────────────────────
-function Accordion({ id, label, hu, open, onToggle }) {
+function Accordion({ id, label, hu, open, onToggle, children }) {
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm">
       <button
@@ -68,8 +71,10 @@ function Accordion({ id, label, hu, open, onToggle }) {
           : <ChevronDown size={16} className="text-slate-400" />}
       </button>
       {open && (
-        <div className="px-5 py-8 bg-slate-50 border-t border-slate-100 text-center">
-          <p className="text-sm text-slate-400 italic">Disponible próximamente ({hu})</p>
+        <div className="px-5 py-5 bg-slate-50 border-t border-slate-100">
+          {children ?? (
+            <p className="text-sm text-slate-400 italic text-center py-3">Disponible próximamente ({hu})</p>
+          )}
         </div>
       )}
     </div>
@@ -111,6 +116,7 @@ export default function ProfilePage() {
   const [openAccordions, setOpenAccordions] = useState(new Set());
   const [menuOpen, setMenuOpen]             = useState(false);
   const [selectedFamiliar, setSelectedFamiliar] = useState(null);
+  const [autoOpenRegisterFamiliar, setAutoOpenRegisterFamiliar] = useState(false);
 
   const [showEdit, setShowEdit]               = useState(false);
   const [editForm, setEditForm]               = useState(null);
@@ -255,6 +261,7 @@ export default function ProfilePage() {
 
   const ACCORDIONS = [
     { id: 'proximas',  label: 'Próximas citas',    hu: 'HU004' },
+    { id: 'pagos',     label: 'Mis pagos',         hu: 'HU004' },
     { id: 'historial', label: 'Historias clínicas', hu: 'HU005' },
   ];
 
@@ -556,7 +563,23 @@ export default function ProfilePage() {
                         {...acc}
                         open={openAccordions.has(acc.id)}
                         onToggle={toggleAccordion}
-                      />
+                      >
+                        {acc.id === 'proximas' && openAccordions.has('proximas') && (
+                          <ProximasCitas
+                            pacienteId={profile.paciente_id}
+                            onSuccess={(msg) => {
+                              setSuccessMsg(msg);
+                              setTimeout(() => setSuccessMsg(null), 4000);
+                            }}
+                          />
+                        )}
+                        {acc.id === 'pagos' && openAccordions.has('pagos') && (
+                          <MisPagos pacienteId={profile.paciente_id} />
+                        )}
+                        {acc.id === 'historial' && openAccordions.has('historial') && (
+                          <HistorialClinico pacienteId={profile.paciente_id} />
+                        )}
+                      </Accordion>
                     ))}
                   </div>
                 </div>
@@ -571,6 +594,8 @@ export default function ProfilePage() {
             <FamiliaresTab
               selectedFamiliar={selectedFamiliar}
               onSelectFamiliar={setSelectedFamiliar}
+              autoOpenRegister={autoOpenRegisterFamiliar}
+              onAutoOpenHandled={() => setAutoOpenRegisterFamiliar(false)}
               onSuccess={(msg) => {
                 setSuccessMsg(msg);
                 setTimeout(() => setSuccessMsg(null), 4000);
@@ -582,20 +607,13 @@ export default function ProfilePage() {
         {/* ── RESERVAR UNA CITA ── */}
         {activeTab === 'citas' && (
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Calendar size={24} className="text-primary" />
-              </div>
-              <h2 className="font-display font-bold text-slate-800 text-xl mb-2">Reservar una cita</h2>
-              <p className="text-slate-400 text-sm max-w-xs mx-auto leading-relaxed">
-                Pronto podrás agendar tu cita directamente desde aquí. Estamos trabajando en ello.
-              </p>
-              <div className="mt-6 inline-flex items-center gap-2 bg-slate-50 border border-slate-200
-                              text-slate-500 text-sm font-semibold px-4 py-2 rounded-xl">
-                <Phone size={14} className="text-primary" />
-                Mientras tanto, llámanos al {INFO.telefono}
-              </div>
-            </div>
+            <BookingWizard
+              titular={profile}
+              onRegistrarFamiliar={() => {
+                setAutoOpenRegisterFamiliar(true);
+                setActiveTab('familiares');
+              }}
+            />
           </div>
         )}
 
