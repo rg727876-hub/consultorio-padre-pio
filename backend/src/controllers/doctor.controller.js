@@ -15,12 +15,12 @@ const getActive = async (req, res) => {
               u.nombre, u.apellido, u.DNI,
               (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
                  FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
-                WHERE de.doctor_id = d.doctor_id) AS especialidad,
+                WHERE de.doctor_id = u.usuario_id) AS especialidad,
               d.nroColegiatura
        FROM   USUARIO u
        JOIN   ROL_USUARIO ru ON ru.usuario_id = u.usuario_id
        JOIN   ROL r          ON r.rol_id = ru.rol_id
-       JOIN   DOCTOR d        ON d.doctor_id = u.usuario_id
+       LEFT JOIN DOCTOR d        ON d.doctor_id = u.usuario_id
        WHERE  r.nombre_rol = 'DOCTOR'
          AND  u.estado = 'ACTIVO'
        ORDER  BY u.apellido, u.nombre`
@@ -64,9 +64,9 @@ const getByService = async (req, res) => {
               u.nombre, u.apellido,
               (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
                  FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
-                WHERE de.doctor_id = d.doctor_id) AS especialidad
+                WHERE de.doctor_id = u.usuario_id) AS especialidad
        FROM   USUARIO u
-       JOIN   DOCTOR d           ON d.doctor_id    = u.usuario_id
+       LEFT JOIN DOCTOR d           ON d.doctor_id    = u.usuario_id
        JOIN   SERVICIO_DOCTOR sd ON sd.doctor_id   = u.usuario_id
        WHERE  sd.servicio_id = ? AND sd.estado = 'ACTIVO'
          AND  u.estado = 'ACTIVO'
@@ -82,7 +82,7 @@ const getByService = async (req, res) => {
                   u.nombre, u.apellido,
                   NULL AS especialidad
            FROM   USUARIO u
-           JOIN   DOCTOR d           ON d.doctor_id    = u.usuario_id
+           LEFT JOIN DOCTOR d           ON d.doctor_id    = u.usuario_id
            JOIN   SERVICIO_DOCTOR sd ON sd.doctor_id   = u.usuario_id
            WHERE  sd.servicio_id = ? AND sd.estado = 'ACTIVO'
              AND  u.estado = 'ACTIVO'
@@ -119,12 +119,12 @@ const getDoctorProfile = async (req, res) => {
           (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
              FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
             WHERE de.doctor_id = u.usuario_id) AS especialidad,
-          (SELECT GROUP_CONCAT(e.especialidad_id)
-             FROM DOCTOR_ESPECIALIDAD de
-            WHERE de.doctor_id = u.usuario_id) AS especialidadesIds,
-          d.nroColegiatura
+          (SELECT GROUP_CONCAT(de2.especialidad_id ORDER BY de2.especialidad_id)
+             FROM DOCTOR_ESPECIALIDAD de2
+            WHERE de2.doctor_id = u.usuario_id) AS especialidadesIds,
+          CAST(d.nroColegiatura AS CHAR) AS nroColegiatura
         FROM USUARIO u
-        JOIN DOCTOR d ON u.usuario_id = d.doctor_id
+        LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
         WHERE u.usuario_id = ?
       `, [doctorId]);
     } catch (err) {
@@ -135,7 +135,7 @@ const getDoctorProfile = async (req, res) => {
             u.estado, u.fecha_registro,
             NULL AS especialidad, NULL AS especialidadesIds, NULL AS nroColegiatura
           FROM USUARIO u
-          JOIN DOCTOR d ON u.usuario_id = d.doctor_id
+          LEFT JOIN DOCTOR d ON u.usuario_id = d.doctor_id
           WHERE u.usuario_id = ?
         `, [doctorId]);
         users = fallbackUsers;
@@ -149,9 +149,13 @@ const getDoctorProfile = async (req, res) => {
     
     // Parse especialidadesIds back to array
     if (doctor.especialidadesIds) {
-      doctor.especialidadesIds = doctor.especialidadesIds.split(',').map(Number);
+      doctor.especialidadesIds = String(doctor.especialidadesIds).split(',').map(Number).filter(Boolean);
     } else {
       doctor.especialidadesIds = [];
+    }
+    // Asegurar que nroColegiatura es string (puede llegar como número desde MySQL)
+    if (doctor.nroColegiatura != null) {
+      doctor.nroColegiatura = String(doctor.nroColegiatura);
     }
 
     // 2. Servicios
@@ -243,8 +247,8 @@ const updateDoctorProfile = async (req, res) => {
 
     // Actualizar DOCTOR
     await conn.query(
-      'UPDATE DOCTOR SET nroColegiatura=? WHERE doctor_id=?',
-      [nroColegiatura, doctorId]
+      'INSERT INTO DOCTOR (doctor_id, nroColegiatura) VALUES (?, ?) ON DUPLICATE KEY UPDATE nroColegiatura = VALUES(nroColegiatura)',
+      [doctorId, nroColegiatura]
     );
 
     // Actualizar ESPECIALIDADES

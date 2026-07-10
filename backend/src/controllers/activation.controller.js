@@ -2,7 +2,7 @@ const bcrypt       = require('bcryptjs');
 const pool         = require('../config/db');
 const { logAudit } = require('../utils/audit.util');
 
-const MAX_INTENTOS  = 5;
+const MAX_INTENTOS  = 3;
 const BLOQUEO_MIN   = 15;
 
 // ── GET /api/auth/activate/:token ────────────────────────────────
@@ -93,21 +93,25 @@ const verifyDni = async (req, res) => {
       const nuevos = intentosActuales + 1;
 
       if (nuevos >= MAX_INTENTOS) {
-        const bloqueadoHasta = new Date(Date.now() + BLOQUEO_MIN * 60 * 1000);
+        // Aplica un bloqueo temporal (ej. 15 minutos) sin invalidar el token original
+        const fechaBloqueo = new Date();
+        fechaBloqueo.setMinutes(fechaBloqueo.getMinutes() + BLOQUEO_MIN);
+
         await pool.execute(
-          'UPDATE USUARIO SET intentos_fallidos = 0, bloqueado_hasta = ? WHERE usuario_id = ?',
-          [bloqueadoHasta, t.usuario_id]
+          'UPDATE USUARIO SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE usuario_id = ?',
+          [nuevos, fechaBloqueo, t.usuario_id]
         );
+        
         await logAudit({
           usuario_id: t.usuario_id,
-          accion:     'ACTIVACION_BLOQUEADO_TEMP',
+          accion:     'ACTIVACION_BLOQUEO_TEMPORAL',
           entidad:    'USUARIO',
           entidad_id: t.usuario_id,
-          detalles:   `Bloqueado ${BLOQUEO_MIN} min por ${MAX_INTENTOS} intentos fallidos`,
+          detalles:   `Bloqueo temporal de ${BLOQUEO_MIN} minutos por ${MAX_INTENTOS} intentos fallidos`,
         });
+        
         return res.status(429).json({
-          error:           `Demasiados intentos. Intenta de nuevo en ${BLOQUEO_MIN} minutos.`,
-          bloqueado_hasta: bloqueadoHasta.toISOString(),
+          error: `Demasiados intentos fallidos. Espere ${BLOQUEO_MIN} minutos`,
         });
       }
 

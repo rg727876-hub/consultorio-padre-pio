@@ -66,7 +66,7 @@ export default function RegistroUsuario() {
       value = soloNumeros(rawValue, 9);
 
     if (name === 'nroColegiatura')
-      value = soloNumeros(rawValue, 10);
+      value = soloNumeros(rawValue, 5);
 
     setForm((p) => ({ ...p, [name]: value }));
     setErrors((p) => ({ ...p, [name]: '' }));

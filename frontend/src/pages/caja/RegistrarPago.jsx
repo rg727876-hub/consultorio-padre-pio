@@ -195,7 +195,7 @@ export default function RegistrarPago() {
         e.montoRecibido = `Monto insuficiente. Total a cobrar: ${fmt(cita.precio_aplicado)}`;
     }
 
-    if (['YAPE', 'PLIN'].includes(metodo)) {
+    if (['YAPE', 'PLIN', 'TARJETA_PRESENCIAL'].includes(metodo)) {
       const num = numeroOperacion.trim();
       if (!num) e.numeroOperacion = 'Ingresa el número de operación';
       else if (!/^\d{6,8}$/.test(num)) e.numeroOperacion = 'Debe tener entre 6 y 8 dígitos';
@@ -229,7 +229,7 @@ export default function RegistrarPago() {
       };
       if (metodo === 'EFECTIVO')
         payload.cambio = cambio;
-      if (['YAPE', 'PLIN'].includes(metodo) && numeroOperacion.trim())
+      if (['YAPE', 'PLIN', 'TARJETA_PRESENCIAL'].includes(metodo) && numeroOperacion.trim())
         payload.numero_operacion = numeroOperacion.trim();
       if (metodo === 'TARJETA_PRESENCIAL') {
         payload.ultimos_4_tarjeta = ultimos4;
@@ -491,7 +491,7 @@ export default function RegistrarPago() {
                     </div>
                   )}
 
-                  {(metodo === 'YAPE' || metodo === 'PLIN') && (
+                  {['YAPE', 'PLIN', 'TARJETA_PRESENCIAL'].includes(metodo) && (
                     <Field label="Número de operación *" error={formErrors.numeroOperacion}>
                       <input
                         value={numeroOperacion}

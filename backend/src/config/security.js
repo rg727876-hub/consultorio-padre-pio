@@ -62,11 +62,17 @@ const previewRegex = process.env.VERCEL_PREVIEW_REGEX
   ? new RegExp(process.env.VERCEL_PREVIEW_REGEX)
   : null;
 
+// En desarrollo, cualquier origen local (localhost / 127.0.0.1, cualquier puerto)
+// se permite para no tener que listar cada puerto de Vite a mano. En producción
+// este patrón NO aplica: la allowlist sigue siendo estricta.
+const localDevRegex = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 const corsOptions = {
   origin(origin, cb) {
     // Permite herramientas sin Origin (curl, health checks, apps móviles).
     if (!origin) return cb(null, true);
     if (allowlist.has(origin)) return cb(null, true);
+    if (!isProd && localDevRegex.test(origin)) return cb(null, true);
     if (previewRegex && previewRegex.test(origin)) return cb(null, true);
     return cb(new Error('Origen no permitido por CORS'));
   },
