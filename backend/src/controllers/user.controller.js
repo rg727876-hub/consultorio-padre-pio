@@ -527,7 +527,7 @@ const uploadAvatar = async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const avatarUrl = req.file.path.startsWith('http') ? req.file.path : `/uploads/avatars/${req.file.filename}`;
     await pool.query('UPDATE USUARIO SET avatar = ? WHERE usuario_id = ?', [avatarUrl, id]);
 
     await logAudit({

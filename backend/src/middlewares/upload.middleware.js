@@ -2,7 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Asegurar que existan los directorios
+// ── Fallback a almacenamiento local (Disco) ──
 const uploadDirs = {
     avatars: path.join(__dirname, '../../uploads/avatars'),
     services: path.join(__dirname, '../../uploads/services'),
@@ -15,11 +15,11 @@ Object.values(uploadDirs).forEach(dir => {
     }
 });
 
-const storage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        let dest = uploadDirs.avatars; // default
+        let dest = uploadDirs.avatars;
         if (req.baseUrl.includes('services')) dest = uploadDirs.services;
-        if (req.baseUrl.includes('patient')) dest = uploadDirs.patients; // Matches both /patient and /patients
+        if (req.baseUrl.includes('patient')) dest = uploadDirs.patients;
         cb(null, dest);
     },
     filename: (req, file, cb) => {
@@ -37,6 +37,29 @@ const fileFilter = (req, file, cb) => {
         cb(new Error('Formato de archivo no soportado. Solo JPG, PNG y WEBP.'), false);
     }
 };
+
+let storage = diskStorage;
+
+// ── Cloudinary Storage (Si está configurado) ──
+if (process.env.CLOUDINARY_URL) {
+    const cloudinary = require('cloudinary').v2;
+    const { CloudinaryStorage } = require('multer-storage-cloudinary');
+    
+    storage = new CloudinaryStorage({
+        cloudinary: cloudinary,
+        params: async (req, file) => {
+            let folder = 'avatars';
+            if (req.baseUrl.includes('services')) folder = 'services';
+            if (req.baseUrl.includes('patient')) folder = 'patients';
+            
+            return {
+                folder: `consultorio/${folder}`,
+                allowed_formats: ['jpeg', 'jpg', 'png', 'webp'],
+                // Se generará un nombre único automáticamente en Cloudinary
+            };
+        },
+    });
+}
 
 const upload = multer({ 
     storage,

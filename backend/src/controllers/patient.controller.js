@@ -527,7 +527,7 @@ const uploadPhoto = async (req, res) => {
       return res.status(404).json({ error: 'Paciente no encontrado' });
     }
 
-    const photoUrl = `/uploads/patients/${req.file.filename}`;
+    const photoUrl = req.file.path.startsWith('http') ? req.file.path : `/uploads/patients/${req.file.filename}`;
     await pool.query('UPDATE PACIENTE SET foto = ? WHERE paciente_id = ?', [photoUrl, id]);
 
     await logAudit({

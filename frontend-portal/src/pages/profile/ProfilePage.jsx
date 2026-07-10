@@ -24,7 +24,8 @@ const INFO = {
 const calcEdad = (fechaNac) => {
   if (!fechaNac) return null;
   const hoy = new Date();
-  const dob = new Date(fechaNac + 'T00:00:00');
+  const dateStr = fechaNac.substring(0, 10);
+  const dob = new Date(dateStr + 'T00:00:00');
   let edad = hoy.getFullYear() - dob.getFullYear();
   const m = hoy.getMonth() - dob.getMonth();
   if (m < 0 || (m === 0 && hoy.getDate() < dob.getDate())) edad--;
@@ -756,7 +757,7 @@ export default function ProfilePage() {
                     <input readOnly value={profile.email_cuenta ?? ''} className={readonlyCls} />
                   </EditField>
                   <EditField label="Fecha de nacimiento">
-                    <input readOnly value={profile.fecha_nacimiento ?? ''} className={readonlyCls} />
+                    <input readOnly value={profile.fecha_nacimiento ? profile.fecha_nacimiento.substring(0, 10) : ''} className={readonlyCls} />
                   </EditField>
                 </div>
               </div>

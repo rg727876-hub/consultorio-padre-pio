@@ -74,7 +74,7 @@ const uploadPhotoForSelf = async (req, res) => {
     return res.status(400).json({ error: 'No se envió ninguna imagen' });
   }
 
-  const fotoUrl = `/uploads/patients/${req.file.filename}`;
+  const fotoUrl = req.file.path.startsWith('http') ? req.file.path : `/uploads/patients/${req.file.filename}`;
 
   try {
     const pool = require('../config/db');

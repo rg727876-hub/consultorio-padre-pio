@@ -204,7 +204,7 @@ const uploadImage = async (req, res) => {
       return res.status(404).json({ error: 'Servicio no encontrado' });
     }
 
-    const imageUrl = `/uploads/services/${req.file.filename}`;
+    const imageUrl = req.file.path.startsWith('http') ? req.file.path : `/uploads/services/${req.file.filename}`;
     await pool.query('UPDATE SERVICIO SET imagen = ? WHERE servicio_id = ?', [imageUrl, id]);
 
     await logAudit({

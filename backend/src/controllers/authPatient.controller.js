@@ -51,7 +51,7 @@ const register = async (req, res) => {
     confirmar_password,
     acepta_politica,
   } = req.body;
-  const fotoUrl = req.file ? `/uploads/patients/${req.file.filename}` : null;
+  const fotoUrl = req.file ? (req.file.path.startsWith('http') ? req.file.path : `/uploads/patients/${req.file.filename}`) : null;
 
   // ── Campos obligatorios ───────────────────────────────────────────────────
   if (
