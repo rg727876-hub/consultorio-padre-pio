@@ -65,7 +65,7 @@ const marcarComoFamiliar = async (paciente_id) => {
 // Lista familiares activos del titular — ordenados por vinculación más reciente primero
 const getFamiliares = async (titular_id) => {
   const [rows] = await pool.query(
-    `SELECT p.paciente_id, p.nombre, p.apellido,
+    `SELECT p.paciente_id, p.nombre, p.apellido, p.foto,
             p.tipo_documento, p.numero_documento,
             p.fecha_nacimiento, p.sexo,
             pf.relacion_id, pf.parentesco, pf.fecha_vinculacion

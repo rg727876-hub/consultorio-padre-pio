@@ -5,11 +5,15 @@ const SEDE = 'Consultorio Padre Pio — Av. Ricardo Palma 679, Urb. Santo Doming
 const fechaLarga = (fecha) =>
   new Date(`${fecha}T00:00:00`).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
 
-function Row({ icon: Icon, label, value }) {
+function Row({ icon: Icon, image, label, value }) {
   return (
     <div className="flex items-start gap-3 py-3 border-b border-slate-100 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={14} className="text-primary" />
+      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
+        {image ? (
+          <img src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${image}`} alt={label} className="w-full h-full object-cover" />
+        ) : (
+          <Icon size={14} className="text-primary" />
+        )}
       </div>
       <div className="min-w-0">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{label}</p>
@@ -28,9 +32,9 @@ export default function StepResumen({ paciente, servicio, doctor, slot }) {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-2">
-        <Row icon={User}        label="Paciente"    value={paciente.parentesco ? `${paciente.nombre} (${paciente.parentesco})` : paciente.nombre} />
-        <Row icon={Stethoscope} label="Especialidad" value={servicio.nombre} />
-        <Row icon={UserRound}   label="Médico"       value={`Dr. ${doctor.apellido}, ${doctor.nombre}`} />
+        <Row icon={User}        image={paciente?.foto}   label="Paciente"    value={paciente.parentesco ? `${paciente.nombre} (${paciente.parentesco})` : paciente.nombre} />
+        <Row icon={Stethoscope} image={servicio?.imagen} label="Especialidad" value={servicio.nombre} />
+        <Row icon={UserRound}   image={doctor?.avatar}   label="Médico"       value={`Dr. ${doctor.apellido}, ${doctor.nombre}`} />
         <Row icon={MapPin}      label="Sede"         value={SEDE} />
         <Row icon={CalendarDays} label="Día y hora"  value={`${fechaLarga(slot.fecha)} · ${slot.hora_inicio}`} />
       </div>

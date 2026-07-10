@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   ChevronDown, ChevronUp, Pencil, X, Check,
   Loader2, AlertCircle, LogOut, Phone, MapPin, Clock,
@@ -112,7 +112,9 @@ export default function ProfilePage() {
   const [loading, setLoading]         = useState(true);
   const [pageError, setPageError]     = useState(null);
 
-  const [activeTab, setActiveTab]           = useState('perfil');
+  const { tab } = useParams();
+  const activeTab = tab || 'inicio';
+  const setActiveTab = (key) => navigate('/portal/' + key);
   const [openAccordions, setOpenAccordions] = useState(new Set());
   const [menuOpen, setMenuOpen]             = useState(false);
   const [selectedFamiliar, setSelectedFamiliar] = useState(null);
@@ -243,10 +245,10 @@ export default function ProfilePage() {
   const edad    = calcEdad(profile.fecha_nacimiento);
 
   const NAV_TABS = [
-    { key: 'bienvenida', label: 'Inicio',        icon: Home     },
-    { key: 'perfil',     label: 'Mi Perfil',     icon: User     },
-    { key: 'familiares', label: 'Familiares',    icon: Users    },
-    { key: 'citas',      label: 'Reservar Cita', icon: Calendar },
+    { key: 'inicio',        label: 'Inicio',        icon: Home     },
+    { key: 'perfil',        label: 'Mi Perfil',     icon: User     },
+    { key: 'familiares',    label: 'Familiares',    icon: Users    },
+    { key: 'reservar-cita', label: 'Reservar Cita', icon: Calendar },
   ];
 
   const profileRows = [
@@ -395,15 +397,23 @@ export default function ProfilePage() {
       <main className="flex-1 pt-16">
 
         {/* ── BIENVENIDA ── */}
-        {activeTab === 'bienvenida' && (
+        {activeTab === 'inicio' && (
           <div>
             {/* Hero banner */}
             <div className="bg-gradient-to-br from-primary via-primary/90 to-accent/80 py-16">
               <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
                 <div className="w-20 h-20 rounded-full bg-white/20 border-4 border-white/40
                                 flex items-center justify-center mx-auto mb-5
-                                text-white text-2xl font-black select-none shadow-lg">
-                  {iniciales(profile.nombre, profile.apellido)}
+                                text-white text-2xl font-black select-none shadow-lg overflow-hidden">
+                  {profile.foto ? (
+                    <img 
+                      src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                      alt="Perfil" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    iniciales(profile.nombre, profile.apellido)
+                  )}
                 </div>
                 <h1 className="font-display font-black text-white text-3xl sm:text-4xl mb-2">
                   ¡Bienvenido/a, {toTitle(profile.nombre)}!
@@ -435,7 +445,7 @@ export default function ProfilePage() {
                     iconColor: 'text-accent bg-accent/20',
                   },
                   {
-                    key: 'citas',
+                    key: 'reservar-cita',
                     icon: Calendar,
                     title: 'Reservar Cita',
                     desc: 'Agenda tu próxima visita con nuestros especialistas.',
@@ -605,7 +615,7 @@ export default function ProfilePage() {
         )}
 
         {/* ── RESERVAR UNA CITA ── */}
-        {activeTab === 'citas' && (
+        {activeTab === 'reservar-cita' && (
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
             <BookingWizard
               titular={profile}

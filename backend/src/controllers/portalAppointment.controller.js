@@ -34,7 +34,7 @@ const getDoctorsByService = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT u.usuario_id AS doctor_id,
-              u.nombre, u.apellido,
+              u.nombre, u.apellido, u.avatar,
               (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
                  FROM DOCTOR_ESPECIALIDAD de JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id
                 WHERE de.doctor_id = u.usuario_id) AS especialidad
