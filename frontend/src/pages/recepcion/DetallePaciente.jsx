@@ -122,7 +122,7 @@ export default function DetallePaciente({ id: propId, onClose }) {
                               text-[#0059B3] text-2xl font-bold flex-shrink-0 select-none overflow-hidden border-2 border-slate-100">
                 {paciente.foto ? (
                   <img 
-                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${paciente.foto}`} 
+                    src={paciente.foto?.startsWith('http') ? paciente.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${paciente.foto}`} 
                     alt="Foto" 
                     className="w-full h-full object-cover"
                   />

@@ -243,7 +243,7 @@ export default function HorariosDoctor() {
               <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
                 {doctor.avatar ? (
                   <img
-                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`}
+                    src={doctor.avatar?.startsWith('http') ? doctor.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`}
                     alt="Avatar"
                     className="w-full h-full object-cover"
                   />

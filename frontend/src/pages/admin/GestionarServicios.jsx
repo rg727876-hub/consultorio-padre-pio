@@ -289,7 +289,7 @@ export default function GestionarServicios() {
                             <div className="flex items-center gap-3">
                               {s.imagen ? (
                                 <img 
-                                  src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${s.imagen}`} 
+                                  src={s.imagen?.startsWith('http') ? s.imagen : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${s.imagen}`} 
                                   alt={s.nombre} 
                                   className="w-10 h-10 rounded-lg object-cover bg-slate-100 flex-shrink-0 border border-slate-200"
                                 />

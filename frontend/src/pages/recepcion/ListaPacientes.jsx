@@ -272,7 +272,7 @@ export default function ListaPacientes() {
                               <div className="flex items-center gap-3">
                                 {p.foto ? (
                                   <img 
-                                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${p.foto}`} 
+                                    src={p.foto?.startsWith('http') ? p.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${p.foto}`} 
                                     alt="Foto" 
                                     className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
                                   />

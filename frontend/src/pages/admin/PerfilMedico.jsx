@@ -341,7 +341,7 @@ export default function PerfilMedico() {
             <div className="relative group w-20 h-20 shrink-0">
               {doctor?.avatar ? (
                 <img
-                  src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`}
+                  src={doctor.avatar?.startsWith('http') ? doctor.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`}
                   alt="Avatar"
                   className="w-full h-full rounded-full object-cover border-2 border-slate-100"
                 />

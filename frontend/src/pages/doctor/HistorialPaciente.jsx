@@ -228,7 +228,7 @@ function AtencionItem({ atencion, abierta, onToggle }) {
           <div>
             <p className="text-xs text-slate-400 mb-1">Odontograma</p>
             {atencion.odontograma_url ? (
-              <img src={atencion.odontograma_url} alt="Odontograma"
+              <img src={atencion.odontograma_url.startsWith('http') ? atencion.odontograma_url : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${atencion.odontograma_url}`} alt="Odontograma"
                 className="max-w-full rounded-lg border border-slate-200" />
             ) : (
               <p className="text-sm text-slate-400 italic bg-slate-50 rounded-lg px-3 py-2">{SIN_INFO}</p>

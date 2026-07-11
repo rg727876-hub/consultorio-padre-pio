@@ -230,7 +230,7 @@ export default function GestionUsuarios() {
                         <div className="flex items-center gap-3">
                           {u.avatar ? (
                             <img 
-                              src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${u.avatar}`} 
+                              src={u.avatar?.startsWith('http') ? u.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${u.avatar}`} 
                               alt="Avatar" 
                               className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
                             />

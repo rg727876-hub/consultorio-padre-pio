@@ -252,7 +252,7 @@ export default function PerfilUsuario() {
             <div className="relative group w-20 h-20 shrink-0">
               {user?.avatar ? (
                 <img
-                  src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${user.avatar}`}
+                  src={user.avatar?.startsWith('http') ? user.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${user.avatar}`}
                   alt="Avatar"
                   className="w-full h-full rounded-full object-cover border-2 border-slate-100"
                 />

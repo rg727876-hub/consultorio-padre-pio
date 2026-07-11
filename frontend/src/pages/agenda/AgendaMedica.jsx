@@ -232,7 +232,7 @@ export default function AgendaMedica() {
               <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
                 {doctorInfo.avatar ? (
                   <img
-                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctorInfo.avatar}`}
+                    src={doctorInfo.avatar?.startsWith('http') ? doctorInfo.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctorInfo.avatar}`}
                     alt="Avatar"
                     className="w-full h-full object-cover"
                   />
