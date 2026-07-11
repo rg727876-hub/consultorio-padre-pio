@@ -49,7 +49,7 @@ export default function StepPaciente({ titular, onSelect, onRegistrarFamiliar })
         >
           <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
             {titular.foto ? (
-              <img src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${titular.foto}`} alt="Avatar" className="w-full h-full object-cover" />
+              <img src={titular.foto?.startsWith('http') ? titular.foto : (titular.foto?.startsWith('http') ? titular.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${titular.foto}`)} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
               <User size={18} className="text-primary" />
             )}
@@ -108,7 +108,7 @@ export default function StepPaciente({ titular, onSelect, onRegistrarFamiliar })
               >
                 <div className="w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                   {f.foto ? (
-                    <img src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${f.foto}`} alt="Avatar" className="w-full h-full object-cover" />
+                    <img src={f.foto?.startsWith('http') ? f.foto : (f.foto?.startsWith('http') ? f.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${f.foto}`)} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
                     <Users size={18} className="text-accent" />
                   )}

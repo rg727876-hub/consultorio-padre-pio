@@ -10,7 +10,7 @@ function Row({ icon: Icon, image, label, value }) {
     <div className="flex items-start gap-3 py-3 border-b border-slate-100 last:border-0">
       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
         {image ? (
-          <img src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${image}`} alt={label} className="w-full h-full object-cover" />
+          <img src={image?.startsWith('http') ? image : (image?.startsWith('http') ? image : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${image}`)} alt={label} className="w-full h-full object-cover" />
         ) : (
           <Icon size={14} className="text-primary" />
         )}

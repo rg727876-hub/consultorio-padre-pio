@@ -157,7 +157,7 @@ export default function ProfilePage() {
     };
     setEditForm(initial); setEditOriginal(initial);
     setImageFile(null);
-    setImagePreview(profile.foto ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}` : null);
+    setImagePreview(profile.foto ? (profile.foto?.startsWith('http') ? profile.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`) : null);
     setEditErrors({}); setEditTouched({}); setEditServerError(null); setShowEdit(true);
   };
 
@@ -304,7 +304,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
               {profile.foto ? (
                 <img 
-                  src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                  src={profile.foto?.startsWith('http') ? profile.foto : (profile.foto?.startsWith('http') ? profile.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`)} 
                   alt="Perfil" 
                   className="w-7 h-7 rounded-full object-cover border border-slate-200"
                 />
@@ -358,7 +358,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2 mb-3 px-1">
                 {profile.foto ? (
                   <img 
-                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                    src={profile.foto?.startsWith('http') ? profile.foto : (profile.foto?.startsWith('http') ? profile.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`)} 
                     alt="Perfil" 
                     className="w-10 h-10 rounded-full object-cover border border-slate-200"
                   />
@@ -408,7 +408,7 @@ export default function ProfilePage() {
                                 text-white text-2xl font-black select-none shadow-lg overflow-hidden">
                   {profile.foto ? (
                     <img 
-                      src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                      src={profile.foto?.startsWith('http') ? profile.foto : (profile.foto?.startsWith('http') ? profile.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`)} 
                       alt="Perfil" 
                       className="w-full h-full object-cover"
                     />
@@ -512,7 +512,7 @@ export default function ProfilePage() {
                   {/* Avatar */}
                   {profile.foto ? (
                     <img 
-                      src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`} 
+                      src={profile.foto?.startsWith('http') ? profile.foto : (profile.foto?.startsWith('http') ? profile.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${profile.foto}`)} 
                       alt="Perfil" 
                       className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-lg flex-shrink-0 bg-white"
                     />

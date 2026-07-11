@@ -48,7 +48,7 @@ function ServiceCard({ servicio }) {
       <div className="flex items-center gap-3">
         {servicio.imagen && (
           <img 
-            src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${servicio.imagen}`} 
+            src={servicio.imagen?.startsWith('http') ? servicio.imagen : (servicio.imagen?.startsWith('http') ? servicio.imagen : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${servicio.imagen}`)} 
             alt={servicio.nombre} 
             className="w-12 h-12 rounded-xl object-cover bg-slate-50 flex-shrink-0 border border-slate-100 shadow-sm"
           />
@@ -76,7 +76,7 @@ function DoctorCard({ doctor }) {
                     items-center text-center gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
       {doctor.avatar ? (
         <img 
-          src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`} 
+          src={doctor.avatar?.startsWith('http') ? doctor.avatar : (doctor.avatar?.startsWith('http') ? doctor.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`)} 
           alt={doctor.nombre}
           className="w-20 h-20 rounded-full object-cover shadow-md border-2 border-white flex-shrink-0 bg-slate-50"
         />

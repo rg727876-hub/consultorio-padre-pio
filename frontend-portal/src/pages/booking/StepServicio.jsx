@@ -50,7 +50,7 @@ export default function StepServicio({ onSelect }) {
             >
               <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
                 {s.imagen ? (
-                  <img src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${s.imagen}`} alt={s.nombre} className="w-full h-full object-cover" />
+                  <img src={s.imagen?.startsWith('http') ? s.imagen : (s.imagen?.startsWith('http') ? s.imagen : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${s.imagen}`)} alt={s.nombre} className="w-full h-full object-cover" />
                 ) : (
                   <Stethoscope size={18} className="text-primary" />
                 )}

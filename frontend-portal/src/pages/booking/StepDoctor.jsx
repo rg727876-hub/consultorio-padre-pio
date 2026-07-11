@@ -59,7 +59,7 @@ export default function StepDoctor({ servicioId, onSelect }) {
             >
               <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
                 {d.avatar ? (
-                  <img src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${d.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={d.avatar?.startsWith('http') ? d.avatar : (d.avatar?.startsWith('http') ? d.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${d.avatar}`)} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <UserRound size={18} className="text-primary" />
                 )}
