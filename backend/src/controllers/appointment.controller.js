@@ -1,6 +1,6 @@
 const pool         = require('../config/db');
 const { logAudit } = require('../utils/audit.util');
-const crypto       = require('crypto');
+const crypto       = require('node:crypto');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -69,6 +69,8 @@ const getSlots = async (req, res) => {
     );
     if (!servicioNuevo) return res.status(404).json({ error: 'Servicio no encontrado' });
 
+    const pacienteId = req.query.paciente_id ? Number(req.query.paciente_id) : null;
+
     // Citas existentes ese día CON el buffer de su propio servicio
     const [booked] = await pool.query(
       `SELECT 
@@ -77,10 +79,10 @@ const getSlots = async (req, res) => {
         s.buffer AS service_buffer
        FROM   CITA c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ?
+       WHERE  (c.doctor_id = ? OR (c.paciente_id = ? AND ? IS NOT NULL)) AND c.fecha = ?
          AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')
        ORDER BY c.hora_inicio`,
-      [doctorId, fecha]
+      [doctorId, pacienteId, pacienteId, fecha]
     );
 
     // Paso de avance: 5 minutos para flexibilidad
@@ -159,6 +161,11 @@ const create = async (req, res) => {
     conn = await pool.getConnection();
     await conn.query('START TRANSACTION');
 
+    // ── Prevenir Race Conditions (Doble Click / Concurrencia) ──
+    // Bloqueamos la fila del paciente y del doctor para serializar las peticiones concurrentes
+    await conn.query('SELECT 1 FROM PACIENTE WHERE paciente_id = ? FOR UPDATE', [Number(paciente_id)]);
+    await conn.query('SELECT 1 FROM USUARIO WHERE usuario_id = ? FOR UPDATE', [Number(doctor_id)]);
+
     // Obtener servicio
     const [[servicio]] = await conn.query(
       `SELECT duracion, buffer, costo FROM SERVICIO
@@ -178,23 +185,31 @@ const create = async (req, res) => {
     const [existentes] = await conn.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
               TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
-              s.buffer AS buffer
+              s.buffer AS buffer,
+              c.doctor_id,
+              c.paciente_id
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ?
-         AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
-      [Number(doctor_id), fecha]
+       WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ?
+         AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
+      [Number(doctor_id), Number(paciente_id), fecha]
     );
     const nIni    = timeToMins(hora_inicio);
     const nFinBuf = timeToMins(hora_fin) + servicio.buffer;
-    const choca = existentes.some(
+    const conflicto = existentes.find(
       b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
     );
-    if (choca) {
+    if (conflicto) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({
-        error: 'Ese horario se cruza con otra cita o con su tiempo de limpieza (buffer). Elige otro.',
-      });
+      if (conflicto.paciente_id === Number(paciente_id)) {
+        return res.status(409).json({
+          error: 'El paciente ya tiene otra cita agendada que se cruza con este horario. Elige otro.',
+        });
+      } else {
+        return res.status(409).json({
+          error: 'Ese horario se cruza con otra cita del doctor o con su tiempo de limpieza (buffer). Elige otro.',
+        });
+      }
     }
 
     // Generar código único
@@ -246,7 +261,7 @@ const create = async (req, res) => {
     });
 
   } catch (err) {
-    if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    if (conn) { try { await conn.query('ROLLBACK'); } catch { /* rollback de mejor esfuerzo: se ignora si falla */ } }
     console.error('[appointment.create]', err.message);
 
     if (err.code === 'ER_DUP_ENTRY')
@@ -268,7 +283,7 @@ const create = async (req, res) => {
 // Filtros: codigo, q (paciente DNI/nombre/apellido), doctor_id, estado,
 //          fecha_inicio, fecha_fin.
 // ─────────────────────────────────────────────────────────────────
-const ESTADOS_VALIDOS = ['RESERVADA','CONFIRMADA','ATENDIDA','CANCELADA','NO_ASISTIO','EXPIRADA'];
+const ESTADOS_VALIDOS = new Set(['RESERVADA','CONFIRMADA','ATENDIDA','CANCELADA','NO_ASISTIO','EXPIRADA']);
 
 const list = async (req, res) => {
   const {
@@ -282,11 +297,11 @@ const list = async (req, res) => {
   const conds  = [];
   const params = [];
 
-  if (codigo && codigo.trim()) {
+  if (codigo?.trim()) {
     conds.push('UPPER(c.codigo_cita) = UPPER(?)');
     params.push(codigo.trim());
   }
-  if (q && q.trim()) {
+  if (q?.trim()) {
     const like = `%${q.trim()}%`;
     conds.push(`(pat.numero_documento LIKE ?
                  OR LOWER(pat.nombre)   LIKE LOWER(?)
@@ -300,15 +315,13 @@ const list = async (req, res) => {
   }
   if (estado) {
     const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
-    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e));
+    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.has(e));
     if (validEstados.length > 0) {
       conds.push(`c.estado IN (${validEstados.map(() => '?').join(',')})`);
       params.push(...validEstados);
     }
   }
-  // Cuando no hay NINGÚN filtro, el listado por defecto muestra todas las
-  // citas CONFIRMADAS (de todas las fechas), con las de hoy primero y
-  // descendiendo hacia las pasadas (las futuras, si existen, van al final).
+
   let ordenPorDefecto = false;
 
   if (fecha_inicio && fecha_fin) {
@@ -320,20 +333,21 @@ const list = async (req, res) => {
   } else if (fecha_fin) {
     conds.push('c.fecha <= ?');
     params.push(fecha_fin);
-  } else if (!codigo && !q && !doctor_id && !estado) {
-    // Sin ningún filtro → por defecto todas las citas confirmadas
-    conds.push("c.estado = 'CONFIRMADA'");
+  } else {
+    // Si no hay filtro de fecha, consideramos que usa el orden por defecto
     ordenPorDefecto = true;
   }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-  // Orden: por defecto, hoy primero → pasado (futuras al final);
-  // con filtros, orden cronológico ascendente como siempre.
+  // Orden: por defecto, citas futuras/hoy primero (ascendente), citas pasadas después (descendente)
+  // Cuando hay filtros de fecha explícitos, orden cronológico descendente
   const orderBy = ordenPorDefecto
-    ? 'ORDER BY (c.fecha > ?) ASC, c.fecha DESC, c.hora_inicio ASC'
-    : 'ORDER BY c.fecha ASC, c.hora_inicio ASC';
-  const orderParams = ordenPorDefecto ? [new Date().toLocaleDateString('en-CA')] : [];
+    ? 'ORDER BY CASE WHEN c.fecha >= ? THEN 0 ELSE 1 END, CASE WHEN c.fecha >= ? THEN c.fecha END ASC, CASE WHEN c.fecha < ? THEN c.fecha END DESC, c.hora_inicio ASC'
+    : 'ORDER BY c.fecha DESC, c.hora_inicio DESC';
+  
+  const hoy = new Date().toLocaleDateString('en-CA');
+  const orderParams = ordenPorDefecto ? [hoy, hoy, hoy] : [];
 
   try {
     const [[{ total }]] = await pool.query(
@@ -495,7 +509,7 @@ const agenda = async (req, res) => {
 
   if (estado) {
     const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
-    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e) && !['RESERVADA', 'EXPIRADA'].includes(e));
+    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.has(e) && !['RESERVADA', 'EXPIRADA'].includes(e));
     if (validEstados.length > 0) {
       conds.push(`c.estado IN (${validEstados.map(() => '?').join(',')})`);
       params.push(...validEstados);
@@ -813,7 +827,7 @@ const unlockSlot = async (req, res) => {
     const key      = lockKey(cita.doctor_id, nueva_fecha, nueva_hora_inicio);
     const existente = locks.get(key);
 
-    if (existente && existente.citaId === citaId) {
+    if (existente?.citaId === citaId) {
       if (existente.timer) clearTimeout(existente.timer);
       locks.delete(key);
     }
@@ -851,7 +865,7 @@ const reschedule = async (req, res) => {
     });
 
   // Validar formato de fecha
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(nueva_fecha) || isNaN(Date.parse(nueva_fecha)))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nueva_fecha) || Number.isNaN(Date.parse(nueva_fecha)))
     return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' });
 
   // Límite de reserva: hasta un mes de anticipación (igual que al agendar).
@@ -867,9 +881,16 @@ const reschedule = async (req, res) => {
     conn = await pool.getConnection();
     await conn.query('START TRANSACTION');
 
+    // ── Prevenir Race Conditions ──
+    const [[tempCita]] = await conn.query('SELECT paciente_id, doctor_id FROM CITA WHERE cita_id = ?', [citaId]);
+    if (tempCita) {
+      await conn.query('SELECT 1 FROM PACIENTE WHERE paciente_id = ? FOR UPDATE', [Number(tempCita.paciente_id)]);
+      await conn.query('SELECT 1 FROM USUARIO WHERE usuario_id = ? FOR UPDATE', [Number(tempCita.doctor_id)]);
+    }
+
     // ── 1. Leer y bloquear la cita original ──────────────────────────────
     const [[cita]] = await conn.query(
-      `SELECT cita_id, codigo_cita, doctor_id, servicio_id, estado,
+      `SELECT cita_id, codigo_cita, doctor_id, paciente_id, servicio_id, estado,
               DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
               TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
               TIME_FORMAT(hora_fin,    '%H:%i') AS hora_fin
@@ -911,24 +932,32 @@ const reschedule = async (req, res) => {
     const [otras] = await conn.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
               TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
-              s.buffer AS buffer
+              s.buffer AS buffer,
+              c.doctor_id,
+              c.paciente_id
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ? AND c.cita_id <> ?
+       WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ? AND c.cita_id <> ?
          AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
-      [cita.doctor_id, nueva_fecha, citaId]
+      [cita.doctor_id, cita.paciente_id, nueva_fecha, citaId]
     );
     const rIni    = timeToMins(nueva_hora_inicio);
     const rFinBuf = timeToMins(nueva_hora_fin) + bufReprog;
-    const solapa = otras.some(
+    const solapa = otras.find(
       b => rIni < (timeToMins(b.hf) + (b.buffer || 0)) && rFinBuf > timeToMins(b.hi)
     );
 
     if (solapa) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({
-        error: 'El horario solicitado se cruza con otra cita o su tiempo de limpieza (buffer).',
-      });
+      if (solapa.paciente_id === cita.paciente_id) {
+        return res.status(409).json({
+          error: 'El paciente ya tiene otra cita agendada que se cruza con este horario. Elige otro.',
+        });
+      } else {
+        return res.status(409).json({
+          error: 'El horario solicitado se cruza con otra cita del doctor o su tiempo de limpieza (buffer).',
+        });
+      }
     }
 
     // ── 4. Actualizar SOLO fecha/hora (sin tocar estado, doc, servicio, precio, código) ─
@@ -977,7 +1006,7 @@ const reschedule = async (req, res) => {
     });
 
   } catch (err) {
-    if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    if (conn) { try { await conn.query('ROLLBACK'); } catch { /* rollback de mejor esfuerzo: se ignora si falla */ } }
     console.error('[appointment.reschedule]', err.message);
     return res.status(500).json({
       error: 'Error interno del servidor',

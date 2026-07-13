@@ -225,7 +225,7 @@ export default function AgendarCita() {
     setLoadingSlots(true);
     try {
       const { data } = await api.get('/appointments/slots', {
-        params: { doctor_id: doctor.doctor_id, servicio_id: servicio.servicio_id, fecha: f },
+        params: { doctor_id: doctor.doctor_id, servicio_id: servicio.servicio_id, fecha: f, paciente_id: paciente?.paciente_id },
       });
       setSlots(Array.isArray(data.slots) ? data.slots : []);
     } catch {
@@ -239,7 +239,7 @@ export default function AgendarCita() {
     if (!doctor || !servicio || !fecha) return;
     try {
       const { data } = await api.get('/appointments/slots', {
-        params: { doctor_id: doctor.doctor_id, servicio_id: servicio.servicio_id, fecha },
+        params: { doctor_id: doctor.doctor_id, servicio_id: servicio.servicio_id, fecha, paciente_id: paciente?.paciente_id },
       });
       setSlots(Array.isArray(data.slots) ? data.slots : []);
       setSlot(null);

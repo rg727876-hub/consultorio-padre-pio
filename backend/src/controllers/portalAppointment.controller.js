@@ -142,7 +142,7 @@ const getAvailability = async (req, res) => {
           return (slotInicio < bookedFinConBuffer && slotFinConBuffer > bookedInicio);
         });
 
-        if (!overlaps && !bookingHold.isSlotHeld(doctorId, fecha, horaInicioStr)) {
+        if (!overlaps && !bookingHold.isSlotHeld(doctorId, null, fecha, horaInicioStr)) {
           slots.push({ hora_inicio: horaInicioStr, hora_fin: minsToTime(slotFin) });
         }
 
@@ -184,26 +184,33 @@ const createHoldHandler = async (req, res) => {
 
     const hora_fin = minsToTime(timeToMins(hora_inicio) + servicio.duracion);
 
-    if (bookingHold.isSlotHeld(Number(doctor_id), fecha, hora_inicio))
-      return res.status(409).json({ error: 'Horario no disponible: otro paciente ya está reservando este horario.' });
+    if (bookingHold.isSlotHeld(Number(doctor_id), Number(paciente_id), fecha, hora_inicio))
+      return res.status(409).json({ error: 'Horario no disponible: ya estás reservando o alguien más está reservando este horario.' });
 
     const [existentes] = await pool.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
               TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
-              s.buffer AS buffer
+              s.buffer AS buffer,
+              c.doctor_id,
+              c.paciente_id
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ?
+       WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ?
          AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
-      [Number(doctor_id), fecha]
+      [Number(doctor_id), Number(paciente_id), fecha]
     );
     const nIni    = timeToMins(hora_inicio);
     const nFinBuf = timeToMins(hora_fin) + servicio.buffer;
-    const choca = existentes.some(
+    const conflicto = existentes.find(
       b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
     );
-    if (choca)
-      return res.status(409).json({ error: 'Ese horario ya no está disponible. Elige otro.' });
+    if (conflicto) {
+      if (conflicto.paciente_id === Number(paciente_id)) {
+        return res.status(409).json({ error: 'Ya tienes otra cita agendada que se cruza con este horario. Por favor, elige otro.' });
+      } else {
+        return res.status(409).json({ error: 'Ese horario ya no está disponible. Elige otro.' });
+      }
+    }
 
     const hold = bookingHold.createHold({
       titularId, pacienteId: Number(paciente_id), doctorId: Number(doctor_id),
@@ -321,6 +328,35 @@ const confirmPayment = async (req, res) => {
     try {
       conn = await pool.getConnection();
       await conn.query('START TRANSACTION');
+
+      // ── Prevenir Race Conditions entre Portal y Recepción ──
+      await conn.query('SELECT 1 FROM PACIENTE WHERE paciente_id = ? FOR UPDATE', [Number(hold.pacienteId)]);
+      await conn.query('SELECT 1 FROM USUARIO WHERE usuario_id = ? FOR UPDATE', [Number(hold.doctorId)]);
+
+      // Re-verificar que el horario no haya sido ocupado (ej. por Recepción) mientras se pagaba
+      const [[servicio]] = await conn.query('SELECT buffer FROM SERVICIO WHERE servicio_id = ?', [hold.servicioId]);
+      const [existentes] = await conn.query(
+        `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+                TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+                s.buffer AS buffer,
+                c.doctor_id,
+                c.paciente_id
+         FROM   CITA     c
+         JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+         WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ?
+           AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
+        [Number(hold.doctorId), Number(hold.pacienteId), hold.fecha]
+      );
+      
+      const nIni = timeToMins(hold.horaInicio);
+      const nFinBuf = timeToMins(hold.horaFin) + (servicio?.buffer || 0);
+      const conflicto = existentes.find(
+        b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
+      );
+
+      if (conflicto) {
+        throw new Error('El horario fue ocupado durante el proceso de pago');
+      }
 
       for (let i = 0; i < 5; i++) {
         const code = generateCode();

@@ -9,6 +9,7 @@ const { generateToken } = require('../utils/jwt.util');
 const { logAudit } = require('../utils/audit.util');
 const { sendWelcomePatientEmail, sendFamiliarActivadoEmail, sendPasswordResetEmail } = require('../utils/mailer.util');
 const crypto = require('crypto');
+const { consultarDni } = require('../services/reniec.service');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -72,8 +73,8 @@ const register = async (req, res) => {
     return res.status(400).json({ error: 'Debes aceptar la Política de Privacidad' });
 
   // ── Nombre y apellido ─────────────────────────────────────────────────────
-  const nombreLimpio  = String(nombre).trim().toUpperCase();
-  const apellidoLimpio = String(apellido).trim().toUpperCase();
+  let nombreLimpio  = String(nombre).trim().toUpperCase();
+  let apellidoLimpio = String(apellido).trim().toUpperCase();
 
   if (nombreLimpio.length < 2 || nombreLimpio.length > 30)
     return res.status(400).json({ error: 'El nombre debe tener entre 2 y 30 caracteres' });
@@ -149,6 +150,18 @@ const register = async (req, res) => {
         error: 'El correo electrónico ya se encuentra registrado.',
         codigo: 'EMAIL_DUPLICADO',
       });
+
+    // ── Validar RENIEC estricto si es DNI ───────────────────────────────────
+    if (tipo_documento === 'DNI') {
+      try {
+        const reniecData = await consultarDni(docLimpio);
+        // Sobrescribimos con los nombres oficiales para mantener integridad
+        nombreLimpio = String(reniecData.first_name).trim().toUpperCase();
+        apellidoLimpio = String(`${reniecData.first_last_name} ${reniecData.second_last_name}`).trim().toUpperCase();
+      } catch (error) {
+        return res.status(400).json({ error: 'El DNI no es válido o no existe en RENIEC. Verifique sus datos.' });
+      }
+    }
 
     // ── Crear cuenta ───────────────────────────────────────────────────────
     const password_hash = await bcrypt.hash(password, 12);
@@ -423,6 +436,7 @@ const vincular = async (req, res) => {
     tipo_documento, numero_documento, fecha_nacimiento,
     email, password, confirmar_password, acepta_politica,
   } = req.body;
+  const fotoUrl = req.file ? (req.file.path.startsWith('http') ? req.file.path : `/uploads/patients/${req.file.filename}`) : null;
 
   if (!tipo_documento || !numero_documento?.trim() || !fecha_nacimiento ||
       !email?.trim() || !password || !confirmar_password)
@@ -492,8 +506,19 @@ const vincular = async (req, res) => {
     const eraFamiliar = paciente.estado_cuenta === 'FAMILIAR';
     const titulares = eraFamiliar ? await getTitularesActivos(paciente.paciente_id) : [];
 
+    // ── Validar RENIEC estricto si es DNI ───────────────────────────────────
+    if (tipo_documento === 'DNI') {
+      try {
+        const reniecData = await consultarDni(docLimpio);
+        // Podríamos sobrescribir los nombres en BD aquí si quisiéramos, pero en 'vincular' 
+        // el paciente ya existe en BD, así que solo validamos que exista en RENIEC.
+      } catch (error) {
+        return res.status(400).json({ error: 'El DNI no es válido o no existe en RENIEC. Verifique sus datos.' });
+      }
+    }
+
     const password_hash = await bcrypt.hash(password, 12);
-    await linkWebAccount(paciente.paciente_id, { email_cuenta: emailLower, password_hash });
+    await linkWebAccount(paciente.paciente_id, { email_cuenta: emailLower, password_hash, foto: fotoUrl });
 
     if (eraFamiliar) {
       // WEB-HU009: al activar su cuenta propia, se desvincula de TODOS sus titulares.

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, Camera, ArrowUpRight, ChevronDown, Check } from 'lucide-react';
 import { registerPatient } from '../../services/authPatient.service';
+import { consultarDniReniec } from '../../services/public.service';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
 // ── Mensajes rotativos de la burbuja del panel fotográfico ───────────────────
@@ -140,8 +141,7 @@ function CustomSelect({ name, value, onChange, onBlur, options, error, touched }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, value]);
+  }, [name, value, onBlur]);
 
   const selected = options.find((o) => o.value === value);
 
@@ -222,6 +222,7 @@ export default function RegisterPage() {
   const [showPolicy, setShowPolicy] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [reniecLoading, setReniecLoading] = useState(false);
 
   // ── Burbuja rotativa: cambia cada 10s o al hacer clic ──────────────────────
   const [msgIndex, setMsgIndex] = useState(0);
@@ -231,6 +232,35 @@ export default function RegisterPage() {
     const id = setTimeout(nextMsg, 10000);
     return () => clearTimeout(id);
   }, [msgIndex]);
+
+  // ── Auto-fetch RENIEC (Lógica integrada de tu compañero) ──────────────────
+  useEffect(() => {
+    const fetchReniec = async () => {
+      if (form.tipo_documento === 'DNI' && form.numero_documento.length === 8) {
+        setReniecLoading(true);
+        try {
+          const res = await consultarDniReniec(form.numero_documento);
+          setForm((prev) => ({
+            ...prev,
+            nombre: res.data.first_name || '',
+            apellido: `${res.data.first_last_name || ''} ${res.data.second_last_name || ''}`.trim()
+          }));
+          setErrors((prev) => ({ ...prev, nombre: null, apellido: null }));
+        } catch (error) {
+          setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+          setErrors((prev) => ({ 
+            ...prev, 
+            numero_documento: 'El DNI no existe en RENIEC'
+          }));
+        } finally {
+          setReniecLoading(false);
+        }
+      } else if (form.tipo_documento === 'DNI') {
+        setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+      }
+    };
+    fetchReniec();
+  }, [form.numero_documento, form.tipo_documento]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleImageChange = (e) => {
@@ -248,7 +278,6 @@ export default function RegisterPage() {
     const newForm = { ...form, [name]: newVal };
     setForm(newForm);
 
-    // Si el tipo de documento cambia, re-validar el número
     if (name === 'tipo_documento' && touched.numero_documento) {
       setErrors((prev) => ({
         ...prev,
@@ -329,10 +358,8 @@ export default function RegisterPage() {
     setShowPolicy(false);
   };
 
-  // ── Render éxito ─────────────────────────────────────────────────────────────
   if (success) return <SuccessScreen email={form.email.trim().toLowerCase()} />;
 
-  // ── Render formulario ────────────────────────────────────────────────────────
   return (
     <>
     {showPolicy && (
@@ -477,20 +504,28 @@ export default function RegisterPage() {
 
               {/* Número de documento */}
               <Field label="Número de documento" error={errors.numero_documento} touched={touched.numero_documento}>
-                <input
-                  type="text"
-                  name="numero_documento"
-                  value={form.numero_documento}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder={
-                    form.tipo_documento === 'DNI' ? '12345678'
-                    : form.tipo_documento === 'CE' ? 'A12345678'
-                    : 'AB1234'
-                  }
-                  className={inputCls(touched.numero_documento, errors.numero_documento)}
-                  maxLength={form.tipo_documento === 'DNI' ? 8 : 12}
-                />
+                <div className="relative w-full">
+                  <input
+                    type="text"
+                    name="numero_documento"
+                    value={form.numero_documento}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder={
+                      form.tipo_documento === 'DNI' ? '12345678'
+                      : form.tipo_documento === 'CE' ? 'A12345678'
+                      : 'AB1234'
+                    }
+                    className={inputCls(touched.numero_documento, errors.numero_documento) + (reniecLoading ? ' bg-slate-100 pr-10' : '')}
+                    maxLength={form.tipo_documento === 'DNI' ? 8 : 12}
+                    disabled={reniecLoading}
+                  />
+                  {reniecLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    </div>
+                  )}
+                </div>
               </Field>
             </div>
 
@@ -530,7 +565,8 @@ export default function RegisterPage() {
                 onBlur={handleBlur}
                 placeholder="JUAN CARLOS"
                 maxLength={30}
-                className={inputCls(touched.nombre, errors.nombre)}
+                className={inputCls(touched.nombre, errors.nombre) + (form.tipo_documento === 'DNI' ? ' bg-slate-100 cursor-not-allowed text-slate-500' : '')}
+                readOnly={form.tipo_documento === 'DNI'}
               />
             </Field>
 
@@ -544,7 +580,8 @@ export default function RegisterPage() {
                 onBlur={handleBlur}
                 placeholder="GARCÍA LÓPEZ"
                 maxLength={30}
-                className={inputCls(touched.apellido, errors.apellido)}
+                className={inputCls(touched.apellido, errors.apellido) + (form.tipo_documento === 'DNI' ? ' bg-slate-100 cursor-not-allowed text-slate-500' : '')}
+                readOnly={form.tipo_documento === 'DNI'}
               />
             </Field>
 

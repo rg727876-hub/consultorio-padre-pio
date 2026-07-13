@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, LinkIcon, ChevronDown, Check } from 'lucide-react';
+
 import { previewPatient, vincularPatient } from '../../services/authPatient.service';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
@@ -177,6 +179,10 @@ export default function VinculacionPage() {
   const [showPass2, setShowPass2] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
   const [success, setSuccess]     = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
+  // ── Inicialización ──────────────────────────────────────────────────────────
 
   // Si viene el documento en state, hacer el preview automáticamente
   useEffect(() => {
@@ -247,6 +253,14 @@ export default function VinculacionPage() {
     }
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     const newVal = type === 'checkbox' ? checked : value;
@@ -283,15 +297,19 @@ export default function VinculacionPage() {
     setLoading(true);
     setServerError(null);
     try {
-      await vincularPatient({
-        tipo_documento:     docInfo.tipo_documento,
-        numero_documento:   docInfo.numero_documento,
-        fecha_nacimiento:   form.fecha_nacimiento,
-        email:              form.email.trim().toLowerCase(),
-        password:           form.password,
-        confirmar_password: form.confirmar_password,
-        acepta_politica:    form.acepta_politica,
-      });
+      const formData = new FormData();
+      formData.append('tipo_documento', docInfo.tipo_documento);
+      formData.append('numero_documento', docInfo.numero_documento);
+      formData.append('fecha_nacimiento', form.fecha_nacimiento);
+      formData.append('email', form.email.trim().toLowerCase());
+      formData.append('password', form.password);
+      formData.append('confirmar_password', form.confirmar_password);
+      formData.append('acepta_politica', form.acepta_politica);
+      if (imageFile) {
+        formData.append('foto', imageFile);
+      }
+
+      await vincularPatient(formData);
       setSuccess(true);
     } catch (err) {
       const data   = err.response?.data;
@@ -465,6 +483,36 @@ export default function VinculacionPage() {
               )}
 
               <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
+                {/* Foto de perfil opcional */}
+                <div className="flex flex-col items-center justify-center mb-2">
+                  <div className="relative group">
+                    <label htmlFor="fotoUpload" className="cursor-pointer block relative">
+                      {imagePreview ? (
+                        <img 
+                          src={imagePreview} 
+                          alt="Preview" 
+                          className="w-24 h-24 rounded-full object-cover border-4 border-slate-100 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-24 h-24 rounded-full bg-slate-100 border-4 border-slate-50 flex items-center justify-center text-slate-400 shadow-sm group-hover:bg-slate-200 transition-colors">
+                          <Camera size={32} />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full shadow-md border-2 border-white">
+                        <Camera size={14} />
+                      </div>
+                    </label>
+                    <input 
+                      type="file" 
+                      id="fotoUpload" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleImageChange}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">Foto de perfil (opcional)</p>
+                </div>
 
                 <Field label="Fecha de nacimiento" error={errors.fecha_nacimiento} touched={touched.fecha_nacimiento}>
                   <input
