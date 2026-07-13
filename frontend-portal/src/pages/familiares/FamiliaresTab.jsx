@@ -8,6 +8,7 @@ import {
   getFamiliares, registrarFamiliar,
   getFamiliarDetalle, updateFamiliar, desvincularFamiliar,
 } from '../../services/patientFamily.service';
+import { consultarDniReniec } from '../../services/public.service';
 import HistorialClinico from '../../components/HistorialClinico';
 import { ProximasCitas, MisPagos } from '../../components/MisCitas';
 
@@ -591,6 +592,36 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
   const [serverError, setServerError]     = useState(null);
   const [candidato, setCandidato]         = useState(null);
   const [confirming, setConfirming]       = useState(false);
+  const [reniecLoading, setReniecLoading] = useState(false);
+
+  // ── Auto-fetch RENIEC ──────────────────────────────────────────
+  useEffect(() => {
+    const fetchReniec = async () => {
+      if (form.tipo_documento === 'DNI' && form.numero_documento.length === 8) {
+        setReniecLoading(true);
+        try {
+          const res = await consultarDniReniec(form.numero_documento);
+          setForm((prev) => ({
+            ...prev,
+            nombre: res.data.first_name || '',
+            apellido: `${res.data.first_last_name || ''} ${res.data.second_last_name || ''}`.trim()
+          }));
+          setErrors((prev) => ({ ...prev, nombre: null, apellido: null, numero_documento: null }));
+        } catch (error) {
+          setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+          setErrors((prev) => ({ 
+            ...prev, 
+            numero_documento: 'El DNI no existe en RENIEC'
+          }));
+        } finally {
+          setReniecLoading(false);
+        }
+      } else if (form.tipo_documento === 'DNI') {
+        setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+      }
+    };
+    fetchReniec();
+  }, [form.numero_documento, form.tipo_documento]);
 
   const fetchFamiliares = useCallback(async () => {
     setLoading(true); setListError(null);
@@ -924,11 +955,19 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
                     </Field>
                     <div className="col-span-4">
                       <Field label="Número de documento" error={touched.numero_documento && errors.numero_documento} required>
-                        <input type="text" name="numero_documento" value={form.numero_documento}
-                          onChange={handleChange} onBlur={handleBlur}
-                          maxLength={MAX_DOC[form.tipo_documento] ?? 12}
-                          placeholder={form.tipo_documento === 'DNI' ? '12345678' : ''}
-                          className={inp(touched.numero_documento && errors.numero_documento)} />
+                        <div className="relative">
+                          <input type="text" name="numero_documento" value={form.numero_documento}
+                            onChange={handleChange} onBlur={handleBlur}
+                            maxLength={MAX_DOC[form.tipo_documento] ?? 12}
+                            placeholder={form.tipo_documento === 'DNI' ? '12345678' : ''}
+                            className={inp(touched.numero_documento && errors.numero_documento)}
+                            disabled={reniecLoading} />
+                          {reniecLoading && (
+                            <div className="absolute right-3 top-2.5">
+                              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                            </div>
+                          )}
+                        </div>
                       </Field>
                     </div>
                   </div>
@@ -937,12 +976,16 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
                     <Field label="Nombres" error={touched.nombre && errors.nombre} required>
                       <input type="text" name="nombre" value={form.nombre}
                         onChange={handleChange} onBlur={handleBlur}
-                        maxLength={30} className={inp(touched.nombre && errors.nombre)} />
+                        maxLength={30}
+                        className={inp(touched.nombre && errors.nombre) + (form.tipo_documento === 'DNI' ? ' bg-slate-100 cursor-not-allowed text-slate-500' : '')}
+                        readOnly={form.tipo_documento === 'DNI'} />
                     </Field>
                     <Field label="Apellidos" error={touched.apellido && errors.apellido} required>
                       <input type="text" name="apellido" value={form.apellido}
                         onChange={handleChange} onBlur={handleBlur}
-                        maxLength={30} className={inp(touched.apellido && errors.apellido)} />
+                        maxLength={30}
+                        className={inp(touched.apellido && errors.apellido) + (form.tipo_documento === 'DNI' ? ' bg-slate-100 cursor-not-allowed text-slate-500' : '')}
+                        readOnly={form.tipo_documento === 'DNI'} />
                     </Field>
                   </div>
 
