@@ -13,6 +13,7 @@ export default {
       },
       fontFamily: {
         display: ['"Playfair Display"', 'Georgia', 'serif'],
+        script:  ['"Dancing Script"', 'cursive'],
       },
     },
   },

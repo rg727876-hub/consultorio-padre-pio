@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Phone, MapPin, Clock, ChevronRight,
+  Phone, MapPin, Clock, ChevronRight, ChevronLeft,
   Loader2, Star, Users, CalendarCheck, ShieldCheck,
 } from 'lucide-react';
 import { getServiciosPublicos, getDoctoresPublicos } from '../../services/public.service';
@@ -29,12 +29,18 @@ const toTitle = (s) => (s ?? '').toLowerCase().replace(/\b\w/g, (c) => c.toUpper
 const iniciales = (nombre, apellido) =>
   ((nombre ?? '').charAt(0) + (apellido ?? '').charAt(0)).toUpperCase();
 
+const mediaUrl = (path) => {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${path}`;
+};
+
 // ── Componentes ───────────────────────────────────────────────────────────────
 function NavLink({ href, children }) {
   return (
     <a
       href={href}
-      className="text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
+      className="text-xs font-semibold uppercase tracking-widest text-slate-500
+                hover:text-primary transition-colors"
     >
       {children}
     </a>
@@ -42,56 +48,120 @@ function NavLink({ href, children }) {
 }
 
 function ServiceCard({ servicio }) {
+  const navigate = useNavigate();
+  const foto = mediaUrl(servicio.imagen);
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col gap-3
-                    hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-      <div className="flex items-center gap-3">
-        {servicio.imagen && (
-          <img 
-            src={servicio.imagen?.startsWith('http') ? servicio.imagen : (servicio.imagen?.startsWith('http') ? servicio.imagen : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${servicio.imagen}`)} 
-            alt={servicio.nombre} 
-            className="w-12 h-12 rounded-xl object-cover bg-slate-50 flex-shrink-0 border border-slate-100 shadow-sm"
-          />
+    <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300
+                    overflow-hidden flex flex-col h-full border border-slate-100">
+      <div className="aspect-[4/3] bg-slate-100 overflow-hidden">
+        {foto ? (
+          <img src={foto} alt={servicio.nombre} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-5xl
+                          bg-gradient-to-br from-primary/15 to-accent/15">
+            🦷
+          </div>
         )}
-        <h3 className="font-bold text-slate-800 text-base leading-tight">{toTitle(servicio.nombre)}</h3>
       </div>
-      {servicio.descripcion && (
-        <p className="text-sm text-slate-500 leading-relaxed flex-1">
-          {servicio.descripcion}
-        </p>
-      )}
-      <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-auto">
-        <span className="text-xs text-slate-400">{servicio.duracion} min</span>
-        <span className="text-sm font-bold text-primary">
+
+      <div className="flex-1 flex flex-col items-center text-center px-5 py-6">
+        <h3 className="font-bold text-slate-800 text-base">{toTitle(servicio.nombre)}</h3>
+        <p className="text-primary font-bold text-sm mt-1">
           S/ {Number(servicio.costo).toFixed(2)}
-        </span>
+        </p>
+        {servicio.descripcion && (
+          <p className="text-xs text-slate-500 leading-relaxed mt-2 line-clamp-3">
+            {servicio.descripcion}
+          </p>
+        )}
+        <div className="mt-auto w-full pt-4">
+          <button
+            type="button"
+            onClick={() => navigate('/register')}
+            className="text-xs font-semibold text-primary border border-primary/30
+                       rounded-full px-5 py-2 hover:bg-primary/5 transition-colors"
+          >
+            Reservar cita
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function DoctorCard({ doctor }) {
+function ServicesCarousel({ servicios }) {
+  const scrollRef = useRef(null);
+
+  const scrollByCard = (dir) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const card = el.querySelector('[data-card]');
+    const amount = card ? card.offsetWidth + 20 : 280;
+    el.scrollBy({ left: dir * amount, behavior: 'smooth' });
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col
-                    items-center text-center gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-      {doctor.avatar ? (
-        <img 
-          src={doctor.avatar?.startsWith('http') ? doctor.avatar : (doctor.avatar?.startsWith('http') ? doctor.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctor.avatar}`)} 
-          alt={doctor.nombre}
-          className="w-20 h-20 rounded-full object-cover shadow-md border-2 border-white flex-shrink-0 bg-slate-50"
-        />
-      ) : (
-        <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center
-                        text-white text-xl font-black select-none shadow-md border-2 border-white flex-shrink-0">
-          {iniciales(doctor.nombre, doctor.apellido)}
-        </div>
+    <div className="relative">
+      <div
+        ref={scrollRef}
+        className="flex items-stretch gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2
+                   [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {servicios.map((s) => (
+          <div
+            key={s.servicio_id}
+            data-card
+            className="snap-start shrink-0 w-[75%] sm:w-64 lg:w-72"
+          >
+            <ServiceCard servicio={s} />
+          </div>
+        ))}
+      </div>
+
+      {servicios.length > 4 && (
+        <>
+          <button
+            onClick={() => scrollByCard(-1)}
+            className="hidden sm:flex absolute -left-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full
+                       bg-white shadow-lg items-center justify-center hover:bg-slate-50 transition-colors"
+            aria-label="Anterior"
+          >
+            <ChevronLeft size={18} className="text-slate-600" />
+          </button>
+          <button
+            onClick={() => scrollByCard(1)}
+            className="hidden sm:flex absolute -right-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full
+                       bg-white shadow-lg items-center justify-center hover:bg-slate-50 transition-colors"
+            aria-label="Siguiente"
+          >
+            <ChevronRight size={18} className="text-slate-600" />
+          </button>
+        </>
       )}
+    </div>
+  );
+}
+
+function DoctorCircle({ doctor }) {
+  const foto = mediaUrl(doctor.avatar);
+
+  return (
+    <div className="flex flex-col items-center text-center gap-3">
+      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden shadow-md bg-slate-100 shrink-0">
+        {foto ? (
+          <img src={foto} alt={doctor.nombre} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-primary
+                          text-white font-black text-lg select-none">
+            {iniciales(doctor.nombre, doctor.apellido)}
+          </div>
+        )}
+      </div>
       <div>
-        <p className="font-bold text-slate-800">
-          Dr. {toTitle(doctor.nombre)} {toTitle(doctor.apellido)}
-        </p>
+        <p className="text-sm font-bold text-slate-800">Dr. {toTitle(doctor.apellido)}</p>
         {doctor.especialidad && (
-          <p className="text-xs text-slate-500 mt-0.5">{doctor.especialidad}</p>
+          <p className="text-xs text-slate-400 mt-0.5">{doctor.especialidad}</p>
         )}
       </div>
     </div>
@@ -109,6 +179,8 @@ export default function LandingPage() {
 
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const heroDoctores = doctores.slice(0, 3);
+
   useEffect(() => {
     getServiciosPublicos()
       .then(({ data }) => setServicios(Array.isArray(data) ? data : []))
@@ -125,51 +197,59 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white font-sans">
 
       {/* ── NAVBAR ── */}
-      <header className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <a href="#inicio" className="flex items-center gap-2">
-            <img src="/ICONOCLINICA.svg" alt="Padre Pio" className="h-8 w-auto" />
-            <span className="font-display font-black text-primary text-xl tracking-tight">
-              PadrePio
+      <header className="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md shadow-[0_1px_0_0_rgba(15,23,42,0.06)]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+
+          {/* Fila 1: marca centrada */}
+          <div className="pt-3 pb-2 flex flex-col items-center text-center">
+            <a href="#inicio" className="flex items-center gap-2">
+              <img src="/ICONOCLINICA.svg" alt="Padre Pio" className="h-6 w-auto" />
+              <span className="font-display font-black text-primary text-2xl tracking-[0.08em]">
+                PadrePio
+              </span>
+            </a>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400 mt-1">
+              {INFO.tagline}
             </span>
-          </a>
-
-          {/* Nav desktop */}
-          <nav className="hidden md:flex items-center gap-6">
-            <NavLink href="#servicios">Servicios</NavLink>
-            <NavLink href="#nosotros">Nosotros</NavLink>
-            <NavLink href="#doctores">Doctores</NavLink>
-            <NavLink href="#contacto">Contacto</NavLink>
-          </nav>
-
-          {/* CTAs desktop */}
-          <div className="hidden md:flex items-center gap-3">
-            <button
-              onClick={() => navigate('/login')}
-              className="text-sm font-semibold text-primary border border-primary/30
-                         px-4 py-2 rounded-lg hover:bg-primary/5 transition-colors"
-            >
-              Ingresar
-            </button>
-            <button
-              onClick={() => navigate('/register')}
-              className="text-sm font-bold bg-accent text-white px-4 py-2 rounded-lg
-                         hover:bg-[#78b52c] transition-colors"
-            >
-              Crear cuenta
-            </button>
           </div>
 
-          {/* Hamburger mobile */}
-          <button
-            className="md:hidden p-2 text-slate-600"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <span className="block w-5 h-0.5 bg-current mb-1" />
-            <span className="block w-5 h-0.5 bg-current mb-1" />
-            <span className="block w-5 h-0.5 bg-current" />
-          </button>
+          {/* Fila 2: nav centrado + CTAs */}
+          <div className="relative flex items-center justify-center h-12 border-t border-slate-100">
+            <nav className="hidden md:flex items-center gap-9">
+              <NavLink href="#servicios">Servicios</NavLink>
+              <NavLink href="#nosotros">Nosotros</NavLink>
+              <NavLink href="#doctores">Doctores</NavLink>
+              <NavLink href="#contacto">Contacto</NavLink>
+            </nav>
+
+            {/* CTAs desktop */}
+            <div className="hidden md:flex items-center gap-2 absolute right-0">
+              <button
+                onClick={() => navigate('/login')}
+                className="text-xs font-semibold text-slate-600 hover:text-primary
+                           px-3 py-1.5 rounded-full transition-colors"
+              >
+                Ingresar
+              </button>
+              <button
+                onClick={() => navigate('/register')}
+                className="text-xs font-bold bg-primary text-white px-4 py-2 rounded-full
+                           hover:bg-blue-700 transition-colors shadow-sm shadow-primary/20"
+              >
+                Crear cuenta
+              </button>
+            </div>
+
+            {/* Hamburger mobile */}
+            <button
+              className="md:hidden absolute right-0 p-2 text-slate-600"
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <span className="block w-5 h-0.5 bg-current mb-1" />
+              <span className="block w-5 h-0.5 bg-current mb-1" />
+              <span className="block w-5 h-0.5 bg-current" />
+            </button>
+          </div>
         </div>
 
         {/* Menú mobile */}
@@ -183,12 +263,12 @@ export default function LandingPage() {
             ))}
             <div className="flex gap-2 pt-2 border-t border-slate-100">
               <button onClick={() => navigate('/login')}
-                className="flex-1 border border-primary/30 text-primary text-sm font-semibold
-                           py-2 rounded-lg">
+                className="flex-1 border border-slate-200 text-slate-600 text-sm font-semibold
+                           py-2 rounded-full">
                 Ingresar
               </button>
               <button onClick={() => navigate('/register')}
-                className="flex-1 bg-accent text-white text-sm font-bold py-2 rounded-lg">
+                className="flex-1 bg-primary text-white text-sm font-bold py-2 rounded-full">
                 Crear cuenta
               </button>
             </div>
@@ -199,89 +279,109 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <section
         id="inicio"
-        className="pt-16 min-h-screen flex items-center bg-gradient-to-br
-                   from-primary/5 via-white to-accent/10"
+        className="relative pt-28 sm:pt-32 min-h-screen flex items-center overflow-hidden bg-white"
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <span className="inline-block text-xs font-bold uppercase tracking-widest
-                             text-accent bg-accent/10 px-3 py-1 rounded-full mb-4">
+        {/* Lavado crema solo a la izquierda, perdiéndose hacia la derecha */}
+        <div className="absolute inset-y-0 left-0 w-full sm:w-1/2
+                        bg-gradient-to-r from-[#F7F1E7] via-[#F7F1E7]/40 to-transparent pointer-events-none" />
+
+        {/* Manchas decorativas de fondo */}
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Foto vertical completa, anclada a la derecha */}
+        <div
+          className="hidden md:block absolute inset-y-0 right-0 h-full"
+          style={{ aspectRatio: '736 / 1104' }}
+        >
+          <img src="/rrr.jpg" alt="" className="w-full h-full object-cover" />
+          {/* Difuminado hacia blanco en el borde izquierdo de la foto */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/30 to-transparent" />
+        </div>
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-20 w-full">
+          <div className="max-w-xl">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest
+                             text-accent bg-accent/10 px-4 py-1.5 rounded-full mb-5">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
               {INFO.tagline}
             </span>
-            <h1 className="font-display font-black text-slate-900 leading-tight mb-4"
-                style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>
+            <h1 className="font-display font-black text-slate-900 leading-[1.08] mb-5"
+                style={{ fontSize: 'clamp(2.25rem, 5.5vw, 4rem)' }}>
               Tu salud dental<br />
               <span className="text-primary">en las mejores manos</span>
             </h1>
-            <p className="text-slate-500 text-lg leading-relaxed mb-8 max-w-lg">
+            <p className="text-slate-500 text-lg leading-relaxed mb-9 max-w-lg">
               Reserva tus citas en línea, gestiona los tratamientos de toda tu familia
               y accede a tu historial clínico cuando lo necesites.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 mb-7">
               <button
                 onClick={() => navigate('/register')}
                 className="inline-flex items-center gap-2 bg-accent text-white font-bold
-                           px-6 py-3 rounded-xl hover:bg-[#78b52c] transition-colors shadow-sm"
+                           px-7 py-3.5 rounded-full hover:bg-[#78b52c] hover:-translate-y-0.5
+                           transition-all shadow-lg shadow-accent/25"
               >
                 Crear mi cuenta <ChevronRight size={16} />
               </button>
               <button
                 onClick={() => navigate('/login')}
-                className="inline-flex items-center gap-2 border border-primary/30 text-primary
-                           font-semibold px-6 py-3 rounded-xl hover:bg-primary/5 transition-colors"
+                className="inline-flex items-center gap-2 border-2 border-primary/15 text-primary
+                           font-semibold px-7 py-3.5 rounded-full hover:bg-primary/5 hover:-translate-y-0.5
+                           transition-all"
               >
                 Ya tengo cuenta
               </button>
             </div>
-            <p className="text-xs text-slate-400 mt-4">
+            <p className="text-xs text-slate-400 mb-7">
               ¿Paciente del consultorio?{' '}
               <button onClick={() => navigate('/vincular')}
                 className="text-primary underline font-semibold">
                 Vincula tu cuenta aquí
               </button>
             </p>
-          </div>
 
-          {/* Tarjeta decorativa */}
-          <div className="hidden md:flex justify-center">
-            <div className="bg-white rounded-3xl shadow-xl p-8 max-w-xs w-full border border-slate-100">
-              <div className="flex items-center gap-3 mb-6">
-                <img src="/ICONOCLINICA.svg" alt="Padre Pio" className="h-10 w-auto" />
-                <div>
-                  <p className="text-sm font-bold text-slate-800">Consultorio Padre Pio</p>
-                  <p className="text-xs text-slate-400">Portal de pacientes</p>
-                </div>
+            {heroDoctores.length > 0 && (
+              <div className="flex items-center gap-5">
+                {heroDoctores.map((d) => {
+                  const foto = mediaUrl(d.avatar);
+                  return (
+                    <div key={d.doctor_id} className="flex flex-col items-center gap-1.5">
+                      {foto ? (
+                        <img
+                          src={foto}
+                          alt={d.nombre}
+                          className="w-12 h-12 rounded-full object-cover shadow-sm border-2 border-white ring-1 ring-slate-200"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center
+                                        text-white text-xs font-black shadow-sm border-2 border-white ring-1 ring-slate-200">
+                          {iniciales(d.nombre, d.apellido)}
+                        </div>
+                      )}
+                      <span className="text-[11px] text-slate-500 font-medium text-center leading-tight max-w-[4.5rem]">
+                        Dr. {toTitle(d.apellido)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              {[
-                { label: 'Reserva citas online',           done: true  },
-                { label: 'Historial clínico digital',      done: true  },
-                { label: 'Gestión de familiares',          done: true  },
-                { label: 'Recordatorios automáticos',      done: false },
-              ].map(({ label, done }) => (
-                <div key={label} className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0
-                                   ${done ? 'bg-accent' : 'bg-slate-100'}`}>
-                    {done && <span className="text-white text-[10px] font-black">✓</span>}
-                  </div>
-                  <span className={`text-sm ${done ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
-                    {label}
-                  </span>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
         </div>
       </section>
 
       {/* ── ESTADÍSTICAS ── */}
-      <section className="bg-primary py-12">
+      <section className="bg-[#F7F1E7] py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 text-center">
             {STATS.map(({ icon: Icon, label, value }) => (
-              <div key={label}>
-                <Icon size={24} className="text-white/60 mx-auto mb-2" />
-                <p className="text-2xl font-black text-white">{value}</p>
-                <p className="text-xs text-white/60 mt-0.5">{label}</p>
+              <div key={label} className="flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-3">
+                  <Icon size={20} className="text-primary" />
+                </div>
+                <p className="text-xl sm:text-2xl font-black text-slate-800">{value}</p>
+                <p className="text-xs text-slate-500 mt-1">{label}</p>
               </div>
             ))}
           </div>
@@ -312,140 +412,267 @@ export default function LandingPage() {
               Próximamente nuestros servicios.
             </p>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {servicios.map((s) => <ServiceCard key={s.servicio_id} servicio={s} />)}
-            </div>
+            <ServicesCarousel servicios={servicios} />
           )}
         </div>
       </section>
 
       {/* ── NOSOTROS ── */}
-      <section id="nosotros" className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-12 items-center">
-          <div>
+      <section id="nosotros" className="relative py-24 bg-white overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-16 items-center">
+
+          {/* Foto con marco decorativo e insignia flotante */}
+          <div className="relative order-2 md:order-1 max-w-sm mx-auto md:max-w-none">
+            <div className="absolute -inset-4 border-2 border-accent/30 rounded-[2rem] -z-10 hidden sm:block" />
+            <div className="rounded-[2rem] overflow-hidden shadow-xl aspect-[4/5] bg-slate-100">
+              <img
+                src="/rrrr.jpg"
+                alt="Consultorio Padre Pio"
+                className="w-full h-full object-cover"
+                style={{ objectPosition: '50% 30%' }}
+              />
+            </div>
+
+            <div className="absolute -bottom-6 -right-2 sm:-right-8 bg-white rounded-2xl shadow-xl
+                            px-5 py-4 border border-slate-100 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-accent/15 flex items-center justify-center shrink-0">
+                <ShieldCheck size={20} className="text-accent" />
+              </div>
+              <div>
+                <p className="font-black text-slate-800 text-lg leading-none">{INFO.inicio}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Cuidando sonrisas desde</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Texto */}
+          <div className="order-1 md:order-2">
             <span className="text-xs font-bold uppercase tracking-widest text-accent">
               Quiénes somos
             </span>
-            <h2 className="font-display font-black text-slate-900 text-3xl mt-2 mb-4">
+            <h2 className="font-display font-black text-slate-900 text-3xl mt-2 mb-5">
               Consultorio Padre Pio
             </h2>
-            <p className="text-slate-500 leading-relaxed mb-6">
+            <p className="text-slate-500 leading-relaxed mb-4">
               {INFO.mision}
             </p>
             <p className="text-slate-500 leading-relaxed">
               Desde inicios del {INFO.inicio} nos comprometemos a ofrecer una experiencia
               de atención cómoda, moderna y personalizada para cada paciente.
             </p>
-          </div>
 
-          <div className="space-y-4">
-            {[
-              {
-                icon: Phone,
-                title: 'Llámanos',
-                value: INFO.telefono,
-                sub:   'Cel. / WhatsApp',
-              },
-              {
-                icon: MapPin,
-                title: 'Encuéntranos',
-                value: INFO.direccion,
-                sub:   'Trujillo, Perú',
-              },
-              {
-                icon: Clock,
-                title: 'Horario de atención',
-                value: INFO.horario,
-                sub:   'Domingos cerrado',
-              },
-            ].map(({ icon: Icon, title, value, sub }) => (
-              <div key={title}
-                className="flex items-start gap-4 bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center
-                                justify-center shrink-0 mt-0.5">
-                  <Icon size={18} className="text-primary" />
-                </div>
-                <div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-9 pt-8 border-t border-slate-100">
+              {[
+                { icon: Phone, title: 'Llámanos', value: INFO.telefono },
+                { icon: MapPin, title: 'Encuéntranos', value: INFO.direccion },
+                { icon: Clock, title: 'Horario', value: INFO.horario },
+              ].map(({ icon: Icon, title, value }) => (
+                <div key={title}>
+                  <Icon size={18} className="text-primary mb-2" />
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{title}</p>
-                  <p className="text-sm font-semibold text-slate-800 mt-0.5">{value}</p>
-                  <p className="text-xs text-slate-400">{sub}</p>
+                  <p className="text-sm font-semibold text-slate-800 mt-1 leading-snug">{value}</p>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── DOCTORES ── */}
-      <section id="doctores" className="py-20 bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <span className="text-xs font-bold uppercase tracking-widest text-accent">
-              Nuestro equipo
-            </span>
-            <h2 className="font-display font-black text-slate-900 text-3xl mt-2">
-              Conoce a nuestros doctores
-            </h2>
-            <p className="text-slate-500 mt-2 text-sm max-w-md mx-auto">
-              Profesionales especializados comprometidos con tu salud bucal.
+      <section
+        id="doctores"
+        className="relative py-24 overflow-hidden"
+        style={{
+          backgroundColor: '#fafaf9',
+          backgroundImage: 'radial-gradient(circle, #0000000f 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+        }}
+      >
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-16 items-center">
+
+          {/* Texto */}
+          <div>
+            <p className="font-script text-5xl sm:text-6xl text-accent/80 leading-none mb-2 select-none">
+              nuestro equipo
             </p>
+            <h2 className="font-display font-black text-slate-900 text-3xl sm:text-4xl leading-tight mb-5">
+              TU SONRISA EN MANOS DE EXPERTOS
+            </h2>
+            <p className="text-slate-500 leading-relaxed mb-6">
+              Nos apasiona cuidar de tu salud dental con la calidez y el profesionalismo
+              que mereces. Contamos con un staff de especialistas altamente calificados,
+              listos para brindarte una atención personalizada utilizando tecnología de
+              vanguardia en cada tratamiento.
+            </p>
+
+            <ul className="space-y-3">
+              {[
+                { emoji: '🪥', text: 'Especialistas certificados' },
+                { emoji: '✨', text: 'Tecnología y confort clínico' },
+                { emoji: '🤍', text: 'Atención empática y sin dolor' },
+              ].map(({ emoji, text }) => (
+                <li key={text} className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <span className="text-lg">{emoji}</span>
+                  {text}
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {loadingDoc ? (
-            <div className="flex justify-center py-10">
-              <Loader2 size={28} className="animate-spin text-primary" />
-            </div>
-          ) : doctores.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm">
-              Próximamente nuestro equipo.
-            </p>
-          ) : (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {doctores.map((d) => <DoctorCard key={d.doctor_id} doctor={d} />)}
-            </div>
-          )}
+          {/* Fotos circulares del equipo */}
+          <div>
+            {loadingDoc ? (
+              <div className="flex justify-center py-10">
+                <Loader2 size={28} className="animate-spin text-primary" />
+              </div>
+            ) : doctores.length === 0 ? (
+              <p className="text-center text-slate-400 text-sm">
+                Próximamente nuestro equipo.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-8">
+                {doctores.slice(0, 6).map((d) => <DoctorCircle key={d.doctor_id} doctor={d} />)}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* ── CTA FINAL ── */}
+      {/* ── CTA FINAL / CONTACTO ── */}
       <section id="contacto" className="py-20 bg-primary">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="font-display font-black text-white text-3xl mb-3">
-            ¿Listo para cuidar tu sonrisa?
-          </h2>
-          <p className="text-white/70 mb-8 text-sm leading-relaxed">
-            Crea tu cuenta gratis y reserva tu primera cita en minutos.
-            Si ya eres paciente del consultorio, vincula tu historial existente.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => navigate('/register')}
-              className="inline-flex items-center gap-2 bg-white text-primary font-bold
-                         px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors shadow"
-            >
-              Crear mi cuenta <ChevronRight size={16} />
-            </button>
-            <button
-              onClick={() => navigate('/vincular')}
-              className="inline-flex items-center gap-2 border border-white/30 text-white
-                         font-semibold px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
-            >
-              Vincular mi cuenta
-            </button>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-12 items-center">
+
+          {/* Texto + CTA + datos de contacto */}
+          <div>
+            <h2 className="font-display font-black text-white text-3xl mb-3">
+              ¿Listo para cuidar tu sonrisa?
+            </h2>
+            <p className="text-white/70 mb-7 text-sm leading-relaxed">
+              Crea tu cuenta gratis y reserva tu primera cita en minutos.
+              Si ya eres paciente del consultorio, vincula tu historial existente.
+            </p>
+            <div className="flex flex-wrap gap-3 mb-8">
+              <button
+                onClick={() => navigate('/register')}
+                className="inline-flex items-center gap-2 bg-white text-primary font-bold
+                           px-6 py-3 rounded-full hover:bg-slate-50 transition-colors shadow"
+              >
+                Crear mi cuenta <ChevronRight size={16} />
+              </button>
+              <button
+                onClick={() => navigate('/vincular')}
+                className="inline-flex items-center gap-2 border border-white/30 text-white
+                           font-semibold px-6 py-3 rounded-full hover:bg-white/10 transition-colors"
+              >
+                Vincular mi cuenta
+              </button>
+            </div>
+
+            <div className="space-y-3 border-t border-white/15 pt-6">
+              <a
+                href={`https://wa.me/51${INFO.telefono.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 text-white text-sm font-semibold hover:underline w-fit"
+              >
+                <Phone size={16} className="shrink-0" /> {INFO.telefono} · Escríbenos por WhatsApp
+              </a>
+              <p className="flex items-center gap-3 text-white/70 text-sm">
+                <MapPin size={16} className="shrink-0" /> {INFO.direccion}
+              </p>
+              <p className="flex items-center gap-3 text-white/70 text-sm">
+                <Clock size={16} className="shrink-0" /> {INFO.horario}
+              </p>
+            </div>
+          </div>
+
+          {/* Mapa */}
+          <div className="rounded-2xl overflow-hidden shadow-xl h-72 md:h-full min-h-[280px]">
+            <iframe
+              title="Ubicación Consultorio Padre Pio"
+              src={`https://www.google.com/maps?q=${encodeURIComponent(INFO.direccion)}&output=embed`}
+              className="w-full h-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
         </div>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="bg-slate-900 text-slate-400 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row
-                        items-center justify-between gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <img src="/ICONOCLINICA.svg" alt="Padre Pio" className="h-6 w-auto brightness-0 invert" />
-            <span className="font-display font-black text-white text-base">PadrePio</span>
+      <footer className="bg-slate-900 text-slate-400">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 grid sm:grid-cols-2 md:grid-cols-4 gap-10">
+
+          {/* Marca */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <img src="/ICONOCLINICA.svg" alt="Padre Pio" className="h-7 w-auto brightness-0 invert" />
+              <span className="font-display font-black text-white text-lg">PadrePio</span>
+            </div>
+            <p className="text-sm leading-relaxed">
+              {INFO.tagline}. Cuidando tu salud bucal con tecnología moderna y un trato cercano.
+            </p>
           </div>
-          <p>{INFO.tagline} · {INFO.direccion}</p>
-          <p>© {new Date().getFullYear()} Consultorio Padre Pio</p>
+
+          {/* Enlaces */}
+          <div>
+            <h3 className="text-white font-semibold text-sm uppercase tracking-wide mb-4">Enlaces</h3>
+            <ul className="space-y-2.5 text-sm">
+              <li><a href="#servicios" className="hover:text-white transition-colors">Servicios</a></li>
+              <li><a href="#nosotros" className="hover:text-white transition-colors">Nosotros</a></li>
+              <li><a href="#doctores" className="hover:text-white transition-colors">Doctores</a></li>
+              <li><a href="#contacto" className="hover:text-white transition-colors">Contacto</a></li>
+            </ul>
+          </div>
+
+          {/* Mi cuenta */}
+          <div>
+            <h3 className="text-white font-semibold text-sm uppercase tracking-wide mb-4">Mi cuenta</h3>
+            <ul className="space-y-2.5 text-sm">
+              <li>
+                <button onClick={() => navigate('/login')} className="hover:text-white transition-colors">
+                  Ingresar
+                </button>
+              </li>
+              <li>
+                <button onClick={() => navigate('/register')} className="hover:text-white transition-colors">
+                  Crear cuenta
+                </button>
+              </li>
+              <li>
+                <button onClick={() => navigate('/vincular')} className="hover:text-white transition-colors">
+                  Vincular cuenta
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Contacto */}
+          <div>
+            <h3 className="text-white font-semibold text-sm uppercase tracking-wide mb-4">Contacto</h3>
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-start gap-2">
+                <Phone size={14} className="mt-0.5 shrink-0" /> {INFO.telefono}
+              </li>
+              <li className="flex items-start gap-2">
+                <MapPin size={14} className="mt-0.5 shrink-0" /> {INFO.direccion}
+              </li>
+              <li className="flex items-start gap-2">
+                <Clock size={14} className="mt-0.5 shrink-0" /> {INFO.horario}
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="border-t border-white/10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row
+                          items-center justify-between gap-2 text-xs">
+            <p>© {new Date().getFullYear()} Consultorio Padre Pio. Todos los derechos reservados.</p>
+            <p>Hecho con cuidado en Trujillo, Perú</p>
+          </div>
         </div>
       </footer>
 
