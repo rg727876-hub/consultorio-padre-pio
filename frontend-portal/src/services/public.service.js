@@ -3,3 +3,4 @@ import api from '../api/axios';
 export const getServiciosPublicos = () => api.get('/public/servicios');
 export const getDoctoresPublicos  = () => api.get('/public/doctores');
 export const getPaymentMethodIcons = () => api.get('/public/payment-methods');
+export const consultarDniReniec    = (dni) => api.get(`/public/reniec/${dni}`);

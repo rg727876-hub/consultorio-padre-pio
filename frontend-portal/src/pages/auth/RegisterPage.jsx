@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, Camera } from 'lucide-react';
 import { registerPatient } from '../../services/authPatient.service';
+import { consultarDniReniec } from '../../services/public.service';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
 // ── Reglas de validación (espejo del backend) ────────────────────────────────
@@ -145,6 +146,38 @@ export default function RegisterPage() {
   const [showPolicy, setShowPolicy] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [reniecLoading, setReniecLoading] = useState(false);
+
+  // ── Auto-fetch RENIEC ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchReniec = async () => {
+      if (form.tipo_documento === 'DNI' && form.numero_documento.length === 8) {
+        setReniecLoading(true);
+        try {
+          const res = await consultarDniReniec(form.numero_documento);
+          setForm((prev) => ({
+            ...prev,
+            nombre: res.data.first_name || '',
+            apellido: `${res.data.first_last_name || ''} ${res.data.second_last_name || ''}`.trim()
+          }));
+          setErrors((prev) => ({ ...prev, nombre: null, apellido: null }));
+        } catch (error) {
+          // Si no se encuentra el DNI, limpiamos los nombres para evitar registros falsos
+          setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+          setErrors((prev) => ({ 
+            ...prev, 
+            numero_documento: 'El DNI no existe en RENIEC'
+          }));
+        } finally {
+          setReniecLoading(false);
+        }
+      } else if (form.tipo_documento === 'DNI') {
+        // Limpiamos si borran el DNI
+        setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+      }
+    };
+    fetchReniec();
+  }, [form.numero_documento, form.tipo_documento]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleImageChange = (e) => {
@@ -374,9 +407,15 @@ export default function RegisterPage() {
                   : form.tipo_documento === 'CE' ? 'A12345678'
                   : 'AB1234'
                 }
-                className={inputCls(touched.numero_documento, errors.numero_documento)}
+                className={inputCls(touched.numero_documento, errors.numero_documento) + (reniecLoading ? ' bg-slate-100' : '')}
                 maxLength={form.tipo_documento === 'DNI' ? 8 : 12}
+                disabled={reniecLoading}
               />
+              {reniecLoading && (
+                <div className="absolute right-3 top-9">
+                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                </div>
+              )}
             </Field>
 
             {/* Nombres */}
@@ -389,7 +428,8 @@ export default function RegisterPage() {
                 onBlur={handleBlur}
                 placeholder="JUAN CARLOS"
                 maxLength={30}
-                className={inputCls(touched.nombre, errors.nombre)}
+                className={inputCls(touched.nombre, errors.nombre) + (form.tipo_documento === 'DNI' ? ' bg-slate-100 cursor-not-allowed text-slate-500' : '')}
+                readOnly={form.tipo_documento === 'DNI'}
               />
             </Field>
 
@@ -403,7 +443,8 @@ export default function RegisterPage() {
                 onBlur={handleBlur}
                 placeholder="GARCÍA LÓPEZ"
                 maxLength={30}
-                className={inputCls(touched.apellido, errors.apellido)}
+                className={inputCls(touched.apellido, errors.apellido) + (form.tipo_documento === 'DNI' ? ' bg-slate-100 cursor-not-allowed text-slate-500' : '')}
+                readOnly={form.tipo_documento === 'DNI'}
               />
             </Field>
 
