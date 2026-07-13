@@ -9,6 +9,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Dancing+Script:wght@600;700&family=Baloo+2:wght@500;700&display=swap" rel="stylesheet" />
     <script src="https://sdk.mercadopago.com/js/v2"></script>
+    <!-- Fingerprint de dispositivo requerido por el motor antifraude de MercadoPago
+         (sin esto, la mayoría de los pagos se rechazan por "controles de seguridad"). -->
+    <script src="https://www.mercadopago.com/v2/security.js" view="checkout"></script>
   </head>
   <body>
     <div id="root"></div>

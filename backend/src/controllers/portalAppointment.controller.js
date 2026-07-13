@@ -247,7 +247,7 @@ const releaseHoldHandler = async (req, res) => {
 // nunca confía en el del cliente.
 const confirmPayment = async (req, res) => {
   const titularId = req.paciente.id;
-  const { hold_id, form_data } = req.body;
+  const { hold_id, form_data, device_id } = req.body;
 
   if (!hold_id || !form_data)
     return res.status(400).json({ error: 'hold_id y form_data son requeridos' });
@@ -308,6 +308,7 @@ const confirmPayment = async (req, res) => {
           last_name:  titular.apellido,
           identification: { type: titular.tipo_documento === 'CE' ? 'CE' : 'DNI', number: titular.numero_documento },
         },
+        deviceId: device_id,
       });
     } catch (mpErr) {
       console.error('[portalAppointment.confirmPayment] MercadoPago error', mpErr.message);

@@ -96,7 +96,11 @@ export default function StepPago({ metodo, holdId, amount, defaultEmail, onSucce
         formData = { token: yapeToken?.id ?? yapeToken, payment_method_id: 'yape', payer: { email } };
       }
 
-      const { data } = await confirmarPago({ hold_id: holdId, form_data: formData });
+      const { data } = await confirmarPago({
+        hold_id: holdId,
+        form_data: formData,
+        device_id: window.MP_DEVICE_SESSION_ID,
+      });
       onSuccess(data);
     } catch (err) {
       const status = err?.response?.status;

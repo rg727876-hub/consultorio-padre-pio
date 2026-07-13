@@ -55,7 +55,7 @@ const mapRejectionMessage = (statusDetail) =>
 // Devuelve { status, payment } cuando MercadoPago respondió (aprobado o
 // rechazado); lanza si hay un error de red/conexión con la pasarela (el
 // caller lo traduce a 502).
-const createPayment = async (formData, { amount, description, payer }) => {
+const createPayment = async (formData, { amount, description, payer, deviceId }) => {
   if (!client) throw new Error('MercadoPago no está configurado (falta access token)');
 
   const payment = new Payment(client);
@@ -67,6 +67,11 @@ const createPayment = async (formData, { amount, description, payer }) => {
       description,
       payer: { ...formData.payer, ...payer },
     },
+    // Fingerprint de dispositivo (window.MP_DEVICE_SESSION_ID en el frontend,
+    // generado por security.js) — sin esto el motor antifraude de MercadoPago
+    // rechaza la gran mayoría de los cobros por "controles de seguridad",
+    // sin importar la tarjeta.
+    requestOptions: deviceId ? { meliSessionId: deviceId } : undefined,
   });
 
   return { status: result.status, payment: result };
