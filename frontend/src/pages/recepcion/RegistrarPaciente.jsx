@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, UserPlus } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -27,8 +27,38 @@ const soloNumeros = (v, max) => v.replace(/\D/g, '').slice(0, max);
 export default function RegistrarPaciente() {
   const [form, setForm]             = useState(INITIAL);
   const [loading, setLoading]       = useState(false);
+  const [reniecLoading, setReniecLoading] = useState(false);
   const [errors, setErrors]         = useState({});
   const [serverError, setServerError] = useState('');
+
+  // ── Auto-fetch RENIEC ──────────────────────────────────────────
+  useEffect(() => {
+    const fetchReniec = async () => {
+      if (form.tipo_documento === 'DNI' && form.numero_documento.length === 8) {
+        setReniecLoading(true);
+        try {
+          const res = await api.get(`/public/reniec/${form.numero_documento}`);
+          setForm((prev) => ({
+            ...prev,
+            nombre: res.data.first_name || '',
+            apellido: `${res.data.first_last_name || ''} ${res.data.second_last_name || ''}`.trim()
+          }));
+          setErrors((prev) => ({ ...prev, nombre: '', apellido: '', numero_documento: '' }));
+        } catch (error) {
+          setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+          setErrors((prev) => ({ 
+            ...prev, 
+            numero_documento: 'El DNI no existe en RENIEC'
+          }));
+        } finally {
+          setReniecLoading(false);
+        }
+      } else if (form.tipo_documento === 'DNI') {
+        setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+      }
+    };
+    fetchReniec();
+  }, [form.numero_documento, form.tipo_documento]);
 
   const handleField = (name, rawValue) => {
     let value = rawValue;
@@ -135,11 +165,13 @@ export default function RegistrarPaciente() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Nombre *" error={errors.nombre}>
                 <Input name="nombre" value={form.nombre} onChange={handleChange}
-                       placeholder="Ej. María" error={errors.nombre} />
+                       placeholder="Ej. María" error={errors.nombre}
+                       disabled={form.tipo_documento === 'DNI'} />
               </Field>
               <Field label="Apellido *" error={errors.apellido}>
                 <Input name="apellido" value={form.apellido} onChange={handleChange}
-                       placeholder="Ej. García" error={errors.apellido} />
+                       placeholder="Ej. García" error={errors.apellido}
+                       disabled={form.tipo_documento === 'DNI'} />
               </Field>
             </div>
 
@@ -154,12 +186,20 @@ export default function RegistrarPaciente() {
               </Field>
               <Field label="Número de documento *" error={errors.numero_documento}
                      hint={form.tipo_documento === 'DNI' ? '8 dígitos' : undefined}>
-                <Input name="numero_documento" value={form.numero_documento}
-                       onChange={handleChange}
-                       placeholder={form.tipo_documento === 'DNI' ? '12345678' : ''}
-                       inputMode={form.tipo_documento === 'DNI' ? 'numeric' : 'text'}
-                       maxLength={form.tipo_documento === 'DNI' ? 8 : 20}
-                       error={errors.numero_documento} />
+                <div className="relative">
+                  <Input name="numero_documento" value={form.numero_documento}
+                         onChange={handleChange}
+                         placeholder={form.tipo_documento === 'DNI' ? '12345678' : ''}
+                         inputMode={form.tipo_documento === 'DNI' ? 'numeric' : 'text'}
+                         maxLength={form.tipo_documento === 'DNI' ? 8 : 20}
+                         error={errors.numero_documento}
+                         disabled={reniecLoading} />
+                  {reniecLoading && (
+                    <div className="absolute right-3 top-2.5">
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    </div>
+                  )}
+                </div>
               </Field>
             </div>
 
