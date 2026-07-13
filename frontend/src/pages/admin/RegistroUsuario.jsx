@@ -37,7 +37,38 @@ export default function RegistroUsuario() {
   const [imageFile, setImageFile]     = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
 
+  const [reniecLoading, setReniecLoading] = useState(false);
+
   const esDoctor = form.rol === 'DOCTOR';
+
+  // ── Auto-fetch RENIEC ──────────────────────────────────────────
+  useEffect(() => {
+    const fetchReniec = async () => {
+      if (form.DNI.length === 8) {
+        setReniecLoading(true);
+        try {
+          const res = await api.get(`/public/reniec/${form.DNI}`);
+          setForm((prev) => ({
+            ...prev,
+            nombre: res.data.first_name || '',
+            apellido: `${res.data.first_last_name || ''} ${res.data.second_last_name || ''}`.trim()
+          }));
+          setErrors((prev) => ({ ...prev, nombre: '', apellido: '', DNI: '' }));
+        } catch (error) {
+          setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+          setErrors((prev) => ({ 
+            ...prev, 
+            DNI: 'El DNI no existe en RENIEC'
+          }));
+        } finally {
+          setReniecLoading(false);
+        }
+      } else {
+        setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+      }
+    };
+    fetchReniec();
+  }, [form.DNI]);
 
   // Cargar servicios y especialidades cuando se elige Doctor
   useEffect(() => {
@@ -195,19 +226,26 @@ export default function RegistroUsuario() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Nombre *" error={errors.nombre}>
                     <Input name="nombre" value={form.nombre} onChange={handleChange}
-                           placeholder="Ej. Juan" error={errors.nombre} />
+                           placeholder="Ej. Juan" error={errors.nombre} disabled={true} />
                   </Field>
                   <Field label="Apellido *" error={errors.apellido}>
                     <Input name="apellido" value={form.apellido} onChange={handleChange}
-                           placeholder="Ej. Pérez" error={errors.apellido} />
+                           placeholder="Ej. Pérez" error={errors.apellido} disabled={true} />
                   </Field>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="DNI *" error={errors.DNI} hint="8 dígitos, solo números">
-                    <Input name="DNI" value={form.DNI} onChange={handleChange}
-                           placeholder="12345678" maxLength={8}
-                           inputMode="numeric" error={errors.DNI} />
+                    <div className="relative">
+                      <Input name="DNI" value={form.DNI} onChange={handleChange}
+                             placeholder="12345678" maxLength={8}
+                             inputMode="numeric" error={errors.DNI} disabled={reniecLoading} />
+                      {reniecLoading && (
+                        <div className="absolute right-3 top-2.5">
+                          <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                        </div>
+                      )}
+                    </div>
                   </Field>
                   <Field label="Teléfono *" error={errors.telefono} hint="9 dígitos, solo números">
                     <Input name="telefono" value={form.telefono} onChange={handleChange}
