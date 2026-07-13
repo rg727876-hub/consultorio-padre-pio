@@ -156,6 +156,9 @@ const reauthenticate = async (req, res) => {
   }
 };
 
+const MAX_RESET_INTENTOS = 3;
+const RESET_BLOQUEO_MIN = 15;
+
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'El correo es requerido' });
@@ -167,13 +170,25 @@ const forgotPassword = async (req, res) => {
     );
 
     if (!rows.length) {
-      // Return 200 to prevent email enumeration
       return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
     }
 
     const user = rows[0];
     if (user.estado !== 'ACTIVO') {
       return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+    }
+
+    // ── Verificar límite de intentos (máx 3 en 15 min) ──────────────
+    const [recentTokens] = await pool.query(
+      `SELECT COUNT(*) AS total FROM TOKEN_RECUPERACION_USUARIO
+       WHERE usuario_id = ? AND fecha_creacion > DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+      [user.usuario_id, RESET_BLOQUEO_MIN]
+    );
+
+    if (recentTokens[0].total >= MAX_RESET_INTENTOS) {
+      return res.status(429).json({
+        error: `Has alcanzado el límite de ${MAX_RESET_INTENTOS} solicitudes. Intenta nuevamente en ${RESET_BLOQUEO_MIN} minutos.`,
+      });
     }
 
     const token = crypto.randomBytes(32).toString('hex');
