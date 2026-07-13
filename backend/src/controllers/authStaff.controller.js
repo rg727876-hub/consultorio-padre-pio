@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const pool   = require('../config/db');
 const { generateToken } = require('../utils/jwt.util');
 const { logAudit }      = require('../utils/audit.util');
+const { sendPasswordResetEmail } = require('../utils/mailer.util');
 
 const MAX_INTENTOS   = 5;
 const BLOQUEO_MIN    = 15;
@@ -154,4 +156,114 @@ const reauthenticate = async (req, res) => {
   }
 };
 
-module.exports = { login, reauthenticate };
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'El correo es requerido' });
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT usuario_id, nombre, apellido, estado FROM USUARIO WHERE email = ?`,
+      [email]
+    );
+
+    if (!rows.length) {
+      // Return 200 to prevent email enumeration
+      return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+    }
+
+    const user = rows[0];
+    if (user.estado !== 'ACTIVO') {
+      return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expireDate = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query(
+      `INSERT INTO TOKEN_RECUPERACION_USUARIO (usuario_id, token, fecha_expira) VALUES (?, ?, ?)`,
+      [user.usuario_id, token, expireDate]
+    );
+
+    await sendPasswordResetEmail(email, user.nombre, token, false);
+    
+    await logAudit({
+      usuario_id: user.usuario_id,
+      accion: 'SOLICITUD_RECUPERACION_PASSWORD',
+      entidad: 'USUARIO',
+      entidad_id: user.usuario_id,
+      ip_origen: req.ip,
+    });
+
+    return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+  } catch (err) {
+    console.error('[authStaff.forgotPassword]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+const verifyResetToken = async (req, res) => {
+  const { token } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT token_id, fecha_expira, usado FROM TOKEN_RECUPERACION_USUARIO WHERE token = ?`,
+      [token]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'El enlace no es válido' });
+
+    const t = rows[0];
+    if (t.usado) return res.status(400).json({ error: 'Este enlace ya fue utilizado' });
+    if (new Date(t.fecha_expira) < new Date()) return res.status(400).json({ error: 'El enlace ha expirado' });
+
+    return res.json({ valid: true });
+  } catch (err) {
+    console.error('[authStaff.verifyResetToken]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Faltan datos' });
+  if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT token_id, usuario_id, fecha_expira, usado FROM TOKEN_RECUPERACION_USUARIO WHERE token = ?`,
+      [token]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'El enlace no es válido' });
+
+    const t = rows[0];
+    if (t.usado) return res.status(400).json({ error: 'Este enlace ya fue utilizado' });
+    if (new Date(t.fecha_expira) < new Date()) return res.status(400).json({ error: 'El enlace ha expirado' });
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      `UPDATE USUARIO SET password_hash = ?, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE usuario_id = ?`,
+      [password_hash, t.usuario_id]
+    );
+
+    await pool.query(
+      `UPDATE TOKEN_RECUPERACION_USUARIO SET usado = TRUE, fecha_usado = NOW() WHERE token_id = ?`,
+      [t.token_id]
+    );
+
+    await logAudit({
+      usuario_id: t.usuario_id,
+      accion: 'RECUPERACION_PASSWORD_EXITOSA',
+      entidad: 'USUARIO',
+      entidad_id: t.usuario_id,
+      ip_origen: req.ip,
+    });
+
+    return res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    console.error('[authStaff.resetPassword]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { login, reauthenticate, forgotPassword, verifyResetToken, resetPassword };

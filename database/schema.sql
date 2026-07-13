@@ -358,6 +358,38 @@ CREATE TABLE TOKEN_ACTIVACION (
 );
 
 -- ============================================
+-- TABLA: TOKEN_RECUPERACION_USUARIO
+-- ============================================
+CREATE TABLE TOKEN_RECUPERACION_USUARIO (
+    token_id INT AUTO_INCREMENT,
+    usuario_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_expira DATETIME NOT NULL,
+    usado BOOLEAN DEFAULT FALSE,
+    fecha_usado DATETIME NULL,
+    CONSTRAINT PK_TOKEN_REC_USUARIO PRIMARY KEY (token_id),
+    CONSTRAINT FK_TOKEN_REC_USUARIO FOREIGN KEY (usuario_id) REFERENCES USUARIO(usuario_id),
+    CONSTRAINT UK_TOKEN_REC_USUARIO UNIQUE (token)
+);
+
+-- ============================================
+-- TABLA: TOKEN_RECUPERACION_PACIENTE
+-- ============================================
+CREATE TABLE TOKEN_RECUPERACION_PACIENTE (
+    token_id INT AUTO_INCREMENT,
+    paciente_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_expira DATETIME NOT NULL,
+    usado BOOLEAN DEFAULT FALSE,
+    fecha_usado DATETIME NULL,
+    CONSTRAINT PK_TOKEN_REC_PACIENTE PRIMARY KEY (token_id),
+    CONSTRAINT FK_TOKEN_REC_PACIENTE FOREIGN KEY (paciente_id) REFERENCES PACIENTE(paciente_id),
+    CONSTRAINT UK_TOKEN_REC_PACIENTE UNIQUE (token)
+);
+
+-- ============================================
 -- ÍNDICES PARA RENDIMIENTO
 -- ============================================
 CREATE INDEX idx_cita_fecha ON CITA(fecha);

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { register, login, logout, preview, vincular } = require('../controllers/authPatient.controller');
+const { register, login, logout, preview, vincular, forgotPassword, verifyResetToken, resetPassword } = require('../controllers/authPatient.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { upload } = require('../middlewares/upload.middleware');
 
@@ -19,5 +19,10 @@ router.post('/preview', preview);
 
 // POST /api/auth/patient/vincular  — Vinculación de cuenta web con historial (público)
 router.post('/vincular', vincular);
+
+// Rutas de recuperación de contraseña
+router.post('/forgot-password', forgotPassword);
+router.get('/reset-password/:token', verifyResetToken);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
