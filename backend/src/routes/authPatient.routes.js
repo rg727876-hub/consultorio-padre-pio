@@ -18,7 +18,7 @@ router.post('/logout', verifyToken, logout);
 router.post('/preview', preview);
 
 // POST /api/auth/patient/vincular  — Vinculación de cuenta web con historial (público)
-router.post('/vincular', vincular);
+router.post('/vincular', upload.single('foto'), vincular);
 
 // Rutas de recuperación de contraseña
 router.post('/forgot-password', forgotPassword);

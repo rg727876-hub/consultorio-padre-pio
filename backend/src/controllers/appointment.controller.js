@@ -178,23 +178,31 @@ const create = async (req, res) => {
     const [existentes] = await conn.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
               TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
-              s.buffer AS buffer
+              s.buffer AS buffer,
+              c.doctor_id,
+              c.paciente_id
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ?
+       WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ?
          AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
-      [Number(doctor_id), fecha]
+      [Number(doctor_id), Number(paciente_id), fecha]
     );
     const nIni    = timeToMins(hora_inicio);
     const nFinBuf = timeToMins(hora_fin) + servicio.buffer;
-    const choca = existentes.some(
+    const conflicto = existentes.find(
       b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
     );
-    if (choca) {
+    if (conflicto) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({
-        error: 'Ese horario se cruza con otra cita o con su tiempo de limpieza (buffer). Elige otro.',
-      });
+      if (conflicto.paciente_id === Number(paciente_id)) {
+        return res.status(409).json({
+          error: 'El paciente ya tiene otra cita agendada que se cruza con este horario. Elige otro.',
+        });
+      } else {
+        return res.status(409).json({
+          error: 'Ese horario se cruza con otra cita del doctor o con su tiempo de limpieza (buffer). Elige otro.',
+        });
+      }
     }
 
     // Generar código único

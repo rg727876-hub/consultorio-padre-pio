@@ -423,6 +423,7 @@ const vincular = async (req, res) => {
     tipo_documento, numero_documento, fecha_nacimiento,
     email, password, confirmar_password, acepta_politica,
   } = req.body;
+  const fotoUrl = req.file ? (req.file.path.startsWith('http') ? req.file.path : `/uploads/patients/${req.file.filename}`) : null;
 
   if (!tipo_documento || !numero_documento?.trim() || !fecha_nacimiento ||
       !email?.trim() || !password || !confirmar_password)
@@ -493,7 +494,7 @@ const vincular = async (req, res) => {
     const titulares = eraFamiliar ? await getTitularesActivos(paciente.paciente_id) : [];
 
     const password_hash = await bcrypt.hash(password, 12);
-    await linkWebAccount(paciente.paciente_id, { email_cuenta: emailLower, password_hash });
+    await linkWebAccount(paciente.paciente_id, { email_cuenta: emailLower, password_hash, foto: fotoUrl });
 
     if (eraFamiliar) {
       // WEB-HU009: al activar su cuenta propia, se desvincula de TODOS sus titulares.
