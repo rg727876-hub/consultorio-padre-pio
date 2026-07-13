@@ -877,7 +877,7 @@ const reschedule = async (req, res) => {
 
     // ── 1. Leer y bloquear la cita original ──────────────────────────────
     const [[cita]] = await conn.query(
-      `SELECT cita_id, codigo_cita, doctor_id, servicio_id, estado,
+      `SELECT cita_id, codigo_cita, doctor_id, paciente_id, servicio_id, estado,
               DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
               TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
               TIME_FORMAT(hora_fin,    '%H:%i') AS hora_fin
@@ -919,24 +919,32 @@ const reschedule = async (req, res) => {
     const [otras] = await conn.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
               TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
-              s.buffer AS buffer
+              s.buffer AS buffer,
+              c.doctor_id,
+              c.paciente_id
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ? AND c.cita_id <> ?
+       WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ? AND c.cita_id <> ?
          AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
-      [cita.doctor_id, nueva_fecha, citaId]
+      [cita.doctor_id, cita.paciente_id, nueva_fecha, citaId]
     );
     const rIni    = timeToMins(nueva_hora_inicio);
     const rFinBuf = timeToMins(nueva_hora_fin) + bufReprog;
-    const solapa = otras.some(
+    const solapa = otras.find(
       b => rIni < (timeToMins(b.hf) + (b.buffer || 0)) && rFinBuf > timeToMins(b.hi)
     );
 
     if (solapa) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({
-        error: 'El horario solicitado se cruza con otra cita o su tiempo de limpieza (buffer).',
-      });
+      if (solapa.paciente_id === cita.paciente_id) {
+        return res.status(409).json({
+          error: 'El paciente ya tiene otra cita agendada que se cruza con este horario. Elige otro.',
+        });
+      } else {
+        return res.status(409).json({
+          error: 'El horario solicitado se cruza con otra cita del doctor o su tiempo de limpieza (buffer).',
+        });
+      }
     }
 
     // ── 4. Actualizar SOLO fecha/hora (sin tocar estado, doc, servicio, precio, código) ─

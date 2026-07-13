@@ -142,7 +142,7 @@ const getAvailability = async (req, res) => {
           return (slotInicio < bookedFinConBuffer && slotFinConBuffer > bookedInicio);
         });
 
-        if (!overlaps && !bookingHold.isSlotHeld(doctorId, fecha, horaInicioStr)) {
+        if (!overlaps && !bookingHold.isSlotHeld(doctorId, null, fecha, horaInicioStr)) {
           slots.push({ hora_inicio: horaInicioStr, hora_fin: minsToTime(slotFin) });
         }
 
@@ -184,8 +184,8 @@ const createHoldHandler = async (req, res) => {
 
     const hora_fin = minsToTime(timeToMins(hora_inicio) + servicio.duracion);
 
-    if (bookingHold.isSlotHeld(Number(doctor_id), fecha, hora_inicio))
-      return res.status(409).json({ error: 'Horario no disponible: otro paciente ya está reservando este horario.' });
+    if (bookingHold.isSlotHeld(Number(doctor_id), Number(paciente_id), fecha, hora_inicio))
+      return res.status(409).json({ error: 'Horario no disponible: ya estás reservando o alguien más está reservando este horario.' });
 
     const [existentes] = await pool.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
