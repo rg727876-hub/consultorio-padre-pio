@@ -142,21 +142,25 @@ const update = async (req, res) => {
     return res.status(400).json({ error: 'Estado no válido' });
 
   try {
-    const [result] = await pool.query(
-      `UPDATE SERVICIO
-       SET nombre=?, descripcion=?, duracion=?, costo=?, buffer=?, imagen=?, estado=?
-       WHERE servicio_id=?`,
-      [
-        String(nombre).trim(),
-        descripcion ? String(descripcion).trim() : null,
-        duracionNum,
-        costoNum,
-        bufferNum,
-        imagen ? String(imagen).trim() : null,
-        estado,
-        id,
-      ]
-    );
+    let updateQuery = `UPDATE SERVICIO SET nombre=?, descripcion=?, duracion=?, costo=?, buffer=?, estado=?`;
+    const queryParams = [
+      String(nombre).trim(),
+      descripcion ? String(descripcion).trim() : null,
+      duracionNum,
+      costoNum,
+      bufferNum,
+      estado,
+    ];
+
+    if (imagen !== undefined) {
+      updateQuery += `, imagen=?`;
+      queryParams.push(imagen ? String(imagen).trim() : null);
+    }
+
+    updateQuery += ` WHERE servicio_id=?`;
+    queryParams.push(id);
+
+    const [result] = await pool.query(updateQuery, queryParams);
 
     if (result.affectedRows === 0)
       return res.status(404).json({ error: 'Servicio no encontrado' });

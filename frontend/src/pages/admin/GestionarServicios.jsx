@@ -168,6 +168,7 @@ export default function GestionarServicios() {
         costo:       Number(editForm.costo),
         buffer:      Number(editForm.buffer),
         estado:      editForm.estado,
+        imagen:      editTarget.imagen || null,
       });
       
       let finalImageUrl = editTarget.imagen;
