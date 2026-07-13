@@ -1010,3 +1010,4 @@ module.exports = {
   getSlots, create, list, getById, agenda, marcarNoAsistio, cancel,
   lockSlot, unlockSlot, reschedule,
 };
+};
