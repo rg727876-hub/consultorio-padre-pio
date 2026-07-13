@@ -38,10 +38,14 @@ export default function RegistrarPaciente() {
         setReniecLoading(true);
         try {
           const res = await api.get(`/public/reniec/${form.numero_documento}`);
+          const d = res.data;
           setForm((prev) => ({
             ...prev,
-            nombre: res.data.first_name || '',
-            apellido: `${res.data.first_last_name || ''} ${res.data.second_last_name || ''}`.trim()
+            nombre:           d.first_name || '',
+            apellido:         `${d.first_last_name || ''} ${d.second_last_name || ''}`.trim(),
+            // Solo autocompleta si el dato viene de la BD (ya validado)
+            fecha_nacimiento: d.fecha_nacimiento || prev.fecha_nacimiento,
+            sexo:             d.sexo             || prev.sexo,
           }));
           setErrors((prev) => ({ ...prev, nombre: '', apellido: '', numero_documento: '' }));
         } catch (error) {
@@ -54,7 +58,7 @@ export default function RegistrarPaciente() {
           setReniecLoading(false);
         }
       } else if (form.tipo_documento === 'DNI') {
-        setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+        setForm((prev) => ({ ...prev, nombre: '', apellido: '', fecha_nacimiento: '', sexo: '' }));
       }
     };
     fetchReniec();

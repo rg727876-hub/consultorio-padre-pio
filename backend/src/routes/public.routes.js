@@ -16,7 +16,7 @@ router.get('/payment-methods', async (req, res) => {
   }
 });
 
-// GET /api/public/reniec/:dni — consultar DNI a RENIEC (sin auth, pero limitado por CORS y rate-limit global)
+// GET /api/public/reniec/:dni — consultar DNI (primero en BD, luego en Decolecta)
 router.get('/reniec/:dni', async (req, res) => {
   const { dni } = req.params;
   if (!/^\d{8}$/.test(dni)) {
@@ -24,8 +24,42 @@ router.get('/reniec/:dni', async (req, res) => {
   }
 
   try {
+    // ── 1. Buscar en la BD primero (ahorra llamadas a la API) ──────────────
+    const [rows] = await pool.query(
+      `SELECT nombre, apellido, fecha_nacimiento, sexo
+       FROM   PACIENTE
+       WHERE  tipo_documento = 'DNI'
+         AND  numero_documento = ?
+         AND  estado = 'ACTIVO'
+       LIMIT  1`,
+      [dni]
+    );
+
+    if (rows.length > 0) {
+      const p = rows[0];
+      // Formato fecha: YYYY-MM-DD (solo la parte de la fecha)
+      const fecha = p.fecha_nacimiento
+        ? (typeof p.fecha_nacimiento === 'string'
+            ? p.fecha_nacimiento.split('T')[0]
+            : p.fecha_nacimiento.toISOString().split('T')[0])
+        : null;
+
+      return res.json({
+        first_name:        p.nombre,
+        first_last_name:   p.apellido.split(' ')[0] || p.apellido,
+        second_last_name:  p.apellido.split(' ').slice(1).join(' ') || '',
+        full_name:         `${p.apellido} ${p.nombre}`,
+        document_number:   dni,
+        fecha_nacimiento:  fecha,
+        sexo:              p.sexo,
+        fuente:            'bd',      // indica que vino de la BD local
+      });
+    }
+
+    // ── 2. No está en BD → consultar a Decolecta ───────────────────────────
     const data = await consultarDni(dni);
-    return res.json(data);
+    return res.json({ ...data, fuente: 'reniec' });
+
   } catch (err) {
     if (err.message.includes('DNI no encontrado')) {
       return res.status(404).json({ error: err.message });

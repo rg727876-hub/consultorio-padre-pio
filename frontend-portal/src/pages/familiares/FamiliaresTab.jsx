@@ -601,14 +601,18 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
         setReniecLoading(true);
         try {
           const res = await consultarDniReniec(form.numero_documento);
+          const d = res.data;
           setForm((prev) => ({
             ...prev,
-            nombre: res.data.first_name || '',
-            apellido: `${res.data.first_last_name || ''} ${res.data.second_last_name || ''}`.trim()
+            nombre:           d.first_name || '',
+            apellido:         `${d.first_last_name || ''} ${d.second_last_name || ''}`.trim(),
+            // Solo autocompleta fecha y sexo si vienen de la BD (ya validado)
+            fecha_nacimiento: d.fecha_nacimiento || prev.fecha_nacimiento,
+            sexo:             d.sexo             || prev.sexo,
           }));
           setErrors((prev) => ({ ...prev, nombre: null, apellido: null, numero_documento: null }));
         } catch (error) {
-          setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+          setForm((prev) => ({ ...prev, nombre: '', apellido: '', fecha_nacimiento: '', sexo: '' }));
           setErrors((prev) => ({ 
             ...prev, 
             numero_documento: 'El DNI no existe en RENIEC'
@@ -617,7 +621,7 @@ export default function FamiliaresTab({ onSuccess, selectedFamiliar, onSelectFam
           setReniecLoading(false);
         }
       } else if (form.tipo_documento === 'DNI') {
-        setForm((prev) => ({ ...prev, nombre: '', apellido: '' }));
+        setForm((prev) => ({ ...prev, nombre: '', apellido: '', fecha_nacimiento: '', sexo: '' }));
       }
     };
     fetchReniec();
