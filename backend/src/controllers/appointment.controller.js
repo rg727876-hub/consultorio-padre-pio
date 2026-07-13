@@ -69,6 +69,8 @@ const getSlots = async (req, res) => {
     );
     if (!servicioNuevo) return res.status(404).json({ error: 'Servicio no encontrado' });
 
+    const pacienteId = req.query.paciente_id ? Number(req.query.paciente_id) : null;
+
     // Citas existentes ese día CON el buffer de su propio servicio
     const [booked] = await pool.query(
       `SELECT 
@@ -77,10 +79,10 @@ const getSlots = async (req, res) => {
         s.buffer AS service_buffer
        FROM   CITA c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ?
+       WHERE  (c.doctor_id = ? OR (c.paciente_id = ? AND ? IS NOT NULL)) AND c.fecha = ?
          AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')
        ORDER BY c.hora_inicio`,
-      [doctorId, fecha]
+      [doctorId, pacienteId, pacienteId, fecha]
     );
 
     // Paso de avance: 5 minutos para flexibilidad
@@ -178,23 +180,31 @@ const create = async (req, res) => {
     const [existentes] = await conn.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
               TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
-              s.buffer AS buffer
+              s.buffer AS buffer,
+              c.doctor_id,
+              c.paciente_id
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ?
-         AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
-      [Number(doctor_id), fecha]
+       WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ?
+         AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
+      [Number(doctor_id), Number(paciente_id), fecha]
     );
     const nIni    = timeToMins(hora_inicio);
     const nFinBuf = timeToMins(hora_fin) + servicio.buffer;
-    const choca = existentes.some(
+    const conflicto = existentes.find(
       b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
     );
-    if (choca) {
+    if (conflicto) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({
-        error: 'Ese horario se cruza con otra cita o con su tiempo de limpieza (buffer). Elige otro.',
-      });
+      if (conflicto.paciente_id === Number(paciente_id)) {
+        return res.status(409).json({
+          error: 'El paciente ya tiene otra cita agendada que se cruza con este horario. Elige otro.',
+        });
+      } else {
+        return res.status(409).json({
+          error: 'Ese horario se cruza con otra cita del doctor o con su tiempo de limpieza (buffer). Elige otro.',
+        });
+      }
     }
 
     // Generar código único
@@ -299,6 +309,7 @@ const list = async (req, res) => {
     params.push(Number(doctor_id));
   }
   if (estado) {
+  if (estado) {
     const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
     const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e));
     if (validEstados.length > 0) {
@@ -306,9 +317,7 @@ const list = async (req, res) => {
       params.push(...validEstados);
     }
   }
-  // Cuando no hay NINGÚN filtro, el listado por defecto muestra todas las
-  // citas CONFIRMADAS (de todas las fechas), con las de hoy primero y
-  // descendiendo hacia las pasadas (las futuras, si existen, van al final).
+
   let ordenPorDefecto = false;
 
   if (fecha_inicio && fecha_fin) {
@@ -320,20 +329,21 @@ const list = async (req, res) => {
   } else if (fecha_fin) {
     conds.push('c.fecha <= ?');
     params.push(fecha_fin);
-  } else if (!codigo && !q && !doctor_id && !estado) {
-    // Sin ningún filtro → por defecto todas las citas confirmadas
-    conds.push("c.estado = 'CONFIRMADA'");
+  } else {
+    // Si no hay filtro de fecha, consideramos que usa el orden por defecto
     ordenPorDefecto = true;
   }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-  // Orden: por defecto, hoy primero → pasado (futuras al final);
-  // con filtros, orden cronológico ascendente como siempre.
+  // Orden: por defecto, citas futuras/hoy primero (ascendente), citas pasadas después (descendente)
+  // Cuando hay filtros de fecha explícitos, orden cronológico descendente
   const orderBy = ordenPorDefecto
-    ? 'ORDER BY (c.fecha > ?) ASC, c.fecha DESC, c.hora_inicio ASC'
-    : 'ORDER BY c.fecha ASC, c.hora_inicio ASC';
-  const orderParams = ordenPorDefecto ? [new Date().toLocaleDateString('en-CA')] : [];
+    ? 'ORDER BY CASE WHEN c.fecha >= ? THEN 0 ELSE 1 END, CASE WHEN c.fecha >= ? THEN c.fecha END ASC, CASE WHEN c.fecha < ? THEN c.fecha END DESC, c.hora_inicio ASC'
+    : 'ORDER BY c.fecha DESC, c.hora_inicio DESC';
+  
+  const hoy = new Date().toLocaleDateString('en-CA');
+  const orderParams = ordenPorDefecto ? [hoy, hoy, hoy] : [];
 
   try {
     const [[{ total }]] = await pool.query(
@@ -869,7 +879,7 @@ const reschedule = async (req, res) => {
 
     // ── 1. Leer y bloquear la cita original ──────────────────────────────
     const [[cita]] = await conn.query(
-      `SELECT cita_id, codigo_cita, doctor_id, servicio_id, estado,
+      `SELECT cita_id, codigo_cita, doctor_id, paciente_id, servicio_id, estado,
               DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha,
               TIME_FORMAT(hora_inicio, '%H:%i') AS hora_inicio,
               TIME_FORMAT(hora_fin,    '%H:%i') AS hora_fin
@@ -911,24 +921,32 @@ const reschedule = async (req, res) => {
     const [otras] = await conn.query(
       `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
               TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
-              s.buffer AS buffer
+              s.buffer AS buffer,
+              c.doctor_id,
+              c.paciente_id
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ? AND c.cita_id <> ?
+       WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ? AND c.cita_id <> ?
          AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
-      [cita.doctor_id, nueva_fecha, citaId]
+      [cita.doctor_id, cita.paciente_id, nueva_fecha, citaId]
     );
     const rIni    = timeToMins(nueva_hora_inicio);
     const rFinBuf = timeToMins(nueva_hora_fin) + bufReprog;
-    const solapa = otras.some(
+    const solapa = otras.find(
       b => rIni < (timeToMins(b.hf) + (b.buffer || 0)) && rFinBuf > timeToMins(b.hi)
     );
 
     if (solapa) {
       await conn.query('ROLLBACK');
-      return res.status(409).json({
-        error: 'El horario solicitado se cruza con otra cita o su tiempo de limpieza (buffer).',
-      });
+      if (solapa.paciente_id === cita.paciente_id) {
+        return res.status(409).json({
+          error: 'El paciente ya tiene otra cita agendada que se cruza con este horario. Elige otro.',
+        });
+      } else {
+        return res.status(409).json({
+          error: 'El horario solicitado se cruza con otra cita del doctor o su tiempo de limpieza (buffer).',
+        });
+      }
     }
 
     // ── 4. Actualizar SOLO fecha/hora (sin tocar estado, doc, servicio, precio, código) ─

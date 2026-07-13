@@ -31,17 +31,28 @@ const getHold = (holdId) => {
   return hold;
 };
 
-// Slot ocupado por un hold vigente de OTRO titular (o de cualquiera, si no se excluye).
-const isSlotHeld = (doctorId, fecha, horaInicio, excludeHoldId = null) => {
+// Slot ocupado por un hold vigente del doctor o del paciente
+const isSlotHeld = (doctorId, pacienteId, fecha, horaInicio, excludeHoldId = null) => {
+  // Check doctor overlap
   const holdId = slotIndex.get(slotKey(doctorId, fecha, horaInicio));
-  if (!holdId || holdId === excludeHoldId) return false;
-  return !!getHold(holdId);
+  if (holdId && holdId !== excludeHoldId && getHold(holdId)) {
+    return true; // Doctor is busy
+  }
+
+  // Check patient overlap
+  for (const [id, hold] of holds.entries()) {
+    if (id !== excludeHoldId && hold.pacienteId === pacienteId && hold.fecha === fecha && hold.horaInicio === horaInicio && !isExpired(hold)) {
+      return true; // Patient is busy
+    }
+  }
+
+  return false;
 };
 
 const createHold = ({ titularId, pacienteId, doctorId, servicioId, fecha, horaInicio, horaFin }) => {
   const key = slotKey(doctorId, fecha, horaInicio);
 
-  if (isSlotHeld(doctorId, fecha, horaInicio)) return null;
+  if (isSlotHeld(doctorId, pacienteId, fecha, horaInicio)) return null;
 
   const holdId = randomUUID();
   const expiresAt = Date.now() + HOLD_TTL_MS;

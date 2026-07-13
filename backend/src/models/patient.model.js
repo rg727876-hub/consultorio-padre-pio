@@ -113,14 +113,21 @@ const findByDocumentPreview = async (tipo_documento, numero_documento) => {
   return row ?? null;
 };
 
-const linkWebAccount = async (paciente_id, { email_cuenta, password_hash }) => {
-  await pool.query(
-    `UPDATE PACIENTE
+const linkWebAccount = async (paciente_id, { email_cuenta, password_hash, foto }) => {
+  let query = `UPDATE PACIENTE
      SET email_cuenta = ?, email = ?, password_hash = ?,
-         estado_cuenta = 'ACTIVO', intentos_fallidos = 0, bloqueado_hasta = NULL
-     WHERE paciente_id = ?`,
-    [email_cuenta, email_cuenta, password_hash, paciente_id]
-  );
+         estado_cuenta = 'ACTIVO', intentos_fallidos = 0, bloqueado_hasta = NULL`;
+  let params = [email_cuenta, email_cuenta, password_hash];
+
+  if (foto !== undefined && foto !== null) {
+    query += `, foto = ?`;
+    params.push(foto);
+  }
+
+  query += ` WHERE paciente_id = ?`;
+  params.push(paciente_id);
+
+  await pool.query(query, params);
 };
 
 module.exports = {
