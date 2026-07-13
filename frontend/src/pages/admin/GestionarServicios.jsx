@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Pencil, ToggleLeft, ToggleRight,
-  Search, Loader2, Stethoscope, X, Check,
+  Search, Loader2, Stethoscope, X, Check, ImagePlus, Plus
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import PageLoader from '../../components/PageLoader';
@@ -29,6 +30,10 @@ export default function GestionarServicios() {
   const [saving, setSaving]           = useState(false);
   const [serverError, setServerError] = useState('');
   const [loadError, setLoadError]     = useState(false);
+  
+  // Imagen edición
+  const [editImageFile, setEditImageFile] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState(null);
 
   const fetchServicios = useCallback(async () => {
     setLoading(true);
@@ -84,6 +89,8 @@ export default function GestionarServicios() {
       buffer:      String(servicio.buffer ?? 0),
       estado:      servicio.estado,
     });
+    setEditImageFile(null);
+    setEditImagePreview(servicio.imagen ? (servicio.imagen.startsWith('http') ? servicio.imagen : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${servicio.imagen}`) : null);
     setEditErrors({});
     setServerError('');
   };
@@ -91,8 +98,27 @@ export default function GestionarServicios() {
   const closeEdit = () => {
     setEditTarget(null);
     setEditForm({});
+    setEditImageFile(null);
+    setEditImagePreview(null);
     setEditErrors({});
     setServerError('');
+  };
+
+  const handleEditImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 5MB');
+      return;
+    }
+
+    setEditImageFile(file);
+    setEditImagePreview(URL.createObjectURL(file));
   };
 
   const handleEditChange = (e) => {
@@ -142,7 +168,19 @@ export default function GestionarServicios() {
         costo:       Number(editForm.costo),
         buffer:      Number(editForm.buffer),
         estado:      editForm.estado,
+        imagen:      editTarget.imagen || null,
       });
+      
+      let finalImageUrl = editTarget.imagen;
+      if (editImageFile) {
+        const formData = new FormData();
+        formData.append('imagen', editImageFile);
+        const { data } = await api.post(`/services/${editTarget.servicio_id}/image`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        finalImageUrl = data.imagen;
+      }
+
       toast.success('Servicio actualizado');
       setServicios((prev) =>
         prev.map((s) =>
@@ -155,6 +193,7 @@ export default function GestionarServicios() {
                 costo:       Number(editForm.costo),
                 buffer:      Number(editForm.buffer),
                 estado:      editForm.estado,
+                imagen:      finalImageUrl
               }
             : s
         )
@@ -177,11 +216,19 @@ export default function GestionarServicios() {
           <div className="max-w-5xl mx-auto">
 
             {/* Encabezado */}
-            <div className="mb-6">
-              <h1 className="text-xl font-bold text-[#0059B3]">Gestionar servicios</h1>
-              <p className="text-sm text-slate-500">
-                Edita o cambia el estado de los servicios dentales
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-xl font-bold text-[#0059B3]">Gestionar servicios</h1>
+                <p className="text-sm text-slate-500">
+                  Edita o cambia el estado de los servicios dentales
+                </p>
+              </div>
+              <Link
+                to="/admin/servicios/nuevo"
+                className="flex items-center gap-2 bg-[#0059B3] hover:bg-[#004a99] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm"
+              >
+                <Plus size={18} /> Registrar servicio
+              </Link>
             </div>
 
             {/* Buscador + chips */}
@@ -240,12 +287,27 @@ export default function GestionarServicios() {
                       {filtered.map((s) => (
                         <tr key={s.servicio_id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-4 py-3 font-medium text-slate-800">
-                            {s.nombre}
-                            {s.descripcion && (
-                              <p className="text-xs text-slate-400 font-normal truncate max-w-[180px]">
-                                {s.descripcion}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-3">
+                              {s.imagen ? (
+                                <img 
+                                  src={s.imagen?.startsWith('http') ? s.imagen : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${s.imagen}`} 
+                                  alt={s.nombre} 
+                                  className="w-10 h-10 rounded-lg object-cover bg-slate-100 flex-shrink-0 border border-slate-200"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 flex-shrink-0">
+                                  <Stethoscope size={18} />
+                                </div>
+                              )}
+                              <div>
+                                {s.nombre}
+                                {s.descripcion && (
+                                  <p className="text-xs text-slate-400 font-normal truncate max-w-[150px]">
+                                    {s.descripcion}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-slate-600 hidden sm:table-cell whitespace-nowrap">
                             {s.duracion} min
@@ -345,6 +407,33 @@ export default function GestionarServicios() {
                                  focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40 resize-none"
                     />
                   </EField>
+
+                  <div className="flex items-center gap-4 py-2">
+                    <div 
+                      className="relative flex items-center justify-center border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl overflow-hidden w-20 h-20 cursor-pointer flex-shrink-0 transition-colors"
+                      onClick={() => document.getElementById('editImageInput')?.click()}
+                    >
+                      {editImagePreview ? (
+                        <img src={editImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-slate-400 flex flex-col items-center">
+                          <ImagePlus size={20} className="mb-0.5" />
+                          <span className="text-[10px] font-medium">Foto</span>
+                        </div>
+                      )}
+                      <input 
+                        id="editImageInput"
+                        type="file" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        className="hidden" 
+                        onChange={handleEditImageChange}
+                      />
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      <p className="font-medium text-slate-700">Cambiar imagen</p>
+                      <p>Puedes subir una nueva imagen representativa para este servicio.</p>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-3 gap-3">
                     <EField label="Duración *" error={editErrors.duracion} hint="min">

@@ -1,0 +1,19 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno / secretos (NUNCA versionar)
+.env
+.env.*
+!.env.example
+
+# Archivos de pruebas / scratch locales
+scratch.js
+**/scratch.js
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build
+dist/
+build/

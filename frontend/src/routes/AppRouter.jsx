@@ -3,6 +3,8 @@ import { AuthProvider }       from '../context/AuthContext';
 import PrivateRoute           from './PrivateRoute';
 import ErrorBoundary          from '../components/ErrorBoundary';
 import StaffLoginPage         from '../pages/auth/StaffLoginPage';
+import ForgotPasswordPage     from '../pages/auth/ForgotPasswordPage';
+import ResetPasswordPage      from '../pages/auth/ResetPasswordPage';
 import ActivateAccountPage    from '../pages/auth/ActivateAccountPage';
 import DashboardPage          from '../pages/DashboardPage';
 import RegistroUsuario        from '../pages/admin/RegistroUsuario';
@@ -26,6 +28,8 @@ import HistorialPaciente      from '../pages/doctor/HistorialPaciente';
 import RegistrarPago          from '../pages/caja/RegistrarPago';
 import ListaPagos             from '../pages/caja/ListaPagos';
 import GenerarComprobante     from '../pages/caja/GenerarComprobante';
+import DashboardReportes      from '../pages/admin/reportes/DashboardReportes';
+import ReportesAuthGuard      from '../pages/admin/reportes/ReportesAuthGuard';
 
 // Wrapper inside BrowserRouter so we can use useLocation to reset ErrorBoundary on navigation
 function RouterContent() {
@@ -34,8 +38,10 @@ function RouterContent() {
     <ErrorBoundary resetKey={pathname}>
       <Routes>
         {/* ── Públicas ── */}
-        <Route path="/login"              element={<StaffLoginPage />} />
-        <Route path="/activate/:token"    element={<ActivateAccountPage />} />
+        <Route path="/login"                  element={<StaffLoginPage />} />
+        <Route path="/forgot-password"        element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token"  element={<ResetPasswordPage />} />
+        <Route path="/activate/:token"        element={<ActivateAccountPage />} />
 
         {/* ── Protegidas (cualquier staff autenticado) ── */}
         <Route path="/dashboard" element={
@@ -96,6 +102,14 @@ function RouterContent() {
         <Route path="/admin/horarios" element={
           <PrivateRoute roles={['ADMINISTRADOR']}>
             <HorariosDoctor />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/reportes" element={
+          <PrivateRoute roles={['ADMINISTRADOR']}>
+            <ReportesAuthGuard>
+              <DashboardReportes />
+            </ReportesAuthGuard>
           </PrivateRoute>
         } />
 

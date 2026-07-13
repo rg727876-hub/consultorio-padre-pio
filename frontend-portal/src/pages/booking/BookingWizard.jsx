@@ -96,9 +96,28 @@ function MetodoPagoPicker({ onSelect, yapeIcon }) {
 // columnas: resumen a la izquierda y medios de pago a la derecha. Elegir un
 // medio abre una ventana flotante con el formulario propio de la clínica.
 export default function BookingWizard({ titular, onRegistrarFamiliar }) {
-  const [step, setStep]         = useState('PACIENTE');
-  const [data, setData]         = useState(EMPTY);
-  const [mostrarMetodos, setMostrarMetodos] = useState(false);
+  const [step, setStep] = useState(() => {
+    try { const saved = sessionStorage.getItem('bookingWizardStep'); return saved ? JSON.parse(saved) : 'PACIENTE'; }
+    catch { return 'PACIENTE'; }
+  });
+  const [data, setData] = useState(() => {
+    try { const saved = sessionStorage.getItem('bookingWizardData'); return saved ? JSON.parse(saved) : EMPTY; }
+    catch { return EMPTY; }
+  });
+  const [mostrarMetodos, setMostrarMetodos] = useState(() => {
+    try { const saved = sessionStorage.getItem('bookingWizardMostrarMetodos'); return saved ? JSON.parse(saved) : false; }
+    catch { return false; }
+  });
+
+  useEffect(() => { sessionStorage.setItem('bookingWizardStep', JSON.stringify(step)); }, [step]);
+  useEffect(() => { sessionStorage.setItem('bookingWizardData', JSON.stringify(data)); }, [data]);
+  useEffect(() => { sessionStorage.setItem('bookingWizardMostrarMetodos', JSON.stringify(mostrarMetodos)); }, [mostrarMetodos]);
+
+  const clearStorage = useCallback(() => {
+    sessionStorage.removeItem('bookingWizardStep');
+    sessionStorage.removeItem('bookingWizardData');
+    sessionStorage.removeItem('bookingWizardMostrarMetodos');
+  }, []);
   const [metodoModal, setMetodoModal] = useState(null); // null | 'tarjeta' | 'yape'
   const [resultado, setResultado] = useState(null);
   const [remaining, setRemaining] = useState(null);
@@ -145,6 +164,7 @@ export default function BookingWizard({ titular, onRegistrarFamiliar }) {
 
   const handleCancel = async () => {
     await releaseCurrentHold();
+    clearStorage();
     setData(EMPTY);
     setMostrarMetodos(false);
     setMetodoModal(null);
@@ -174,6 +194,7 @@ export default function BookingWizard({ titular, onRegistrarFamiliar }) {
         <StepExito
           resultado={resultado}
           onNuevaReserva={() => {
+            clearStorage();
             setData(EMPTY); setMostrarMetodos(false); setMetodoModal(null);
             setResultado(null); setStep('PACIENTE');
           }}
@@ -192,7 +213,7 @@ export default function BookingWizard({ titular, onRegistrarFamiliar }) {
             </button>
           )}
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            {STEP_LABELS[step]}
+            {step === 'RESUMEN' ? (mostrarMetodos ? 'Resumen y pago' : 'Resumen') : STEP_LABELS[step]}
           </span>
         </div>
         <div className="flex items-center gap-3">

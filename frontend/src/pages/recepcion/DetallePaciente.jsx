@@ -116,33 +116,47 @@ export default function DetallePaciente({ id: propId, onClose }) {
             >
               <ArrowLeft size={18} />
             </button>
-
-            <div className="flex-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-xl font-bold text-[#0059B3]">
-                  {paciente.nombre} {paciente.apellido}
-                </h1>
-                {/* Badge estado */}
-                {inactivo ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold
-                                   px-2.5 py-1 rounded-full border
-                                   bg-slate-100 text-slate-500 border-slate-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                    Inactivo
-                  </span>
+            
+            <div className="flex items-center gap-4 flex-1 flex-wrap">
+              <div className="w-20 h-20 rounded-full bg-[#0059B3]/10 flex items-center justify-center
+                              text-[#0059B3] text-2xl font-bold flex-shrink-0 select-none overflow-hidden border-2 border-slate-100">
+                {paciente.foto ? (
+                  <img 
+                    src={paciente.foto?.startsWith('http') ? paciente.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${paciente.foto}`} 
+                    alt="Foto" 
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold
-                                   px-2.5 py-1 rounded-full border
-                                   bg-emerald-50 text-emerald-700 border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Activo
-                  </span>
+                  (paciente.nombre?.[0] ?? '') + (paciente.apellido?.[0] ?? '')
                 )}
               </div>
-              <p className="text-sm text-slate-500 font-mono mt-0.5">
-                {DOC_LABEL[paciente.tipo_documento] ?? paciente.tipo_documento}{' '}
-                {paciente.numero_documento}
-              </p>
+              <div className="flex-1 min-w-[200px]">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-xl font-bold text-[#0059B3]">
+                    {paciente.nombre} {paciente.apellido}
+                  </h1>
+                  {/* Badge estado */}
+                  {inactivo ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold
+                                     px-2.5 py-1 rounded-full border
+                                     bg-slate-100 text-slate-500 border-slate-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                      Inactivo
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold
+                                     px-2.5 py-1 rounded-full border
+                                     bg-emerald-50 text-emerald-700 border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Activo
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-500 font-mono mt-0.5">
+                  {DOC_LABEL[paciente.tipo_documento] ?? paciente.tipo_documento}{' '}
+                  {paciente.numero_documento}
+                </p>
+              </div>
             </div>
 
             {/* Botones de acción */}

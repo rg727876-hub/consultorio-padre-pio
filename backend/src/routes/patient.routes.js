@@ -1,6 +1,7 @@
 const { Router }    = require('express');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { checkRole }   = require('../middlewares/role.middleware');
+const { upload }      = require('../middlewares/upload.middleware');
 const {
   register,
   search,
@@ -9,6 +10,7 @@ const {
   update,
   deactivate,
   reactivate,
+  uploadPhoto
 } = require('../controllers/patient.controller');
 
 const router = Router();
@@ -47,5 +49,9 @@ router.patch('/:id/deactivate', verifyToken, recepOAdmin, deactivate);
 // Reactivar paciente
 // PATCH /api/patients/:id/reactivate
 router.patch('/:id/reactivate', verifyToken, recepOAdmin, reactivate);
+
+// Subir foto de perfil
+// POST /api/patients/:id/foto
+router.post('/:id/foto', verifyToken, recepOAdmin, upload.single('foto'), uploadPhoto);
 
 module.exports = router;

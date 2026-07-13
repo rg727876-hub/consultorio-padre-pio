@@ -7,7 +7,8 @@ const {
 const { getTitularesActivos, desvincularTodasComoFamiliar } = require('../models/familiar.model');
 const { generateToken } = require('../utils/jwt.util');
 const { logAudit } = require('../utils/audit.util');
-const { sendWelcomePatientEmail, sendFamiliarActivadoEmail } = require('../utils/mailer.util');
+const { sendWelcomePatientEmail, sendFamiliarActivadoEmail, sendPasswordResetEmail } = require('../utils/mailer.util');
+const crypto = require('crypto');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -51,6 +52,7 @@ const register = async (req, res) => {
     confirmar_password,
     acepta_politica,
   } = req.body;
+  const fotoUrl = req.file ? (req.file.path.startsWith('http') ? req.file.path : `/uploads/patients/${req.file.filename}`) : null;
 
   // ── Campos obligatorios ───────────────────────────────────────────────────
   if (
@@ -161,6 +163,7 @@ const register = async (req, res) => {
       email_cuenta:     emailLower,
       fecha_nacimiento,
       password_hash,
+      foto:             fotoUrl,
     });
 
     // ── Email de bienvenida (fire-and-forget, no bloquea la respuesta) ─────
@@ -297,7 +300,10 @@ const login = async (req, res) => {
       id:       paciente.paciente_id,
       nombre:   paciente.nombre,
       apellido: paciente.apellido,
+      email:    paciente.email_cuenta,
+      foto:     paciente.foto,
       tipo:     'PACIENTE',
+      rol:      'PACIENTE',
     };
 
     const token = generateToken(payload);
@@ -528,4 +534,129 @@ const vincular = async (req, res) => {
   }
 };
 
-module.exports = { register, login, logout, preview, vincular };
+const MAX_RESET_INTENTOS = 3;
+const RESET_BLOQUEO_MIN = 15;
+
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'El correo es requerido' });
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT paciente_id, nombre, apellido, estado_cuenta FROM PACIENTE WHERE email_cuenta = ?`,
+      [email]
+    );
+
+    if (!rows.length) {
+      return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+    }
+
+    const user = rows[0];
+    if (user.estado_cuenta !== 'ACTIVO') {
+      return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+    }
+
+    // ── Verificar límite de intentos (máx 3 en 15 min) ──────────────
+    const [recentTokens] = await pool.query(
+      `SELECT COUNT(*) AS total FROM TOKEN_RECUPERACION_PACIENTE
+       WHERE paciente_id = ? AND fecha_creacion > DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+      [user.paciente_id, RESET_BLOQUEO_MIN]
+    );
+
+    if (recentTokens[0].total >= MAX_RESET_INTENTOS) {
+      return res.status(429).json({
+        error: `Has alcanzado el límite de ${MAX_RESET_INTENTOS} solicitudes. Intenta nuevamente en ${RESET_BLOQUEO_MIN} minutos.`,
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expireDate = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query(
+      `INSERT INTO TOKEN_RECUPERACION_PACIENTE (paciente_id, token, fecha_expira) VALUES (?, ?, ?)`,
+      [user.paciente_id, token, expireDate]
+    );
+
+    await sendPasswordResetEmail(email, user.nombre, token, true);
+    
+    await logAudit({
+      paciente_id: user.paciente_id,
+      accion: 'SOLICITUD_RECUPERACION_PASSWORD',
+      entidad: 'PACIENTE',
+      entidad_id: user.paciente_id,
+      ip_origen: req.ip,
+    });
+
+    return res.json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+  } catch (err) {
+    console.error('[authPatient.forgotPassword]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+const verifyResetToken = async (req, res) => {
+  const { token } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT token_id, fecha_expira, usado FROM TOKEN_RECUPERACION_PACIENTE WHERE token = ?`,
+      [token]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'El enlace no es válido' });
+
+    const t = rows[0];
+    if (t.usado) return res.status(400).json({ error: 'Este enlace ya fue utilizado' });
+    if (new Date(t.fecha_expira) < new Date()) return res.status(400).json({ error: 'El enlace ha expirado' });
+
+    return res.json({ valid: true });
+  } catch (err) {
+    console.error('[authPatient.verifyResetToken]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Faltan datos' });
+  if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT token_id, paciente_id, fecha_expira, usado FROM TOKEN_RECUPERACION_PACIENTE WHERE token = ?`,
+      [token]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'El enlace no es válido' });
+
+    const t = rows[0];
+    if (t.usado) return res.status(400).json({ error: 'Este enlace ya fue utilizado' });
+    if (new Date(t.fecha_expira) < new Date()) return res.status(400).json({ error: 'El enlace ha expirado' });
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      `UPDATE PACIENTE SET password_hash = ?, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE paciente_id = ?`,
+      [password_hash, t.paciente_id]
+    );
+
+    await pool.query(
+      `UPDATE TOKEN_RECUPERACION_PACIENTE SET usado = TRUE, fecha_usado = NOW() WHERE token_id = ?`,
+      [t.token_id]
+    );
+
+    await logAudit({
+      paciente_id: t.paciente_id,
+      accion: 'RECUPERACION_PASSWORD_EXITOSA',
+      entidad: 'PACIENTE',
+      entidad_id: t.paciente_id,
+      ip_origen: req.ip,
+    });
+
+    return res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    console.error('[authPatient.resetPassword]', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { register, login, logout, preview, vincular, forgotPassword, verifyResetToken, resetPassword };

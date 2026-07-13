@@ -10,6 +10,13 @@ const app = require('../../src/app');
 const pool = require('../../src/config/db');
 const jwt = require('jsonwebtoken');
 
+// Fecha válida dentro del límite de reserva (hasta un mes de anticipación).
+const fechaEnRango = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toLocaleDateString('en-CA');
+})();
+
 describe('Gestión Avanzada de Citas (INT-HU015, INT-HU016, INT-HU017)', () => {
   let mockConnection;
   const adminToken = 'Bearer validtoken';
@@ -83,7 +90,7 @@ describe('Gestión Avanzada de Citas (INT-HU015, INT-HU016, INT-HU017)', () => {
         .patch('/api/appointments/1/reschedule')
         .set('Authorization', adminToken)
         .send({
-          nueva_fecha: '2026-10-10',
+          nueva_fecha: fechaEnRango,
           nueva_hora_inicio: '10:00',
           nueva_hora_fin: '10:30',
           doctor_id: 999, // Intentando cambiar el doctor maliciosamente
@@ -98,7 +105,7 @@ describe('Gestión Avanzada de Citas (INT-HU015, INT-HU016, INT-HU017)', () => {
       // Verificamos que el query de UPDATE solo actualiza fecha y horas, ignorando doctor_id
       expect(updateCall[0]).not.toContain('doctor_id');
       expect(updateCall[0]).not.toContain('servicio_id');
-      expect(updateCall[1]).toEqual(['2026-10-10', '10:00', '10:30', 1]);
+      expect(updateCall[1]).toEqual([fechaEnRango, '10:00', '10:30', 1]);
     });
 
     it('CP-39: Dado un recepcionista confirmando una reprogramación. Cuando el horario seleccionado fue tomado milisegundos antes por otro usuario. Entonces el sistema detiene el cambio, alerta "Horario no disponible selecciona otra opción y actualiza el calendario en vivo.', async () => {

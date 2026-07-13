@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, Camera } from 'lucide-react';
 import { registerPatient } from '../../services/authPatient.service';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
@@ -143,8 +143,18 @@ export default function RegisterPage() {
   const [showPass, setShowPass]   = useState(false);
   const [showPass2, setShowPass2] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     let newVal = type === 'checkbox' ? checked : value;
@@ -202,19 +212,21 @@ export default function RegisterPage() {
     setServerError(null);
 
     try {
-      await registerPatient({
-        tipo_documento:    form.tipo_documento,
-        numero_documento:  form.numero_documento.trim(),
-        nombre:            form.nombre.trim(),
-        apellido:          form.apellido.trim(),
-        fecha_nacimiento:  form.fecha_nacimiento,
-        sexo:              form.sexo,
-        telefono:          form.telefono.replace(/\D/g, ''),
-        email:             form.email.trim().toLowerCase(),
-        password:          form.password,
-        confirmar_password: form.confirmar_password,
-        acepta_politica:   form.acepta_politica,
-      });
+      const formData = new FormData();
+      formData.append('tipo_documento', form.tipo_documento);
+      formData.append('numero_documento', form.numero_documento.trim());
+      formData.append('nombre', form.nombre.trim());
+      formData.append('apellido', form.apellido.trim());
+      formData.append('fecha_nacimiento', form.fecha_nacimiento);
+      formData.append('sexo', form.sexo);
+      formData.append('telefono', form.telefono.replace(/\D/g, ''));
+      formData.append('email', form.email.trim().toLowerCase());
+      formData.append('password', form.password);
+      formData.append('confirmar_password', form.confirmar_password);
+      formData.append('acepta_politica', form.acepta_politica);
+      if (imageFile) formData.append('foto', imageFile);
+
+      await registerPatient(formData);
       setSuccess(true);
     } catch (err) {
       const data   = err.response?.data;
@@ -303,6 +315,35 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit} noValidate>
+          {/* Subir Foto de Perfil */}
+          <div className="flex justify-center mb-8">
+            <div className="relative group">
+              <label htmlFor="fotoUpload" className="cursor-pointer block relative">
+                {imagePreview ? (
+                  <img 
+                    src={imagePreview} 
+                    alt="Preview" 
+                    className="w-24 h-24 rounded-full object-cover border-4 border-slate-100 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-slate-100 border-4 border-slate-50 flex items-center justify-center text-slate-400 shadow-sm group-hover:bg-slate-200 transition-colors">
+                    <Camera size={32} />
+                  </div>
+                )}
+                <div className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full shadow-md border-2 border-white">
+                  <Camera size={14} />
+                </div>
+              </label>
+              <input 
+                type="file" 
+                id="fotoUpload" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleImageChange}
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
             {/* Tipo de documento */}

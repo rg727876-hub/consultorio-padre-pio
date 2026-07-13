@@ -47,8 +47,8 @@ const registerWebAccount = async (data) => {
   const [result] = await pool.query(
     `INSERT INTO PACIENTE
      (nombre, apellido, tipo_documento, numero_documento, telefono, sexo,
-      email, email_cuenta, fecha_nacimiento, password_hash, estado_cuenta, fecha_creacion_cuenta)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO', NOW())`,
+      email, email_cuenta, fecha_nacimiento, password_hash, foto, estado_cuenta, fecha_creacion_cuenta)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO', NOW())`,
     [
       data.nombre,
       data.apellido,
@@ -60,6 +60,7 @@ const registerWebAccount = async (data) => {
       data.email_cuenta,  // email_cuenta (login web, UNIQUE)
       data.fecha_nacimiento ?? null,
       data.password_hash,
+      data.foto ?? null,
     ]
   );
   return result.insertId;
@@ -68,7 +69,7 @@ const registerWebAccount = async (data) => {
 const findByDocumentForLogin = async (tipo_documento, numero_documento) => {
   const [[row]] = await pool.query(
     `SELECT paciente_id, nombre, apellido, email_cuenta,
-            password_hash, estado_cuenta,
+            password_hash, estado_cuenta, foto,
             intentos_fallidos, bloqueado_hasta
      FROM   PACIENTE
      WHERE  tipo_documento = ? AND numero_documento = ?`,
@@ -80,7 +81,7 @@ const findByDocumentForLogin = async (tipo_documento, numero_documento) => {
 const findProfileById = async (paciente_id) => {
   const [[row]] = await pool.query(
     `SELECT paciente_id, nombre, apellido, tipo_documento, numero_documento,
-            fecha_nacimiento, sexo, email_cuenta,
+            fecha_nacimiento, sexo, email_cuenta, foto,
             telefono, direccion, ocupacion, contacto_emergencia
      FROM   PACIENTE
      WHERE  paciente_id = ? AND estado_cuenta = 'ACTIVO'`,

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Loader2, Stethoscope } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Loader2, Stethoscope, ImagePlus, X } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
@@ -18,9 +18,12 @@ const soloDecimal = (v) => v.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1
 
 export default function RegistroServicio() {
   const [form, setForm]               = useState(INITIAL);
+  const [imageFile, setImageFile]     = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading]         = useState(false);
   const [errors, setErrors]           = useState({});
   const [serverError, setServerError] = useState('');
+  const fileInputRef                  = useRef(null);
 
   const handleChange = (e) => {
     let { name, value } = e.target;
@@ -30,6 +33,29 @@ export default function RegistroServicio() {
     setForm((p) => ({ ...p, [name]: value }));
     setErrors((p) => ({ ...p, [name]: '' }));
     setServerError('');
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 5MB');
+      return;
+    }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const validate = () => {
@@ -66,8 +92,21 @@ export default function RegistroServicio() {
         buffer:      Number(form.buffer),
         estado:      'ACTIVO',
       });
-      toast.success(data.message || 'Servicio registrado');
+      
+      const servicioId = data.servicio_id;
+      
+      // Subir imagen si se seleccionó
+      if (imageFile && servicioId) {
+        const formData = new FormData();
+        formData.append('imagen', imageFile);
+        await api.post(`/services/${servicioId}/image`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+
+      toast.success(data.message || 'Servicio registrado con éxito');
       setForm(INITIAL);
+      clearImage();
       setErrors({});
     } catch (err) {
       setServerError(err.response?.data?.error || 'Error al registrar el servicio');
@@ -114,6 +153,49 @@ export default function RegistroServicio() {
                            resize-none transition-shadow"
               />
             </Field>
+
+            {/* Imagen del Servicio */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Imagen Representativa (Opcional)</label>
+              <div className="flex items-start gap-4">
+                <div 
+                  className={`relative flex items-center justify-center border-2 border-dashed rounded-xl overflow-hidden
+                              ${imagePreview ? 'border-transparent bg-slate-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 cursor-pointer'} 
+                              w-32 h-32 transition-colors flex-shrink-0`}
+                  onClick={() => !imagePreview && fileInputRef.current?.click()}
+                >
+                  {imagePreview ? (
+                    <>
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); clearImage(); }}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                        title="Quitar imagen"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-slate-400 flex flex-col items-center">
+                      <ImagePlus size={24} className="mb-1" />
+                      <span className="text-xs font-medium">Subir foto</span>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    accept="image/jpeg, image/png, image/webp" 
+                    className="hidden" 
+                    ref={fileInputRef}
+                    onChange={handleImageChange}
+                  />
+                </div>
+                <div className="flex-1 text-sm text-slate-500">
+                  <p className="mb-1">Añade una foto para identificar el servicio más fácilmente.</p>
+                  <p className="text-xs">Recomendado: formato cuadrado, máximo 5MB (JPG, PNG, WEBP).</p>
+                </div>
+              </div>
+            </div>
 
             <SectionTitle>Tiempo y precio</SectionTitle>
 

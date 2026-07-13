@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDotCursor } from '../../hooks/useDotCursor';
@@ -141,9 +141,14 @@ export default function Login() {
 
             {/* Contraseña */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Contraseña
-              </label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-sm font-medium text-slate-700">
+                  Contraseña
+                </label>
+                <Link to="/forgot-password" className="text-xs font-semibold text-[#0059B3] hover:underline">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}

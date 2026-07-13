@@ -57,8 +57,12 @@ export default function StepDoctor({ servicioId, onSelect }) {
                          shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5
                          transition-all duration-200 text-left"
             >
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <UserRound size={18} className="text-primary" />
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                {d.avatar ? (
+                  <img src={d.avatar?.startsWith('http') ? d.avatar : (d.avatar?.startsWith('http') ? d.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${d.avatar}`)} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <UserRound size={18} className="text-primary" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-800 truncate">

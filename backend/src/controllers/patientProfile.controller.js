@@ -67,4 +67,36 @@ const updateProfile = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, updateProfile };
+const uploadPhotoForSelf = async (req, res) => {
+  const pacienteId = req.paciente.id;
+  
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se envió ninguna imagen' });
+  }
+
+  const fotoUrl = req.file.path.startsWith('http') ? req.file.path : `/uploads/patients/${req.file.filename}`;
+
+  try {
+    const pool = require('../config/db');
+    await pool.query(
+      'UPDATE PACIENTE SET foto = ? WHERE paciente_id = ?',
+      [fotoUrl, pacienteId]
+    );
+
+    await logAudit({
+      paciente_id: pacienteId,
+      accion:      'SUBIDA_FOTO_PACIENTE',
+      entidad:     'PACIENTE',
+      entidad_id:  pacienteId,
+      detalles:    JSON.stringify({ archivo: req.file.filename }),
+      ip_origen:   req.ip,
+    });
+
+    return res.json({ message: 'Foto actualizada correctamente', fotoUrl });
+  } catch (err) {
+    console.error('[patientProfile.uploadPhotoForSelf]', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor', detail: err.message, stack: err.stack });
+  }
+};
+
+module.exports = { getProfile, updateProfile, uploadPhotoForSelf };

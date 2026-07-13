@@ -8,6 +8,13 @@ const app = require('../../src/app');
 const pool = require('../../src/config/db');
 const jwt = require('jsonwebtoken');
 
+// Fecha válida dentro del límite de reserva (hasta un mes de anticipación).
+const fechaEnRango = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toLocaleDateString('en-CA');
+})();
+
 describe('INT-HU012: Crear citas a pacientes registrados', () => {
   let mockConnection;
   const recepcionistaToken = 'Bearer validtoken';
@@ -59,7 +66,7 @@ describe('INT-HU012: Crear citas a pacientes registrados', () => {
           paciente_id: 1,
           doctor_id: 2,
           servicio_id: 1,
-          fecha: '2026-12-01',
+          fecha: fechaEnRango,
           hora_inicio: '10:00'
         });
 
@@ -99,7 +106,7 @@ describe('INT-HU012: Crear citas a pacientes registrados', () => {
           paciente_id: 1,
           doctor_id: 2,
           servicio_id: 1,
-          fecha: '2026-12-01',
+          fecha: fechaEnRango,
           hora_inicio: '10:05' // Choca con el buffer de la cita anterior
         });
 

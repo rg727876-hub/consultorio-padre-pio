@@ -42,13 +42,17 @@ export default function StepPaciente({ titular, onSelect, onRegistrarFamiliar })
       <div>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Titular</p>
         <button
-          onClick={() => onSelect({ paciente_id: titular.paciente_id, nombre: `${toTitle(titular.nombre)} ${toTitle(titular.apellido)}`, parentesco: null })}
+          onClick={() => onSelect({ paciente_id: titular.paciente_id, nombre: `${toTitle(titular.nombre)} ${toTitle(titular.apellido)}`, parentesco: null, foto: titular.foto })}
           className="w-full flex items-center gap-4 px-5 py-4 bg-white rounded-xl border border-slate-200
                      shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5
                      transition-all duration-200 text-left"
         >
-          <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <User size={18} className="text-primary" />
+          <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+            {titular.foto ? (
+              <img src={titular.foto?.startsWith('http') ? titular.foto : (titular.foto?.startsWith('http') ? titular.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${titular.foto}`)} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <User size={18} className="text-primary" />
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-slate-800 truncate">
@@ -96,13 +100,18 @@ export default function StepPaciente({ titular, onSelect, onRegistrarFamiliar })
                   paciente_id: f.paciente_id,
                   nombre: `${toTitle(f.nombre)} ${toTitle(f.apellido)}`,
                   parentesco: f.parentesco,
+                  foto: f.foto
                 })}
                 className="w-full flex items-center gap-4 px-5 py-4 bg-white rounded-xl border border-slate-200
                            shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5
                            transition-all duration-200 text-left"
               >
-                <div className="w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
-                  <Users size={18} className="text-accent" />
+                <div className="w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
+                  {f.foto ? (
+                    <img src={f.foto?.startsWith('http') ? f.foto : (f.foto?.startsWith('http') ? f.foto : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${f.foto}`)} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <Users size={18} className="text-accent" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">

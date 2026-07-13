@@ -19,7 +19,7 @@ router.get('/payment-methods', async (req, res) => {
 router.get('/servicios', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT servicio_id, nombre, descripcion, duracion, costo
+      `SELECT servicio_id, nombre, descripcion, duracion, costo, imagen
        FROM   SERVICIO
        WHERE  estado = 'ACTIVO'
        ORDER  BY nombre`
@@ -36,7 +36,7 @@ router.get('/doctores', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT u.usuario_id AS doctor_id,
-              u.nombre, u.apellido,
+              u.nombre, u.apellido, u.avatar,
               (SELECT GROUP_CONCAT(e.nombre ORDER BY e.nombre SEPARATOR ', ')
                  FROM DOCTOR_ESPECIALIDAD de
                  JOIN ESPECIALIDAD e ON e.especialidad_id = de.especialidad_id

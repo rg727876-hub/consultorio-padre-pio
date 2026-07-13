@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { PatientAuthProvider, usePatientAuth } from '../context/PatientAuthContext';
 import RegisterPage    from '../pages/auth/RegisterPage';
-import LoginPage       from '../pages/auth/LoginPage';
-import VinculacionPage from '../pages/auth/VinculacionPage';
-import ProfilePage     from '../pages/profile/ProfilePage';
+import LoginPage          from '../pages/auth/LoginPage';
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import ResetPasswordPage  from '../pages/auth/ResetPasswordPage';
+import VinculacionPage    from '../pages/auth/VinculacionPage';
+import ProfilePage        from '../pages/profile/ProfilePage';
 import LandingPage     from '../pages/landing/LandingPage';
 
 function ProtectedRoute({ children }) {
@@ -30,9 +32,13 @@ export default function AppRouter() {
       <BrowserRouter>
         <Routes>
           <Route path="/login"     element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/forgot-password"        element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+          <Route path="/reset-password/:token"  element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
           <Route path="/register"  element={<PublicRoute><RegisterPage /></PublicRoute>} />
           <Route path="/vincular"  element={<PublicRoute><VinculacionPage /></PublicRoute>} />
-          <Route path="/perfil"    element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/portal/:tab" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/portal"      element={<Navigate to="/portal/inicio" replace />} />
+          <Route path="/perfil"      element={<Navigate to="/portal/perfil" replace />} />
           <Route path="/"          element={<HomeRoute />} />
           <Route path="*"         element={
             <div className="min-h-screen flex items-center justify-center bg-slate-50">

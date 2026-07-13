@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Loader2, UserPlus, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Loader2, UserPlus, X, Camera } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
@@ -8,7 +9,6 @@ const ROLES = [
   { value: 'ADMINISTRADOR', label: 'Administrador' },
   { value: 'RECEPCIONISTA', label: 'Recepcionista' },
   { value: 'CAJERO',        label: 'Cajero'        },
-  { value: 'DOCTOR',        label: 'Doctor'        },
 ];
 
 const INITIAL = {
@@ -22,7 +22,10 @@ const soloLetras   = (v) => v.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g
 const soloNumeros  = (v, max) => v.replace(/\D/g, '').slice(0, max);
 
 export default function RegistroUsuario() {
-  const [form, setForm]               = useState(INITIAL);
+  const [searchParams] = useSearchParams();
+  const isSoloDoctor = searchParams.get('tipo') === 'doctor';
+
+  const [form, setForm]               = useState(() => ({ ...INITIAL, rol: isSoloDoctor ? 'DOCTOR' : '' }));
   const [servicios, setServicios]     = useState([]);
   const [selServicios, setSelServicios] = useState([]);
   const [especialidadesCat, setEspecialidadesCat] = useState([]);
@@ -31,6 +34,8 @@ export default function RegistroUsuario() {
   const [loadingSvc, setLoadingSvc]   = useState(false);
   const [errors, setErrors]           = useState({});
   const [serverError, setServerError] = useState('');
+  const [imageFile, setImageFile]     = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   const esDoctor = form.rol === 'DOCTOR';
 
@@ -80,6 +85,23 @@ export default function RegistroUsuario() {
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
 
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 5MB');
+      return;
+    }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   // ── Validación ───────────────────────────────────────────────
   const validate = () => {
     const e = {};
@@ -119,10 +141,25 @@ export default function RegistroUsuario() {
       };
 
       const { data } = await api.post('/users', payload);
+      
+      if (imageFile && data.usuario_id) {
+        const formData = new FormData();
+        formData.append('avatar', imageFile);
+        try {
+          await api.post(`/users/${data.usuario_id}/avatar`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        } catch (imgErr) {
+          toast.error('El usuario se creó, pero hubo un error al subir la foto de perfil');
+        }
+      }
+
       toast.success(data.message || 'Usuario registrado correctamente');
-      setForm(INITIAL);
+      setForm({ ...INITIAL, rol: isSoloDoctor ? 'DOCTOR' : '' });
       setSelServicios([]);
       setSelEspecialidades([]);
+      setImageFile(null);
+      setImagePreview(null);
       setErrors({});
     } catch (err) {
       const msg = err.response?.data?.error || 'Error al registrar el usuario';
@@ -140,64 +177,104 @@ export default function RegistroUsuario() {
 
         {/* Encabezado */}
         <div className="mb-6">
-          <h1 className="text-xl font-bold text-[#0059B3]">Registrar nuevo usuario</h1>
+          <h1 className="text-xl font-bold text-[#0059B3]">
+            {isSoloDoctor ? 'Registrar nuevo doctor' : 'Registrar nuevo usuario'}
+          </h1>
           <p className="text-sm text-slate-500">
             Se enviará un correo de activación al correo ingresado
           </p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
-          <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
+          <div className="bg-white rounded-2xl shadow-sm p-6 space-y-6">
 
-            <SectionTitle>Datos personales</SectionTitle>
+            <div>
+              <SectionTitle>Datos personales</SectionTitle>
+              
+              <div className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Nombre *" error={errors.nombre}>
+                    <Input name="nombre" value={form.nombre} onChange={handleChange}
+                           placeholder="Ej. Juan" error={errors.nombre} />
+                  </Field>
+                  <Field label="Apellido *" error={errors.apellido}>
+                    <Input name="apellido" value={form.apellido} onChange={handleChange}
+                           placeholder="Ej. Pérez" error={errors.apellido} />
+                  </Field>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Nombre *" error={errors.nombre}>
-                <Input name="nombre" value={form.nombre} onChange={handleChange}
-                       placeholder="Ej. Juan" error={errors.nombre} />
-              </Field>
-              <Field label="Apellido *" error={errors.apellido}>
-                <Input name="apellido" value={form.apellido} onChange={handleChange}
-                       placeholder="Ej. Pérez" error={errors.apellido} />
-              </Field>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="DNI *" error={errors.DNI} hint="8 dígitos, solo números">
+                    <Input name="DNI" value={form.DNI} onChange={handleChange}
+                           placeholder="12345678" maxLength={8}
+                           inputMode="numeric" error={errors.DNI} />
+                  </Field>
+                  <Field label="Teléfono *" error={errors.telefono} hint="9 dígitos, solo números">
+                    <Input name="telefono" value={form.telefono} onChange={handleChange}
+                           placeholder="987654321" maxLength={9}
+                           inputMode="numeric" error={errors.telefono} />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Correo electrónico *" error={errors.email}>
+                    <Input type="email" name="email" value={form.email} onChange={handleChange}
+                           placeholder="correo@clinica.com" error={errors.email} />
+                  </Field>
+
+                  <Field label="Dirección">
+                    <Input name="direccion" value={form.direccion} onChange={handleChange}
+                           placeholder="Opcional" />
+                  </Field>
+                </div>
+
+                <div className="pt-2">
+                  <p className="block text-sm font-medium text-slate-700 mb-3">Foto de perfil (Opcional)</p>
+                  <div className="flex items-center gap-4">
+                    <div 
+                      className="relative w-24 h-24 rounded-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 flex items-center justify-center cursor-pointer overflow-hidden transition-colors shadow-sm flex-shrink-0"
+                      onClick={() => document.getElementById('avatarInput')?.click()}
+                    >
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-slate-400 flex flex-col items-center">
+                          <Camera size={24} className="mb-1" />
+                          <span className="text-[10px] font-medium uppercase tracking-widest">Foto</span>
+                        </div>
+                      )}
+                      <input 
+                        id="avatarInput"
+                        type="file" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        className="hidden" 
+                        onChange={handleImageChange}
+                      />
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      <p className="font-medium text-slate-700">Subir una imagen</p>
+                      <p>Puedes subir una foto en formato JPG, PNG o WEBP.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="DNI *" error={errors.DNI}
-                     hint="8 dígitos, solo números">
-                <Input name="DNI" value={form.DNI} onChange={handleChange}
-                       placeholder="12345678" maxLength={8}
-                       inputMode="numeric" error={errors.DNI} />
-              </Field>
-              <Field label="Teléfono *" error={errors.telefono}
-                     hint="9 dígitos, solo números">
-                <Input name="telefono" value={form.telefono} onChange={handleChange}
-                       placeholder="987654321" maxLength={9}
-                       inputMode="numeric" error={errors.telefono} />
-              </Field>
-            </div>
+            {!isSoloDoctor && (
+              <>
+                <SectionTitle>Rol en el sistema</SectionTitle>
 
-            <Field label="Correo electrónico *" error={errors.email}>
-              <Input type="email" name="email" value={form.email} onChange={handleChange}
-                     placeholder="correo@clinica.com" error={errors.email} />
-            </Field>
-
-            <Field label="Dirección">
-              <Input name="direccion" value={form.direccion} onChange={handleChange}
-                     placeholder="Opcional" />
-            </Field>
-
-            <SectionTitle>Rol en el sistema</SectionTitle>
-
-            <Field label="Rol *" error={errors.rol}>
-              <select name="rol" value={form.rol} onChange={handleChange}
-                      className={selectCls(errors.rol)}>
-                <option value="">Selecciona un rol</option>
-                {ROLES.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </Field>
+                <Field label="Rol *" error={errors.rol}>
+                  <select name="rol" value={form.rol} onChange={handleChange}
+                          className={selectCls(errors.rol)}>
+                    <option value="">Selecciona un rol</option>
+                    {ROLES.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </Field>
+              </>
+            )}
 
             {/* Campos extra para Doctor */}
             {esDoctor && (
@@ -326,11 +403,12 @@ function SectionTitle({ children }) {
 function Field({ label, error, hint, children }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <div className="flex items-center justify-between mb-1">
+        <label className="block text-sm font-medium text-slate-700">{label}</label>
+        {!error && hint && <span className="text-[10px] text-slate-400 font-normal">{hint}</span>}
+      </div>
       {children}
-      {error
-        ? <p className="text-xs text-red-500 mt-1">⚠ {error}</p>
-        : hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+      {error && <p className="text-xs text-red-500 mt-1">⚠ {error}</p>}
     </div>
   );
 }

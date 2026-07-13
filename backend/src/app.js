@@ -30,6 +30,7 @@ const consultaRoutes     = require('./routes/consulta.routes');
 const historialRoutes       = require('./routes/historial.routes');
 const especialidadRoutes    = require('./routes/especialidad.routes');
 const patientProfileRoutes  = require('./routes/patientProfile.routes');
+const reporteRoutes         = require('./routes/reporte.routes');
 const familiarRoutes        = require('./routes/familiar.routes');
 const publicRoutes          = require('./routes/public.routes');
 const patientHistorialRoutes = require('./routes/patientHistorial.routes');
@@ -75,6 +76,15 @@ app.use('/api/auth/staff', authLimiter, authStaffRoutes);     // Staff: email + 
 app.use('/api/auth/patient', authLimiter, authPatientRoutes); // Paciente: doc + password
 app.use('/api/auth/activate', authLimiter, activationRoutes); // Activación de cuentas
 
+// ===== UPLOADS (Archivos estáticos) =====
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+    setHeaders: (res) => {
+        // Permitir carga cross-origin de recursos estáticos para el frontend
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
+}));
+
 // ===== RECURSOS =====
 app.use('/api/users', userRoutes);
 app.use('/api/patients', patientRoutes);
@@ -90,6 +100,7 @@ app.use('/api/consultas',    consultaRoutes);
 app.use('/api/historial',    historialRoutes);
 app.use('/api/especialidades', especialidadRoutes);
 app.use('/api/patient',       patientProfileRoutes);
+app.use('/api/reportes',      reporteRoutes);
 app.use('/api/familiar',      familiarRoutes);
 app.use('/api/public',        publicRoutes);
 app.use('/api/mi-historial',  patientHistorialRoutes);

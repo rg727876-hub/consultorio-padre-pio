@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   UserPlus, Calendar, Stethoscope, CreditCard,
   LogOut, Menu, X, Home, Clock, ChevronRight, Receipt, List, CalendarSearch, LayoutGrid, Users,
-  UserCog, FileClock,
+  UserCog, FileClock, BarChart2,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/images/Logo-Consultorio-Padre-Pio.png';
@@ -13,11 +13,10 @@ const NAV = {
     { label: 'Inicio',               icon: Home,          ruta: '/dashboard' },
     { label: 'Gestion de Personal',  icon: Users,         ruta: '/admin/usuarios' },
     { label: 'Gestion de Doctores',  icon: UserCog,       ruta: '/admin/doctores' },
-    { label: 'Registrar usuario',    icon: UserPlus,      ruta: '/admin/usuarios/nuevo' },
-    { label: 'Registrar servicio',   icon: Stethoscope,   ruta: '/admin/servicios/nuevo' },
     { label: 'Gestionar servicios',  icon: List,          ruta: '/admin/servicios' },
     { label: 'Horarios de doctores', icon: Clock,         ruta: '/admin/horarios' },
     { label: 'Gestión de pacientes', icon: Users,         ruta: '/recepcion/pacientes' },
+    { label: 'Reportes',             icon: BarChart2,     ruta: '/admin/reportes' },
   ],
   RECEPCIONISTA: [
     { label: 'Inicio',               icon: Home,          ruta: '/dashboard' },
@@ -77,10 +76,18 @@ export default function AppLayout({ children }) {
   const userBlock = (
     <div className="border-t border-slate-200 px-4 py-4">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#0059B3]/10 flex items-center justify-center
-                        text-[#0059B3] text-xs font-bold flex-shrink-0 select-none">
-          {(user?.nombre?.[0] ?? '') + (user?.apellido?.[0] ?? '')}
-        </div>
+        {user?.avatar ? (
+          <img
+            src={user.avatar?.startsWith('http') ? user.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${user.avatar}`}
+            alt="Avatar"
+            className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-[#0059B3]/10 flex items-center justify-center
+                          text-[#0059B3] text-xs font-bold flex-shrink-0 select-none">
+            {(user?.nombre?.[0] ?? '') + (user?.apellido?.[0] ?? '')}
+          </div>
+        )}
         <div className="flex-1 min-w-0 leading-tight">
           <p className="text-sm font-semibold text-slate-800 truncate">
             {user?.nombre} {user?.apellido}

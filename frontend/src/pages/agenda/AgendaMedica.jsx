@@ -229,9 +229,19 @@ export default function AgendaMedica() {
           {doctorInfo && (
             <div className="bg-[#0059B3]/5 border border-[#0059B3]/20 rounded-2xl
                             px-4 py-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-[#0059B3]/10 flex items-center
-                              justify-center text-[#0059B3] text-sm font-bold flex-shrink-0">
-                {(doctorInfo.nombre ?? doctorInfo.nombre_doctor ?? '?')[0]}
+              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                {doctorInfo.avatar ? (
+                  <img
+                    src={doctorInfo.avatar?.startsWith('http') ? doctorInfo.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${doctorInfo.avatar}`}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#0059B3]/10 flex items-center
+                                  justify-center text-[#0059B3] text-sm font-bold">
+                    {(doctorInfo.nombre ?? '?')[0]}{(doctorInfo.apellido ?? '')[0]}
+                  </div>
+                )}
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-800">

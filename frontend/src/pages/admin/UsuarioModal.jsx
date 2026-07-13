@@ -8,6 +8,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import Modal from '../../components/Modal';
 import { fmtFechaHora } from '../recepcion/citaEstados';
+import { Camera } from 'lucide-react';
 
 const ROL_LABEL = {
   ADMINISTRADOR: 'Administrador', RECEPCIONISTA: 'Recepcionista',
@@ -55,6 +56,9 @@ export default function UsuarioModal({ id, onClose, onChanged }) {
   // Historial (CA16)
   const [actividad, setActividad] = useState(null);
   const [loadingAct, setLoadingAct] = useState(false);
+
+  // Subida de imagen
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true); setError(false);
@@ -144,6 +148,41 @@ export default function UsuarioModal({ id, onClose, onChanged }) {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validar tipo y tamaño
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 5MB');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    setUploadingAvatar(true);
+    try {
+      const { data } = await api.post(`/users/${id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(data.message);
+      // Actualizar la foto localmente para no tener que recargar todo
+      setUser(u => ({ ...u, avatar: data.avatar }));
+      onChanged?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al subir la imagen');
+    } finally {
+      setUploadingAvatar(false);
+      // Limpiar input
+      e.target.value = '';
+    }
+  };
+
   // ── Acciones de estado / activación ──────────────────────────
   const accion = async (fn, okMsg) => {
     setActing(true);
@@ -202,9 +241,33 @@ export default function UsuarioModal({ id, onClose, onChanged }) {
             {/* Cabecera */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-[#0059B3]/10 flex items-center justify-center
-                                text-[#0059B3] text-lg font-bold flex-shrink-0 select-none">
-                  {(user.nombre?.[0] ?? '') + (user.apellido?.[0] ?? '')}
+                <div className="relative group w-14 h-14 flex-shrink-0">
+                  {user.avatar ? (
+                    <img 
+                      src={user.avatar?.startsWith('http') ? user.avatar : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${user.avatar}`} 
+                      alt="Avatar" 
+                      className="w-full h-full rounded-full object-cover border-2 border-slate-100"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-[#0059B3]/10 flex items-center justify-center
+                                    text-[#0059B3] text-lg font-bold select-none border-2 border-transparent">
+                      {(user.nombre?.[0] ?? '') + (user.apellido?.[0] ?? '')}
+                    </div>
+                  )}
+                  
+                  <label className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/40 
+                                     opacity-0 cursor-pointer transition-opacity text-white
+                                     ${!inactivo && !uploadingAvatar ? 'group-hover:opacity-100' : 'hidden'}`}
+                         title="Cambiar foto de perfil">
+                    {uploadingAvatar ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                    <input 
+                      type="file" 
+                      accept="image/jpeg, image/png, image/webp" 
+                      className="hidden" 
+                      onChange={handleAvatarUpload}
+                      disabled={uploadingAvatar || inactivo}
+                    />
+                  </label>
                 </div>
                 <div>
                   <p className="text-lg font-bold text-slate-800 leading-tight">{user.nombre} {user.apellido}</p>

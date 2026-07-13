@@ -194,7 +194,7 @@ const fichaAtencion = (paciente, antecedentes, a, logo, nhc) => {
     <h2>VII. TRATAMIENTO</h2>
     ${bloque(tratamiento)}
 
-    ${a.odontograma_url ? `<h3>Odontograma</h3><img class="odo" src="${esc(a.odontograma_url)}" alt="Odontograma" />` : ''}
+    ${a.odontograma_url ? `<h3>Odontograma</h3><img class="odo" src="${esc(a.odontograma_url.startsWith('http') ? a.odontograma_url : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${a.odontograma_url}`)}" alt="Odontograma" />` : ''}
 
     <h2>VIII. PRONÓSTICO</h2>
     ${bloque(a.pronostico)}
