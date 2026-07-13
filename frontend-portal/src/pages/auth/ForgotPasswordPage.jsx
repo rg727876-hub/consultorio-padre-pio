@@ -1,7 +1,24 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, MailCheck, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, MailCheck, AlertCircle, KeyRound } from 'lucide-react';
 import api from '../../api/axios';
+
+// ── Fondo con textura de puntos + separación curva decorativa ────────────────
+function DottedBackground() {
+  return (
+    <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #00000014 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+        }}
+      />
+      <div className="absolute -top-48 -right-48 w-[560px] h-[560px] sm:w-[720px] sm:h-[720px] rounded-full bg-primary/[0.06]" />
+      <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-accent/10" />
+    </div>
+  );
+}
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -36,15 +53,20 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 relative">
-      <Link 
-        to="/login" 
+    <div className="relative z-0 min-h-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center px-4">
+      <DottedBackground />
+
+      <Link
+        to="/login"
         className="absolute top-6 left-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors text-sm font-medium"
       >
         <ArrowLeft size={16} /> Volver al login
       </Link>
 
-      <div className="text-center mb-6">
+      <div className="flex flex-col items-center text-center mb-6">
+        <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40 mb-4">
+          <KeyRound size={24} className="text-white" />
+        </div>
         <h1 className="text-2xl font-bold text-primary">Consultorio Padre Pio</h1>
         <p className="text-slate-500 text-sm mt-1">Recuperar acceso</p>
       </div>
@@ -91,14 +113,18 @@ export default function ForgotPasswordPage() {
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-2 w-full bg-primary text-white font-semibold text-sm py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                {loading && <Loader2 size={16} className="animate-spin" />}
-                {loading ? 'Enviando enlace...' : 'Enviar enlace de recuperación'}
-              </button>
+              <div className="flex justify-center pt-1">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-primary text-white font-semibold text-sm px-8 py-3 rounded-full
+                             hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                             transition-colors shadow-lg shadow-primary/40 flex items-center justify-center gap-2"
+                >
+                  {loading && <Loader2 size={16} className="animate-spin" />}
+                  {loading ? 'Enviando enlace...' : 'Enviar enlace de recuperación'}
+                </button>
+              </div>
             </form>
           </>
         )}
