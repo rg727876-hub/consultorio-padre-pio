@@ -6,6 +6,10 @@
 -- - Soporte para reprogramación
 -- - Liberación de slot al cancelar (slot_activo)
 -- - Registro de Atención Médica / Historia Clínica Odontológica (INT-HU019)
+-- - Modelo Titular + Familiar para portal web del paciente (Sprint 3)
+-- - Teléfono opcional en PACIENTE (familiares sin teléfono propio)
+-- - Pasarela de pagos genérica (Mercado Pago / Culqi / etc.)
+-- - Reserva de citas desde el portal a nombre de un familiar (titular_id en CITA)
 -- ============================================
 
 DROP DATABASE IF EXISTS consultorio_padre_pio;
@@ -144,14 +148,14 @@ CREATE TABLE PACIENTE (
     email_cuenta VARCHAR(100) NULL,
     tipo_documento ENUM('DNI', 'CE', 'PASAPORTE') NOT NULL DEFAULT 'DNI',
     numero_documento VARCHAR(20) NOT NULL,
-    telefono VARCHAR(15) NOT NULL,
+    telefono VARCHAR(15) NULL,
     direccion VARCHAR(299),
     sexo ENUM('FEMENINO', 'MASCULINO') NOT NULL,
     fecha_nacimiento DATE NULL,
     ocupacion VARCHAR(100) NULL,
     contacto_emergencia VARCHAR(150) NULL,
     password_hash VARCHAR(255) NULL,
-    estado_cuenta ENUM('SIN_CUENTA', 'ACTIVO') DEFAULT 'SIN_CUENTA',
+    estado_cuenta ENUM('SIN_CUENTA', 'ACTIVO', 'FAMILIAR') NOT NULL DEFAULT 'SIN_CUENTA',
     intentos_fallidos INT DEFAULT 0,
     bloqueado_hasta DATETIME NULL,
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
@@ -165,11 +169,39 @@ CREATE TABLE PACIENTE (
 );
 
 -- ============================================
+-- TABLA: PACIENTE_FAMILIAR (relación N:N)
+-- Vincula titulares (cuentas web) con sus familiares (pacientes).
+-- Un familiar puede estar vinculado a varios titulares (madre Y padre).
+-- Las vinculaciones tienen estado para permitir desvincular sin eliminar.
+-- ============================================
+CREATE TABLE PACIENTE_FAMILIAR (
+    relacion_id INT AUTO_INCREMENT,
+    titular_id INT NOT NULL,
+    familiar_id INT NOT NULL,
+    parentesco ENUM(
+        'HIJO', 'HIJA', 'CONYUGE',
+        'PADRE', 'MADRE',
+        'HERMANO', 'HERMANA',
+        'ABUELO', 'ABUELA',
+        'OTRO'
+    ) NOT NULL,
+    estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
+    fecha_vinculacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_desvinculacion DATETIME NULL,
+    CONSTRAINT PK_PACIENTE_FAMILIAR PRIMARY KEY (relacion_id),
+    CONSTRAINT FK_PF_TITULAR FOREIGN KEY (titular_id) REFERENCES PACIENTE(paciente_id),
+    CONSTRAINT FK_PF_FAMILIAR FOREIGN KEY (familiar_id) REFERENCES PACIENTE(paciente_id),
+    CONSTRAINT UK_PF_RELACION UNIQUE (titular_id, familiar_id),
+    CONSTRAINT CHK_PF_NO_AUTO CHECK (titular_id != familiar_id)
+);
+
+-- ============================================
 -- TABLA: CITA (con cancelación, reprogramación y liberación de slot)
 -- ============================================
 CREATE TABLE CITA (
     cita_id INT AUTO_INCREMENT,
     paciente_id INT NOT NULL,
+    titular_id INT NULL,
     doctor_id INT NOT NULL,
     servicio_id INT NOT NULL,
     usuario_id INT NULL,
@@ -196,6 +228,7 @@ CREATE TABLE CITA (
     ) STORED,
     CONSTRAINT PK_CITA PRIMARY KEY (cita_id),
     CONSTRAINT FK_CITA_PACIENTE FOREIGN KEY (paciente_id) REFERENCES PACIENTE(paciente_id),
+    CONSTRAINT FK_CITA_TITULAR FOREIGN KEY (titular_id) REFERENCES PACIENTE(paciente_id),
     CONSTRAINT FK_CITA_DOCTOR FOREIGN KEY (doctor_id) REFERENCES DOCTOR(doctor_id),
     CONSTRAINT FK_CITA_SERVICIO FOREIGN KEY (servicio_id) REFERENCES SERVICIO(servicio_id),
     CONSTRAINT FK_CITA_USUARIO FOREIGN KEY (usuario_id) REFERENCES USUARIO(usuario_id),
@@ -284,8 +317,9 @@ CREATE TABLE PAGO (
     metodo_pago ENUM('YAPE', 'EFECTIVO', 'TARJETA_PRESENCIAL', 'PLIN', 'TARJETA_ONLINE') NOT NULL,
     cambio DECIMAL(10, 2) DEFAULT 0,
     numero_operacion VARCHAR(100) NULL,
-    culqi_charge_id VARCHAR(100) NULL,
-    culqi_outcome_code VARCHAR(50) NULL,
+    pasarela_transaction_id VARCHAR(100) NULL,
+    pasarela_status VARCHAR(50) NULL,
+    pasarela_nombre VARCHAR(20) NULL,
     ultimos_4_tarjeta CHAR(4) NULL,
     marca_tarjeta VARCHAR(20) NULL,
     estado ENUM('PENDIENTE', 'COMPLETADO', 'FALLIDO') NOT NULL DEFAULT 'PENDIENTE',
@@ -370,6 +404,8 @@ CREATE INDEX idx_consulta_doctor ON CONSULTA_CLINICA(firmado_por_doctor_id);
 CREATE INDEX idx_consulta_historia ON CONSULTA_CLINICA(historia_id);
 CREATE INDEX idx_token_usuario ON TOKEN_ACTIVACION(usuario_id);
 CREATE INDEX idx_doctor_especialidad ON DOCTOR_ESPECIALIDAD(especialidad_id);
+CREATE INDEX idx_pf_titular ON PACIENTE_FAMILIAR(titular_id);
+CREATE INDEX idx_pf_familiar ON PACIENTE_FAMILIAR(familiar_id);
 
 -- ============================================================
 -- DATOS INICIALES (SEED)
