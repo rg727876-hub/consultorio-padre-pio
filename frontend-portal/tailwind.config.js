@@ -14,6 +14,7 @@ export default {
       fontFamily: {
         display: ['"Playfair Display"', 'Georgia', 'serif'],
         script:  ['"Dancing Script"', 'cursive'],
+        friendly: ['"Baloo 2"', 'cursive'],
       },
     },
   },

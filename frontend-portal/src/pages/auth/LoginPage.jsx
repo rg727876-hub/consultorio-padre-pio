@@ -1,8 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle, Loader2, LockKeyhole } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Loader2, LockKeyhole, ArrowUpRight, ChevronDown, Check } from 'lucide-react';
 import { loginPatient } from '../../services/authPatient.service';
 import { usePatientAuth } from '../../context/PatientAuthContext';
+
+// ── Mensajes rotativos de la burbuja del panel fotográfico ───────────────────
+const BUBBLE_MESSAGES = [
+  {
+    titulo: '¿Seguro que limpiaste cada rincón? 🦷✨',
+    texto:  'Un buen cepillado toma 2 minutos. No olvides el hilo dental para proteger tus encías.',
+  },
+  {
+    titulo: '¿Sabías que el cepillo va a 45°? 🪥🤔',
+    texto:  'No hagas mucha fuerza; los movimientos suaves limpian mejor y cuidan tu esmalte.',
+  },
+  {
+    titulo: '¡Espera un momento! ✋🚨',
+    texto:  'Todo ese buen cepillado no sirve de nada si olvidas agendar tu limpieza profesional cada 6 meses...',
+  },
+  {
+    titulo: '¡Vamos a revisar tu agenda! 🔑🗓️',
+    texto:  'Inicia sesión ahora mismo para ver cuándo te toca tu próximo control y mantener esa sonrisa perfecta.',
+  },
+];
 
 // ── Reglas de validación (espejo del backend) ────────────────────────────────
 const RE_DNI       = /^\d{8}$/;
@@ -48,6 +68,63 @@ function Field({ label, error, touched, children }) {
         <p className="text-xs text-red-500 flex items-center gap-1">
           <AlertCircle size={12} /> {error}
         </p>
+      )}
+    </div>
+  );
+}
+
+// ── Select con menú propio (reemplaza el <select> nativo) ────────────────────
+function CustomSelect({ name, value, onChange, onBlur, options, error, touched }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen((wasOpen) => {
+          if (wasOpen) onBlur?.({ target: { name, value } });
+          return false;
+        });
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, value]);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${inputCls(touched, error)} flex items-center justify-between gap-2 text-left`}
+      >
+        <span className={selected ? 'text-slate-800' : 'text-slate-400'}>
+          {selected ? selected.label : 'Seleccionar...'}
+        </span>
+        <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1.5 w-full bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 overflow-hidden">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange({ target: { name, value: opt.value, type: 'select-one' } });
+                setOpen(false);
+              }}
+              className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between
+                ${opt.value === value ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {opt.label}
+              {opt.value === value && <Check size={15} />}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -100,6 +177,15 @@ export default function LoginPage() {
   const [bloqueadoHasta, setBloqueadoHasta] = useState(null);
   const [loading, setLoading]   = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  // ── Burbuja rotativa: cambia cada 10s o al hacer clic ──────────────────────
+  const [msgIndex, setMsgIndex] = useState(0);
+  const nextMsg = () => setMsgIndex((i) => (i + 1) % BUBBLE_MESSAGES.length);
+
+  useEffect(() => {
+    const id = setTimeout(nextMsg, 10000);
+    return () => clearTimeout(id);
+  }, [msgIndex]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -175,22 +261,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen md:h-screen flex bg-white md:overflow-hidden">
 
-      {/* Cabecera */}
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-primary">Consultorio Padre Pio</h1>
-        <p className="text-slate-500 text-sm mt-1">Accede a tus citas e historial</p>
-      </div>
+      {/* ── Formulario ── */}
+      <div className="w-full md:w-1/2 md:h-full flex flex-col items-center justify-center px-4 py-10 md:overflow-y-auto">
 
-      <div className="w-full max-w-md -mt-3 mb-3">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-primary font-medium hover:underline">
-          ← Volver al inicio
-        </Link>
-      </div>
+        {/* Cabecera (solo visible sin el panel, en mobile) */}
+        <div className="text-center mb-6 md:hidden">
+          <h1 className="text-2xl font-bold text-primary">Consultorio Padre Pio</h1>
+          <p className="text-slate-500 text-sm mt-1">Accede a tus citas e historial</p>
+        </div>
+        <div className="w-full max-w-md -mt-3 mb-3 md:hidden">
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-primary font-medium hover:underline">
+            ← Volver al inicio
+          </Link>
+        </div>
+
+        <div className="hidden md:flex flex-col items-center text-center mb-8">
+          <Link to="/" className="flex items-center gap-2 mb-5">
+            <img src="/ICONOCLINICA.svg" alt="Padre Pio" className="h-7 w-auto" />
+            <span className="font-display font-black text-primary text-lg tracking-tight">
+              PadrePio
+            </span>
+          </Link>
+          <h1 className="text-2xl font-bold text-slate-900">Bienvenido de nuevo</h1>
+          <p className="text-slate-500 text-sm mt-1">Accede a tus citas e historial</p>
+        </div>
 
       {/* Tarjeta */}
-      <div className="bg-white rounded-2xl shadow-md w-full max-w-md p-6 sm:p-8">
+      <div className="bg-white md:shadow-none shadow-md rounded-2xl w-full max-w-md p-6 sm:p-8 md:p-0">
 
         {/* Cuenta bloqueada */}
         {bloqueadoHasta && <BloqueadoAlert bloqueadoHasta={bloqueadoHasta} onReset={handleReset} />}
@@ -211,16 +310,16 @@ export default function LoginPage() {
             <label className="text-sm font-medium text-slate-700">
               Tipo de documento<span className="text-red-500 ml-0.5">*</span>
             </label>
-            <select
+            <CustomSelect
               name="tipo_documento"
               value={form.tipo_documento}
               onChange={handleChange}
-              className={inputCls(false, false)}
-            >
-              <option value="DNI">DNI</option>
-              <option value="CE">Carnet de Extranjería</option>
-              <option value="PASAPORTE">Pasaporte</option>
-            </select>
+              options={[
+                { value: 'DNI', label: 'DNI' },
+                { value: 'CE', label: 'Carnet de Extranjería' },
+                { value: 'PASAPORTE', label: 'Pasaporte' },
+              ]}
+            />
           </div>
 
           {/* Número de documento */}
@@ -297,6 +396,55 @@ export default function LoginPage() {
             Regístrate aquí
           </Link>
         </p>
+      </div>
+      </div>
+
+      {/* ── Panel fotográfico ── */}
+      <div
+        className="hidden md:flex md:w-1/2 md:h-full relative overflow-hidden items-center justify-center"
+        style={{ backgroundColor: '#D99393' }}
+      >
+        <img src="/rrrrr.jpg" alt="" className="max-w-full max-h-full object-contain" />
+
+        {/* Volver al inicio */}
+        <Link
+          to="/"
+          className="absolute top-8 right-8 inline-flex items-center gap-1.5 bg-white/90 backdrop-blur
+                     text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-full shadow-md
+                     hover:shadow-lg hover:bg-white transition-all"
+        >
+          <ArrowUpRight size={16} /> Volver al inicio
+        </Link>
+
+        {/* Burbuja de texto rotativa */}
+        <div className="absolute top-10 left-8 lg:left-10 max-w-[230px]">
+          <button
+            type="button"
+            onClick={nextMsg}
+            className="relative block text-left bg-white rounded-2xl rounded-tl-sm shadow-lg
+                       px-5 py-4 cursor-pointer hover:shadow-xl transition-shadow"
+          >
+            <p className="font-friendly font-bold text-slate-800 text-[15px] leading-snug mb-1.5">
+              {BUBBLE_MESSAGES[msgIndex].titulo}
+            </p>
+            <p className="font-friendly text-slate-500 text-xs leading-relaxed">
+              {BUBBLE_MESSAGES[msgIndex].texto}
+            </p>
+            <span className="absolute -top-2 left-6 w-4 h-4 bg-white rotate-45 rounded-sm" />
+          </button>
+
+          {/* Indicadores de posición */}
+          <div className="flex items-center gap-1.5 mt-3 ml-1">
+            {BUBBLE_MESSAGES.map((_, i) => (
+              <span
+                key={i}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === msgIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/50'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
