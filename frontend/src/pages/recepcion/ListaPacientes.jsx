@@ -59,8 +59,14 @@ export default function ListaPacientes() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, estado]);
 
-  // Carga inicial
-  useEffect(() => { fetchPacientes(1); /* eslint-disable-next-line */ }, []);
+  // Carga inicial y debounce de búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchPacientes(1);
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, estado]);
 
   // ── Handlers ─────────────────────────────────────────────────────
   const handleEstadoChange = (val) => {

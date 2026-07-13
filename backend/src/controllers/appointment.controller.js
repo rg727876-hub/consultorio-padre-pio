@@ -69,6 +69,8 @@ const getSlots = async (req, res) => {
     );
     if (!servicioNuevo) return res.status(404).json({ error: 'Servicio no encontrado' });
 
+    const pacienteId = req.query.paciente_id ? Number(req.query.paciente_id) : null;
+
     // Citas existentes ese día CON el buffer de su propio servicio
     const [booked] = await pool.query(
       `SELECT 
@@ -77,10 +79,10 @@ const getSlots = async (req, res) => {
         s.buffer AS service_buffer
        FROM   CITA c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
-       WHERE  c.doctor_id = ? AND c.fecha = ?
+       WHERE  (c.doctor_id = ? OR (c.paciente_id = ? AND ? IS NOT NULL)) AND c.fecha = ?
          AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')
        ORDER BY c.hora_inicio`,
-      [doctorId, fecha]
+      [doctorId, pacienteId, pacienteId, fecha]
     );
 
     // Paso de avance: 5 minutos para flexibilidad
@@ -184,7 +186,7 @@ const create = async (req, res) => {
        FROM   CITA     c
        JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
        WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ?
-         AND  c.estado IN ('RESERVADA','CONFIRMADA')`,
+         AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
       [Number(doctor_id), Number(paciente_id), fecha]
     );
     const nIni    = timeToMins(hora_inicio);
@@ -307,6 +309,7 @@ const list = async (req, res) => {
     params.push(Number(doctor_id));
   }
   if (estado) {
+  if (estado) {
     const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
     const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e));
     if (validEstados.length > 0) {
@@ -314,9 +317,7 @@ const list = async (req, res) => {
       params.push(...validEstados);
     }
   }
-  // Cuando no hay NINGÚN filtro, el listado por defecto muestra todas las
-  // citas CONFIRMADAS (de todas las fechas), con las de hoy primero y
-  // descendiendo hacia las pasadas (las futuras, si existen, van al final).
+
   let ordenPorDefecto = false;
 
   if (fecha_inicio && fecha_fin) {
@@ -328,20 +329,21 @@ const list = async (req, res) => {
   } else if (fecha_fin) {
     conds.push('c.fecha <= ?');
     params.push(fecha_fin);
-  } else if (!codigo && !q && !doctor_id && !estado) {
-    // Sin ningún filtro → por defecto todas las citas confirmadas
-    conds.push("c.estado = 'CONFIRMADA'");
+  } else {
+    // Si no hay filtro de fecha, consideramos que usa el orden por defecto
     ordenPorDefecto = true;
   }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-  // Orden: por defecto, hoy primero → pasado (futuras al final);
-  // con filtros, orden cronológico ascendente como siempre.
+  // Orden: por defecto, citas futuras/hoy primero (ascendente), citas pasadas después (descendente)
+  // Cuando hay filtros de fecha explícitos, orden cronológico descendente
   const orderBy = ordenPorDefecto
-    ? 'ORDER BY (c.fecha > ?) ASC, c.fecha DESC, c.hora_inicio ASC'
-    : 'ORDER BY c.fecha ASC, c.hora_inicio ASC';
-  const orderParams = ordenPorDefecto ? [new Date().toLocaleDateString('en-CA')] : [];
+    ? 'ORDER BY CASE WHEN c.fecha >= ? THEN 0 ELSE 1 END, CASE WHEN c.fecha >= ? THEN c.fecha END ASC, CASE WHEN c.fecha < ? THEN c.fecha END DESC, c.hora_inicio ASC'
+    : 'ORDER BY c.fecha DESC, c.hora_inicio DESC';
+  
+  const hoy = new Date().toLocaleDateString('en-CA');
+  const orderParams = ordenPorDefecto ? [hoy, hoy, hoy] : [];
 
   try {
     const [[{ total }]] = await pool.query(
