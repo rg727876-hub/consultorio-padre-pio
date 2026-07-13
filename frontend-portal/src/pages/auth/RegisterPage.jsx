@@ -263,6 +263,12 @@ export default function RegisterPage() {
         <p className="text-slate-500 text-sm mt-1">Crea tu cuenta de paciente</p>
       </div>
 
+      <div className="w-full max-w-2xl -mt-3 mb-3">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-primary font-medium hover:underline">
+          ← Volver al inicio
+        </Link>
+      </div>
+
       {/* Tarjeta */}
       <div className="bg-white rounded-2xl shadow-md w-full max-w-2xl p-6 sm:p-8">
 

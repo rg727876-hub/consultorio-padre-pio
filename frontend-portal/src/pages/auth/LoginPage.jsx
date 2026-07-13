@@ -183,6 +183,12 @@ export default function LoginPage() {
         <p className="text-slate-500 text-sm mt-1">Accede a tus citas e historial</p>
       </div>
 
+      <div className="w-full max-w-md -mt-3 mb-3">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-primary font-medium hover:underline">
+          ← Volver al inicio
+        </Link>
+      </div>
+
       {/* Tarjeta */}
       <div className="bg-white rounded-2xl shadow-md w-full max-w-md p-6 sm:p-8">
 
