@@ -263,7 +263,7 @@ export default function LoginPage() {
           {/* ¿Olvidaste tu contraseña? */}
           <div className="text-right -mt-1">
             <Link
-              to="/recuperar-password"
+              to="/forgot-password"
               className="text-xs text-primary hover:underline"
             >
               ¿Olvidaste tu contraseña?
