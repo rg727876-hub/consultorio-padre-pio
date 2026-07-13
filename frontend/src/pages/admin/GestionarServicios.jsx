@@ -90,7 +90,7 @@ export default function GestionarServicios() {
       estado:      servicio.estado,
     });
     setEditImageFile(null);
-    setEditImagePreview(servicio.imagen ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${servicio.imagen}` : null);
+    setEditImagePreview(servicio.imagen ? (servicio.imagen.startsWith('http') ? servicio.imagen : `${import.meta.env.VITE_BASE_URL || 'http://localhost:4000'}${servicio.imagen}`) : null);
     setEditErrors({});
     setServerError('');
   };
