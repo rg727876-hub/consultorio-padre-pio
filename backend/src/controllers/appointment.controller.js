@@ -21,6 +21,14 @@ const getDayName = (fechaStr) => {
 
 const generateCode = () => crypto.randomBytes(5).toString('hex').toUpperCase();
 
+// Límite de reserva: solo se permite agendar hasta un mes en el futuro.
+// Evita "datos fantasma" y desorden cuando los horarios aún pueden cambiar.
+const maxFechaReserva = () => {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return d.toLocaleDateString('en-CA');
+};
+
 // GET /api/appointments/slots?doctor_id=X&servicio_id=Y&fecha=YYYY-MM-DD
 // GET /api/appointments/slots?doctor_id=X&servicio_id=Y&fecha=YYYY-MM-DD
 const getSlots = async (req, res) => {
@@ -34,6 +42,8 @@ const getSlots = async (req, res) => {
   const hoy = new Date().toLocaleDateString('en-CA');
   if (fecha < hoy)
     return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
+  if (fecha > maxFechaReserva())
+    return res.status(400).json({ error: 'Solo se pueden agendar citas hasta un mes de anticipación' });
 
   const diaSemana = getDayName(fecha);
   if (diaSemana === 'DOMINGO')
@@ -141,6 +151,8 @@ const create = async (req, res) => {
   const hoy = new Date().toLocaleDateString('en-CA');
   if (fecha < hoy)
     return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
+  if (fecha > maxFechaReserva())
+    return res.status(400).json({ error: 'Solo se pueden agendar citas hasta un mes de anticipación' });
 
   let conn;
   try {
@@ -841,6 +853,10 @@ const reschedule = async (req, res) => {
   // Validar formato de fecha
   if (!/^\d{4}-\d{2}-\d{2}$/.test(nueva_fecha) || isNaN(Date.parse(nueva_fecha)))
     return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' });
+
+  // Límite de reserva: hasta un mes de anticipación (igual que al agendar).
+  if (nueva_fecha > maxFechaReserva())
+    return res.status(400).json({ error: 'Solo se pueden reprogramar citas hasta un mes de anticipación' });
 
   // Validar que hora_inicio < hora_fin
   if (nueva_hora_inicio >= nueva_hora_fin)

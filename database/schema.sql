@@ -395,7 +395,9 @@ INSERT INTO ROL (nombre_rol) VALUES
     ('DOCTOR');
 
 -- Usuario administrador (único usuario inicial)
--- Email: consultoripadrepio@gmail.com | Password: consultorio@padrepio123
+-- IMPORTANTE: el password_hash de abajo es una credencial temporal SOLO para el
+-- primer arranque. Cámbiala inmediatamente tras el primer login. NO documentes
+-- la contraseña en texto plano aquí ni en ningún archivo versionado.
 INSERT INTO USUARIO (nombre, apellido, email, DNI, telefono, estado, password_hash)
 VALUES (
     'Admin',
