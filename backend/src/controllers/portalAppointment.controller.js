@@ -329,6 +329,35 @@ const confirmPayment = async (req, res) => {
       conn = await pool.getConnection();
       await conn.query('START TRANSACTION');
 
+      // ── Prevenir Race Conditions entre Portal y Recepción ──
+      await conn.query('SELECT 1 FROM PACIENTE WHERE paciente_id = ? FOR UPDATE', [Number(hold.pacienteId)]);
+      await conn.query('SELECT 1 FROM USUARIO WHERE usuario_id = ? FOR UPDATE', [Number(hold.doctorId)]);
+
+      // Re-verificar que el horario no haya sido ocupado (ej. por Recepción) mientras se pagaba
+      const [[servicio]] = await conn.query('SELECT buffer FROM SERVICIO WHERE servicio_id = ?', [hold.servicioId]);
+      const [existentes] = await conn.query(
+        `SELECT TIME_FORMAT(c.hora_inicio,'%H:%i') AS hi,
+                TIME_FORMAT(c.hora_fin,   '%H:%i') AS hf,
+                s.buffer AS buffer,
+                c.doctor_id,
+                c.paciente_id
+         FROM   CITA     c
+         JOIN   SERVICIO s ON s.servicio_id = c.servicio_id
+         WHERE  (c.doctor_id = ? OR c.paciente_id = ?) AND c.fecha = ?
+           AND  UPPER(c.estado) IN ('RESERVADA','CONFIRMADA')`,
+        [Number(hold.doctorId), Number(hold.pacienteId), hold.fecha]
+      );
+      
+      const nIni = timeToMins(hold.horaInicio);
+      const nFinBuf = timeToMins(hold.horaFin) + (servicio?.buffer || 0);
+      const conflicto = existentes.find(
+        b => nIni < (timeToMins(b.hf) + (b.buffer || 0)) && nFinBuf > timeToMins(b.hi)
+      );
+
+      if (conflicto) {
+        throw new Error('El horario fue ocupado durante el proceso de pago');
+      }
+
       for (let i = 0; i < 5; i++) {
         const code = generateCode();
         const [[{ c }]] = await conn.query('SELECT COUNT(*) AS c FROM CITA WHERE codigo_cita = ?', [code]);

@@ -161,6 +161,11 @@ const create = async (req, res) => {
     conn = await pool.getConnection();
     await conn.query('START TRANSACTION');
 
+    // ── Prevenir Race Conditions (Doble Click / Concurrencia) ──
+    // Bloqueamos la fila del paciente y del doctor para serializar las peticiones concurrentes
+    await conn.query('SELECT 1 FROM PACIENTE WHERE paciente_id = ? FOR UPDATE', [Number(paciente_id)]);
+    await conn.query('SELECT 1 FROM USUARIO WHERE usuario_id = ? FOR UPDATE', [Number(doctor_id)]);
+
     // Obtener servicio
     const [[servicio]] = await conn.query(
       `SELECT duracion, buffer, costo FROM SERVICIO
@@ -875,6 +880,13 @@ const reschedule = async (req, res) => {
   try {
     conn = await pool.getConnection();
     await conn.query('START TRANSACTION');
+
+    // ── Prevenir Race Conditions ──
+    const [[tempCita]] = await conn.query('SELECT paciente_id, doctor_id FROM CITA WHERE cita_id = ?', [citaId]);
+    if (tempCita) {
+      await conn.query('SELECT 1 FROM PACIENTE WHERE paciente_id = ? FOR UPDATE', [Number(tempCita.paciente_id)]);
+      await conn.query('SELECT 1 FROM USUARIO WHERE usuario_id = ? FOR UPDATE', [Number(tempCita.doctor_id)]);
+    }
 
     // ── 1. Leer y bloquear la cita original ──────────────────────────────
     const [[cita]] = await conn.query(
