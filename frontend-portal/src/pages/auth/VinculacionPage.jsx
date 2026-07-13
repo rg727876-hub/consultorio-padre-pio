@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, LinkIcon } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, LinkIcon, ChevronDown, Check } from 'lucide-react';
 import { previewPatient, vincularPatient } from '../../services/authPatient.service';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
@@ -39,6 +39,80 @@ const inputCls = (touched, error) =>
    ${touched && error
      ? 'border-red-400 bg-red-50 focus:border-red-400'
      : 'border-slate-300 bg-white focus:border-primary'}`;
+
+// ── Select con menú propio (reemplaza el <select> nativo) ────────────────────
+function CustomSelect({ name, value, onChange, onBlur, options, error, touched }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen((wasOpen) => {
+          if (wasOpen) onBlur?.({ target: { name, value } });
+          return false;
+        });
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, value]);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${inputCls(touched, error)} flex items-center justify-between gap-2 text-left`}
+      >
+        <span className={selected ? 'text-slate-800' : 'text-slate-400'}>
+          {selected ? selected.label : 'Seleccionar...'}
+        </span>
+        <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1.5 w-full bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 overflow-hidden">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange({ target: { name, value: opt.value, type: 'select-one' } });
+                setOpen(false);
+              }}
+              className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between
+                ${opt.value === value ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {opt.label}
+              {opt.value === value && <Check size={15} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Fondo con textura de puntos + separación curva decorativa ────────────────
+function DottedBackground() {
+  return (
+    <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #00000014 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+        }}
+      />
+      <div className="absolute -top-48 -left-48 w-[560px] h-[560px] sm:w-[720px] sm:h-[720px] rounded-full bg-primary/[0.06]" />
+      <div className="absolute -bottom-24 -right-24 w-64 h-64 rounded-full bg-accent/10" />
+    </div>
+  );
+}
 
 // ── Pantalla de éxito ─────────────────────────────────────────────────────────
 function SuccessScreen({ esFamiliar }) {
@@ -239,7 +313,8 @@ export default function VinculacionPage() {
         />
       )}
 
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-start py-10 px-4">
+      <div className="relative z-0 min-h-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center py-10 px-4">
+        <DottedBackground />
 
         {/* Cabecera */}
         <div className="text-center mb-6">
@@ -247,15 +322,18 @@ export default function VinculacionPage() {
           <p className="text-slate-500 text-sm mt-1">Vincula tu cuenta web con tu historial</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-md w-full max-w-md p-6 sm:p-8">
+        <div className="w-full max-w-md">
 
           {/* ── STEP 1: si no hay preview, mostrar búsqueda de documento ── */}
           {!preview && (
             <>
-              <p className="text-sm text-slate-600 mb-5 leading-relaxed">
-                Si ya tienes historial clínico en el consultorio, ingresa tu documento
-                para vincular tu cuenta web sin perder tus datos.
-              </p>
+              <div className="relative bg-white rounded-2xl rounded-bl-sm shadow-md px-5 py-4 mb-6">
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Si ya tienes historial clínico en el consultorio, ingresa tu documento
+                  para vincular tu cuenta web sin perder tus datos.
+                </p>
+                <span className="absolute -bottom-2 left-6 w-4 h-4 bg-white rotate-45 rounded-sm" />
+              </div>
 
               {docError && docError.codigo === 'CUENTA_ACTIVA' && (
                 <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -282,15 +360,16 @@ export default function VinculacionPage() {
 
               <form onSubmit={handleDocSubmit} noValidate className="space-y-4">
                 <Field label="Tipo de documento" touched error="">
-                  <select
+                  <CustomSelect
+                    name="tipo_documento"
                     value={docForm.tipo_documento}
                     onChange={(e) => setDocForm((p) => ({ ...p, tipo_documento: e.target.value }))}
-                    className={inputCls(false, '')}
-                  >
-                    <option value="DNI">DNI</option>
-                    <option value="CE">Carnet de Extranjería</option>
-                    <option value="PASAPORTE">Pasaporte</option>
-                  </select>
+                    options={[
+                      { value: 'DNI', label: 'DNI' },
+                      { value: 'CE', label: 'Carnet de Extranjería' },
+                      { value: 'PASAPORTE', label: 'Pasaporte' },
+                    ]}
+                  />
                 </Field>
                 <Field label="Número de documento" touched={!!docError} error={docError?.msg}>
                   <input
@@ -303,16 +382,19 @@ export default function VinculacionPage() {
                   />
                 </Field>
 
-                <button
-                  type="submit"
-                  disabled={docLoading}
-                  className="w-full bg-primary text-white font-semibold text-sm py-3 rounded-lg
-                             hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {docLoading
-                    ? <><Loader2 size={16} className="animate-spin" /> Buscando…</>
-                    : 'Buscar mi registro'}
-                </button>
+                <div className="flex justify-center pt-1">
+                  <button
+                    type="submit"
+                    disabled={docLoading}
+                    className="bg-primary text-white font-semibold text-sm px-10 py-3 rounded-full
+                               hover:bg-blue-700 disabled:opacity-50 transition-colors
+                               shadow-lg shadow-primary/40 flex items-center justify-center gap-2"
+                  >
+                    {docLoading
+                      ? <><Loader2 size={16} className="animate-spin" /> Buscando…</>
+                      : 'Buscar mi registro'}
+                  </button>
+                </div>
               </form>
 
               <p className="mt-5 text-center text-sm text-slate-500">
@@ -488,16 +570,16 @@ export default function VinculacionPage() {
                     type="button"
                     onClick={() => navigate('/register')}
                     className="flex-1 border border-slate-300 text-slate-600 font-semibold text-sm
-                               py-3 rounded-lg hover:bg-slate-50 transition-colors"
+                               py-3 rounded-full hover:bg-slate-50 transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={loading || !form.acepta_politica}
-                    className="flex-1 bg-primary text-white font-semibold text-sm py-3 rounded-lg
+                    className="flex-1 bg-primary text-white font-semibold text-sm py-3 rounded-full
                                hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
-                               transition-colors flex items-center justify-center gap-2"
+                               transition-colors shadow-lg shadow-primary/40 flex items-center justify-center gap-2"
                   >
                     {loading
                       ? <><Loader2 size={16} className="animate-spin" /> {preview.es_familiar ? 'Activando…' : 'Vinculando…'}</>
