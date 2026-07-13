@@ -48,6 +48,13 @@ export default function AgendarCita() {
   const [serverError, setServerError]   = useState('');
 
   const today = new Date().toLocaleDateString('en-CA');
+  // Límite de reserva: solo se permite agendar hasta un mes en el futuro.
+  // Evita "datos fantasma" y desorden cuando los horarios aún pueden cambiar.
+  const maxFecha = (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toLocaleDateString('en-CA');
+  })();
   const currentStep = !paciente ? 1 : !servicio ? 2 : !doctor ? 3 : !slot ? 4 : 5;
 
   useEffect(() => {
@@ -211,6 +218,10 @@ export default function AgendarCita() {
     const f = e.target.value;
     setFecha(f); setSlot(null); setSlots([]); setServerError('');
     if (!f || !doctor || !servicio) return;
+    if (f > maxFecha) {
+      setServerError('Solo se pueden agendar citas hasta un mes de anticipación.');
+      return;
+    }
     setLoadingSlots(true);
     try {
       const { data } = await api.get('/appointments/slots', {
@@ -414,11 +425,15 @@ export default function AgendarCita() {
               <input
                 type="date"
                 min={today}
+                max={maxFecha}
                 value={fecha}
                 onChange={handleFechaChange}
                 className="w-full sm:w-52 border border-slate-300 rounded-lg px-3 py-2 text-sm
                            focus:outline-none focus:ring-2 focus:ring-[#0059B3]/40"
               />
+              <p className="text-xs text-slate-400 mt-1.5">
+                Solo se pueden agendar citas hasta un mes de anticipación.
+              </p>
               {fecha && (
                 <div className="mt-3">
                   {loadingSlots ? (

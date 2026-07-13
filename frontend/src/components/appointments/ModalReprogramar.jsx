@@ -30,6 +30,16 @@ const hoyISO = () => {
   return `${year}-${month}-${day}`;
 };
 
+// Límite de reserva: solo se permite reprogramar hasta un mes en el futuro.
+const maxFechaISO = () => {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const agregarDias = (fechaStr, n) => {
   const [y, m, d] = String(fechaStr).slice(0, 10).split('-').map(Number);
   const dt = new Date(y, m - 1, d);
@@ -339,7 +349,9 @@ export default function ModalReprogramar({ open, onClose, cita, onSuccess }) {
                   console.log('Click en botón siguiente. Fecha actual:', fecha);
                   irFecha(1);
                 }}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+                disabled={fecha >= maxFechaISO()}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors
+                           disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronRight size={16} />
               </button>
