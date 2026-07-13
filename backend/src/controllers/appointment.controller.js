@@ -1,6 +1,6 @@
 const pool         = require('../config/db');
 const { logAudit } = require('../utils/audit.util');
-const crypto       = require('crypto');
+const crypto       = require('node:crypto');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -256,7 +256,7 @@ const create = async (req, res) => {
     });
 
   } catch (err) {
-    if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    if (conn) { try { await conn.query('ROLLBACK'); } catch { /* rollback de mejor esfuerzo: se ignora si falla */ } }
     console.error('[appointment.create]', err.message);
 
     if (err.code === 'ER_DUP_ENTRY')
@@ -278,7 +278,7 @@ const create = async (req, res) => {
 // Filtros: codigo, q (paciente DNI/nombre/apellido), doctor_id, estado,
 //          fecha_inicio, fecha_fin.
 // ─────────────────────────────────────────────────────────────────
-const ESTADOS_VALIDOS = ['RESERVADA','CONFIRMADA','ATENDIDA','CANCELADA','NO_ASISTIO','EXPIRADA'];
+const ESTADOS_VALIDOS = new Set(['RESERVADA','CONFIRMADA','ATENDIDA','CANCELADA','NO_ASISTIO','EXPIRADA']);
 
 const list = async (req, res) => {
   const {
@@ -292,11 +292,11 @@ const list = async (req, res) => {
   const conds  = [];
   const params = [];
 
-  if (codigo && codigo.trim()) {
+  if (codigo?.trim()) {
     conds.push('UPPER(c.codigo_cita) = UPPER(?)');
     params.push(codigo.trim());
   }
-  if (q && q.trim()) {
+  if (q?.trim()) {
     const like = `%${q.trim()}%`;
     conds.push(`(pat.numero_documento LIKE ?
                  OR LOWER(pat.nombre)   LIKE LOWER(?)
@@ -309,9 +309,8 @@ const list = async (req, res) => {
     params.push(Number(doctor_id));
   }
   if (estado) {
-  if (estado) {
     const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
-    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e));
+    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.has(e));
     if (validEstados.length > 0) {
       conds.push(`c.estado IN (${validEstados.map(() => '?').join(',')})`);
       params.push(...validEstados);
@@ -505,7 +504,7 @@ const agenda = async (req, res) => {
 
   if (estado) {
     const estadosArray = Array.isArray(estado) ? estado : estado.split(',');
-    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.includes(e) && !['RESERVADA', 'EXPIRADA'].includes(e));
+    const validEstados = estadosArray.filter(e => ESTADOS_VALIDOS.has(e) && !['RESERVADA', 'EXPIRADA'].includes(e));
     if (validEstados.length > 0) {
       conds.push(`c.estado IN (${validEstados.map(() => '?').join(',')})`);
       params.push(...validEstados);
@@ -823,7 +822,7 @@ const unlockSlot = async (req, res) => {
     const key      = lockKey(cita.doctor_id, nueva_fecha, nueva_hora_inicio);
     const existente = locks.get(key);
 
-    if (existente && existente.citaId === citaId) {
+    if (existente?.citaId === citaId) {
       if (existente.timer) clearTimeout(existente.timer);
       locks.delete(key);
     }
@@ -861,7 +860,7 @@ const reschedule = async (req, res) => {
     });
 
   // Validar formato de fecha
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(nueva_fecha) || isNaN(Date.parse(nueva_fecha)))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nueva_fecha) || Number.isNaN(Date.parse(nueva_fecha)))
     return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' });
 
   // Límite de reserva: hasta un mes de anticipación (igual que al agendar).
@@ -995,7 +994,7 @@ const reschedule = async (req, res) => {
     });
 
   } catch (err) {
-    if (conn) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    if (conn) { try { await conn.query('ROLLBACK'); } catch { /* rollback de mejor esfuerzo: se ignora si falla */ } }
     console.error('[appointment.reschedule]', err.message);
     return res.status(500).json({
       error: 'Error interno del servidor',
@@ -1009,5 +1008,4 @@ const reschedule = async (req, res) => {
 module.exports = {
   getSlots, create, list, getById, agenda, marcarNoAsistio, cancel,
   lockSlot, unlockSlot, reschedule,
-};
 };
