@@ -4,6 +4,13 @@ import { getDisponibilidad, crearHold } from '../../services/portalAppointments.
 
 const hoyISO = () => new Date().toLocaleDateString('en-CA');
 
+const DIAS_MAX_ANTICIPACION_RESERVA = 30;
+const maxFechaISO = () => {
+  const max = new Date();
+  max.setDate(max.getDate() + DIAS_MAX_ANTICIPACION_RESERVA);
+  return max.toLocaleDateString('en-CA');
+};
+
 export default function StepHorario({ pacienteId, doctorId, servicioId, onHoldCreated }) {
   const [fecha, setFecha]       = useState(hoyISO());
   const [slots, setSlots]       = useState([]);
@@ -58,6 +65,7 @@ export default function StepHorario({ pacienteId, doctorId, servicioId, onHoldCr
           type="date"
           value={fecha}
           min={hoyISO()}
+          max={maxFechaISO()}
           onChange={(e) => setFecha(e.target.value)}
           className="flex-1 outline-none text-sm text-slate-700 bg-transparent"
         />

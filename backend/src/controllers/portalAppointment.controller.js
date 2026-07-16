@@ -15,6 +15,14 @@ const SEDE = 'Consultorio Padre Pio — Av. Ricardo Palma 679, Urb. Santo Doming
 
 const BOLETA_SERIE = process.env.BOLETA_SERIE || 'B001';
 
+// Máxima anticipación para reservar una cita online por el portal.
+const DIAS_MAX_ANTICIPACION_RESERVA = 30;
+const maxFechaReserva = () => {
+  const max = new Date();
+  max.setDate(max.getDate() + DIAS_MAX_ANTICIPACION_RESERVA);
+  return max.toLocaleDateString('en-CA');
+};
+
 // ── Utilidades (copiadas deliberadamente de appointment.controller.js para no
 //    acoplar este controller nuevo al de staff — ver plan WEB-HU003) ────────
 const timeToMins = (t) => {
@@ -72,6 +80,8 @@ const getAvailability = async (req, res) => {
   const hoy = new Date().toLocaleDateString('en-CA');
   if (fecha < hoy)
     return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
+  if (fecha > maxFechaReserva())
+    return res.status(400).json({ error: `Solo se puede reservar con hasta ${DIAS_MAX_ANTICIPACION_RESERVA} días de anticipación` });
 
   const DIAS = ['DOMINGO','LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO'];
   const [y, m, d] = fecha.split('-').map(Number);
@@ -168,6 +178,8 @@ const createHoldHandler = async (req, res) => {
   const hoy = new Date().toLocaleDateString('en-CA');
   if (fecha < hoy)
     return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
+  if (fecha > maxFechaReserva())
+    return res.status(400).json({ error: `Solo se puede reservar con hasta ${DIAS_MAX_ANTICIPACION_RESERVA} días de anticipación` });
 
   try {
     if (Number(paciente_id) !== titularId) {
