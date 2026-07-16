@@ -443,12 +443,25 @@ const confirmPayment = async (req, res) => {
       [citaId]
     );
 
-    // Comprobante + correo: best-effort, no debe tumbar la respuesta de éxito
-    // (la cita y el pago ya están confirmados/cobrados).
+    // El correo del comprobante es el que el titular escribió en el checkout
+    // (form_data.payer.email, ya validado por el <input type="email" required>
+    // del frontend) — no el guardado en la BD del paciente atendido, que puede
+    // no tener email propio si es un familiar registrado por el titular.
+    const emailIngresado = String(form_data?.payer?.email || '').trim();
+    if (emailIngresado) {
+      detalle.paciente_email = emailIngresado;
+    }
+
+    // Comprobante y correo son best-effort e independientes entre sí: no deben
+    // tumbar la respuesta de éxito (la cita y el pago ya están confirmados/cobrados),
+    // y un fallo en uno no debe impedir el otro (ej. Nubefact caído no debe
+    // bloquear el email de confirmación que el paciente sí necesita ver).
     (async () => {
+      let nubefactResp = null;
+
       try {
         const numero = await comprobanteModel.getNextNumero(BOLETA_SERIE, Number(process.env.BOLETA_NUMERO_BASE || 0));
-        const nubefactResp = await emitirComprobante({
+        nubefactResp = await emitirComprobante({
           tipo: 'BOLETA',
           serie: BOLETA_SERIE,
           numero,
@@ -478,8 +491,12 @@ const confirmPayment = async (req, res) => {
           nubefact_hash:    nubefactResp.codigo_hash    || null,
           nubefact_aceptado_sunat: nubefactResp.aceptada_por_sunat ?? nubefactResp.accepted_by_sunat ?? null,
         });
+      } catch (comprobanteErr) {
+        console.error('[portalAppointment.confirmPayment] emisión de comprobante Nubefact falló', comprobanteErr.message);
+      }
 
-        if (detalle.paciente_email) {
+      if (detalle.paciente_email) {
+        try {
           await sendAppointmentConfirmationEmail({
             paciente_email:   detalle.paciente_email,
             paciente_nombre:  detalle.paciente_nombre,
@@ -490,11 +507,13 @@ const confirmPayment = async (req, res) => {
             fecha:             detalle.fecha,
             hora_inicio:      detalle.hora_inicio,
             precio_aplicado:  detalle.precio_aplicado,
-            nubefact_pdf_url: nubefactResp.enlace_del_pdf || null,
+            nubefact_pdf_url: nubefactResp?.enlace_del_pdf || null,
           });
+        } catch (mailErr) {
+          console.error('[portalAppointment.confirmPayment] envío de email de confirmación falló', mailErr.message);
         }
-      } catch (postErr) {
-        console.error('[portalAppointment.confirmPayment] comprobante/email post-pago falló', postErr.message);
+      } else {
+        console.warn(`[portalAppointment.confirmPayment] cita ${citaId} sin email de paciente registrado, no se envió confirmación`);
       }
     })();
 
