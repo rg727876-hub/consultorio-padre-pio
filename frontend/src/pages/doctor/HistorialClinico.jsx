@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileClock, Search, Loader2, UserRound, ChevronRight, AlertTriangle, SearchX,
@@ -15,18 +15,19 @@ export default function HistorialClinico() {
   const [error,      setError]      = useState('');
   const [buscado,    setBuscado]    = useState(false);
 
-  const buscar = useCallback(async (e) => {
-    e?.preventDefault();
-    const texto = q.trim();
-    if (texto.length < 2) {
-      setError('Ingrese al menos 2 caracteres para buscar.');
-      return;
-    }
+  // Evita que una respuesta vieja (de una letra ya reemplazada) pise el
+  // resultado de la búsqueda más reciente si llegan fuera de orden.
+  const ultimaConsultaRef = useRef('');
+
+  const ejecutarBusqueda = useCallback(async (texto) => {
+    ultimaConsultaRef.current = texto;
     setLoading(true); setError(''); setBuscado(true);
     try {
       const { data } = await api.get('/historial/buscar', { params: { q: texto } });
+      if (ultimaConsultaRef.current !== texto) return; // llegó una más nueva primero
       setResultados(data.data);
     } catch (err) {
+      if (ultimaConsultaRef.current !== texto) return;
       if (err.response?.status === 400) {
         setError(err.response.data?.error || 'Búsqueda inválida.');
       } else {
@@ -34,9 +35,31 @@ export default function HistorialClinico() {
       }
       setResultados([]);
     } finally {
-      setLoading(false);
+      if (ultimaConsultaRef.current === texto) setLoading(false);
     }
-  }, [q]);
+  }, []);
+
+  // Búsqueda en vivo mientras se escribe (con pequeño debounce) — igual
+  // criterio (documento, nombres o apellidos) que el botón "Buscar".
+  useEffect(() => {
+    const texto = q.trim();
+    if (texto.length < 2) {
+      setResultados([]); setError(''); setBuscado(false);
+      return;
+    }
+    const timer = setTimeout(() => ejecutarBusqueda(texto), 300);
+    return () => clearTimeout(timer);
+  }, [q, ejecutarBusqueda]);
+
+  const buscar = useCallback((e) => {
+    e?.preventDefault();
+    const texto = q.trim();
+    if (texto.length < 2) {
+      setError('Ingrese al menos 2 caracteres para buscar.');
+      return;
+    }
+    ejecutarBusqueda(texto);
+  }, [q, ejecutarBusqueda]);
 
   return (
     <AppLayout>
