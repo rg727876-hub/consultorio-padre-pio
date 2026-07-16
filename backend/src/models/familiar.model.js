@@ -45,11 +45,19 @@ const findRelacion = async (titular_id, familiar_id) => {
   return row ?? null;
 };
 
-// Crea relación titular-familiar en PACIENTE_FAMILIAR
+// Crea relación titular-familiar en PACIENTE_FAMILIAR. Si ya existe una fila
+// para ese (titular_id, familiar_id) —p. ej. una desvinculación previa, que
+// deja la fila en estado INACTIVO por UK_PF_RELACION— la reactiva en vez de
+// intentar un INSERT duplicado (violaría el UNIQUE y tiraría error 500).
 const createRelacion = async (titular_id, familiar_id, parentesco) => {
   await pool.query(
     `INSERT INTO PACIENTE_FAMILIAR (titular_id, familiar_id, parentesco)
-     VALUES (?, ?, ?)`,
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       parentesco = VALUES(parentesco),
+       estado = 'ACTIVO',
+       fecha_vinculacion = NOW(),
+       fecha_desvinculacion = NULL`,
     [titular_id, familiar_id, parentesco]
   );
 };
