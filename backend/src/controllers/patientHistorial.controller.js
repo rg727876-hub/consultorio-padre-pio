@@ -32,7 +32,8 @@ const CONSULTA_FIELDS = `
   cc.pronostico, cc.control_evolucion, cc.alta_paciente, cc.observaciones,
   cc.odontograma_url,
   CONCAT(du.nombre, ' ', du.apellido) AS doctor_nombre,
-  s.nombre AS servicio_nombre`;
+  s.nombre       AS servicio_nombre,
+  ci.codigo_cita AS codigo_cita`;
 
 const CONSULTA_FROM = `
   FROM   CONSULTA_CLINICA cc
@@ -62,7 +63,8 @@ const getMiHistorial = async (req, res) => {
       return res.status(403).json({ error: 'No autorizado para ver este historial clínico' });
 
     const [[paciente]] = await pool.query(
-      `SELECT paciente_id, nombre, apellido,
+      `SELECT paciente_id, nombre, apellido, tipo_documento, numero_documento,
+              telefono, sexo, direccion, ocupacion, contacto_emergencia,
               DATE_FORMAT(fecha_nacimiento, '%Y-%m-%d') AS fecha_nacimiento
        FROM   PACIENTE WHERE paciente_id = ?`,
       [pacienteId]
@@ -70,7 +72,8 @@ const getMiHistorial = async (req, res) => {
     if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado' });
 
     const [[historia]] = await pool.query(
-      `SELECT hc.antecedentes_sistemicos, hc.antecedentes_estomatologicos,
+      `SELECT hc.historia_id,
+              hc.antecedentes_sistemicos, hc.antecedentes_estomatologicos,
               hc.antecedentes_farmacologicos, hc.antecedentes_familiares,
               hc.antecedentes_otros, hc.alergias,
               hc.fecha_creacion, hc.fecha_actualizacion,
@@ -82,6 +85,9 @@ const getMiHistorial = async (req, res) => {
        WHERE  hc.paciente_id = ? LIMIT 1`,
       [pacienteId]
     );
+    const antecedentes = historia
+      ? (({ historia_id, ...resto }) => resto)(historia)   // antecedentes sin el id
+      : null;
 
     const [atenciones] = await pool.query(
       `SELECT ${CONSULTA_FIELDS}
@@ -106,7 +112,9 @@ const getMiHistorial = async (req, res) => {
         nombre_completo: `${paciente.nombre} ${paciente.apellido}`,
         edad: calcEdad(paciente.fecha_nacimiento),
       },
-      antecedentes: historia ?? null,
+      tiene_historia: !!historia,
+      historia_id:    historia?.historia_id ?? null,
+      antecedentes,
       atenciones,
     });
   } catch (err) {
