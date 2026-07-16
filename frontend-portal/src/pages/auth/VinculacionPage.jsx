@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
-import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, LinkIcon, ChevronDown, Check } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, LinkIcon, ChevronDown, Check, Camera } from 'lucide-react';
 
 import { previewPatient, vincularPatient } from '../../services/authPatient.service';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
