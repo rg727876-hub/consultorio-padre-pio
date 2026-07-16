@@ -616,7 +616,7 @@ export default function VinculacionPage() {
                 <div className="flex gap-3 pt-1">
                   <button
                     type="button"
-                    onClick={() => navigate('/register')}
+                    onClick={() => navigate(-1)}
                     className="flex-1 border border-slate-300 text-slate-600 font-semibold text-sm
                                py-3 rounded-full hover:bg-slate-50 transition-colors"
                   >
