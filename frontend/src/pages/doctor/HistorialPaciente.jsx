@@ -44,6 +44,8 @@ export default function HistorialPaciente() {
     try {
       const { data } = await api.get(`/historial/paciente/${pacienteId}`);
       setData(data);
+      // Recordado por el sidebar (AppLayout) para volver aquí en vez del buscador.
+      sessionStorage.setItem('doctorUltimoHistorialPacienteId', pacienteId);
     } catch (err) {
       if (err.response?.status === 404 || err.response?.status === 403) {
         toast.error(err.response?.data?.error || 'No se pudo abrir el historial');
@@ -84,7 +86,11 @@ export default function HistorialPaciente() {
           {/* Encabezado */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">
-              <button onClick={() => navigate(-1)}
+              <button
+                onClick={() => {
+                  sessionStorage.removeItem('doctorUltimoHistorialPacienteId');
+                  navigate('/doctor/historial');
+                }}
                 className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
                 <ArrowLeft size={18} />
               </button>

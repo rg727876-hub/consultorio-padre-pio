@@ -51,7 +51,16 @@ export default function AppLayout({ children }) {
   const location         = useLocation();
   const [open, setOpen]  = useState(false);
 
-  const items = NAV[user?.rol] ?? [{ label: 'Inicio', icon: Home, ruta: '/dashboard' }];
+  // El link "Historial clínico" del doctor recuerda el último paciente visto
+  // en esta sesión (guardado por HistorialPaciente.jsx) para volver directo a
+  // esa vista en vez de reiniciar en el buscador.
+  const items = (NAV[user?.rol] ?? [{ label: 'Inicio', icon: Home, ruta: '/dashboard' }]).map((item) => {
+    if (user?.rol === 'DOCTOR' && item.ruta === '/doctor/historial') {
+      const ultimoId = sessionStorage.getItem('doctorUltimoHistorialPacienteId');
+      if (ultimoId) return { ...item, ruta: `/doctor/historial/${ultimoId}` };
+    }
+    return item;
+  });
 
   const navLinks = items.map(({ label, icon: Icon, ruta }) => {
     const active = location.pathname === ruta;
